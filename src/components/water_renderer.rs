@@ -177,7 +177,7 @@ impl WaterRenderer {
 
     pub fn initialize(
         &mut self,
-        regions: Vec<(WaterRegionType, Rect<u16>, u8)>,
+        regions: Vec<(WaterRegionType, Rect<u16>, u16)>,
         water_params: &WaterParams,
         stage: &Stage,
     ) {

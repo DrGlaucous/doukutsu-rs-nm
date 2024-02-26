@@ -13,14 +13,16 @@ use crate::framework::filesystem;
 use crate::game::shared_game_state::TileSize;
 use crate::game::stage::{PxPackScroll, PxPackStageData, StageData};
 
-static SUPPORTED_PXM_VERSIONS: [u8; 1] = [0x10];
+// Map files: 0x10 is standard, 0x21 is NOXID multi-layer
+static SUPPORTED_PXM_VERSIONS: [u8; 2] = [0x10, 0x21];
+// Entity files
 static SUPPORTED_PXE_VERSIONS: [u8; 2] = [0, 0x10];
 
 #[derive(Clone)]
 pub struct Map {
     pub width: u16,
     pub height: u16,
-    pub tiles: Vec<u8>,
+    pub tiles: Vec<u16>, // all tiledata is stored in here, even if there are multiple layers
     pub attrib: [u8; 0x100],
     pub tile_size: TileSize,
 }
@@ -36,6 +38,7 @@ pub enum WaterRegionType {
 }
 
 impl Map {
+    /*
     pub fn load_pxm<R: io::Read>(mut map_data: R, mut attrib_data: R) -> GameResult<Map> {
         let mut magic = [0; 3];
 
@@ -65,6 +68,106 @@ impl Map {
 
         Ok(Map { width, height, tiles, attrib, tile_size: TileSize::Tile16x16 })
     }
+    */
+
+
+    // Default cave story storage format
+    pub fn load_pxm<R: io::Read + io::Seek>(mut map_data: R, mut attrib_data: R) -> GameResult<Map> {
+    
+
+        //how much error handling do we need?
+        //get file size
+        map_data.seek(std::io::SeekFrom::End(0))?;
+        let fsize = map_data.stream_position()?;
+        map_data.rewind()?;
+
+
+
+        //holds first 3 bytes of PXM file to see what type it is
+        let mut magic = [0; 3];
+
+        //filebuffer-type object (like "FILE" in standard C)
+        map_data.read_exact(&mut magic)?;
+
+        //treat PXM as a byte sequence, compare the value to the header
+        if &magic != b"PXM" {
+            return Err(ResourceLoadError("Invalid magic".to_owned()));
+        }
+
+        let version = map_data.read_u8()?;
+
+        //check 4th byte
+        if !SUPPORTED_PXM_VERSIONS.contains(&version) {
+            return Err(ResourceLoadError(format!("Unsupported PXM version: {:#x}", version)));
+        }
+
+        
+        //filesize if normal PXM: width*height + 8
+        //filesize if layered PXM: width*height*4*sizeof(short) + 8
+        //example: almond (regular rr vs layers tt)
+        //let rr = 0x0968; //2408
+        //let tt = 0x4B08; //19208
+
+        let width = map_data.read_u16::<LE>()?;
+        let height = map_data.read_u16::<LE>()?;
+
+        let mut tiles_u16 = Vec::<u16>::new();
+
+        //layered file
+        if fsize == ((width * height) as u64 * std::mem::size_of::<u16>() as u64 * 4 + 8)
+        {
+            // Layer order in file:
+            //0 far back
+            //1 back
+            //2 foreground
+            //3 far front
+
+            // Needed layer order in memory:
+            //0 foreground
+            //1 far back
+            //2 back
+            //3 far front
+
+            let layer_size = (width * height) as usize;
+
+            // Temp vector to pull slices from, we will read the entire file into it
+            let mut tiles = vec![0u16; layer_size * 4];
+            let byte_size = 2 *tiles.len();
+            let u8_pointer = unsafe{
+                std::slice::from_raw_parts_mut(tiles.as_mut_ptr().cast::<u8>(), byte_size)
+            };
+
+            map_data.read_exact(u8_pointer)?;
+
+            // Foreground
+            tiles_u16.extend_from_slice(&tiles[(layer_size * 2)..(layer_size * 3)]);
+            // Backgrounds 'far' and 'mid'
+            tiles_u16.extend_from_slice(&tiles[(layer_size * 0)..(layer_size * 2)]);
+            // Far foreground
+            tiles_u16.extend_from_slice(&tiles[(layer_size * 3)..(layer_size * 4)]);
+
+        }
+        // Normal file
+        else if fsize == ((width * height) as u64 + 8)
+        {
+            let mut tiles = vec![0u8; (width * height) as usize];
+            map_data.read_exact(&mut tiles)?;
+
+            //copy the tiles out to a u16 vector
+            tiles_u16 = tiles.iter().map(|&e| e as u16).collect();
+        }
+
+        log::info!("Map size: {}x{}", width, height);
+
+        //read attribute data
+        let mut attrib = [0u8; 0x100];
+        if attrib_data.read_exact(&mut attrib).is_err() {
+            log::warn!("Map attribute data is shorter than 256 bytes!");
+        }
+
+        Ok(Map { width, height, tiles: tiles_u16, attrib, tile_size: TileSize::Tile16x16 })
+    }
+
 
     pub fn load_pxpack<R: io::Read>(
         mut map_data: R,
@@ -279,7 +382,10 @@ impl Map {
             offset_bg: size_fg + size_mg,
         });
 
-        Ok(Map { width: width_fg, height: height_fg, tiles, attrib, tile_size: TileSize::Tile8x8 })
+        // Copy the tiles out to a u16 vector
+        let tiles_u16: Vec<u16> = tiles.iter().map(|&e| e as u16).collect();
+
+        Ok(Map { width: width_fg, height: height_fg, tiles: tiles_u16, attrib, tile_size: TileSize::Tile8x8 })
     }
 
     pub fn get_attribute(&self, x: usize, y: usize) -> u8 {
@@ -287,10 +393,10 @@ impl Map {
             return 0;
         }
 
-        self.attrib[*self.tiles.get(self.width as usize * y + x).unwrap_or(&0u8) as usize]
+        self.attrib[*self.tiles.get(self.width as usize * y + x).unwrap_or(&0u16) as usize]
     }
 
-    pub fn find_water_regions(&self, water_params: &WaterParams) -> Vec<(WaterRegionType, Rect<u16>, u8)> {
+    pub fn find_water_regions(&self, water_params: &WaterParams) -> Vec<(WaterRegionType, Rect<u16>, u16)> {
         let mut result = Vec::new();
 
         if self.height == 0 || self.width == 0 {
@@ -298,7 +404,7 @@ impl Map {
         }
 
         let mut walked = vec![false; self.width as usize * self.height as usize];
-        let mut rects = Vec::<(Rect<u16>, u8)>::new();
+        let mut rects = Vec::<(Rect<u16>, u16)>::new();
 
         for x in 0..self.width {
             for y in 0..self.height {
@@ -528,7 +634,7 @@ impl Default for WaterParamEntry {
 }
 
 pub struct WaterParams {
-    pub entries: HashMap<u8, WaterParamEntry>,
+    pub entries: HashMap<u16, WaterParamEntry>,
 }
 
 impl WaterParams {
@@ -537,10 +643,15 @@ impl WaterParams {
     }
 
     pub fn load_from<R: io::Read>(&mut self, data: R) -> GameResult {
-        fn next_u8<'a>(s: &mut impl Iterator<Item = &'a str>, error_msg: &str) -> GameResult<u8> {
+        // Parses the next integer in the string iterator
+        fn next_u<'a, T: std::str::FromStr>(s: &mut impl Iterator<Item=&'a str>, error_msg: &str) -> GameResult<T> {//<u8> {
+
             match s.next() {
+                //nothing in the iterator, error out
                 None => Err(GameError::ParseError("Out of range.".to_string())),
-                Some(v) => v.trim().parse::<u8>().map_err(|_| GameError::ParseError(error_msg.to_string())),
+                //s.next is now v
+                //try to parse v into a u8
+                Some(v) => v.trim().parse::<T>().map_err(|_| GameError::ParseError(error_msg.to_string())),
             }
         }
 
@@ -548,13 +659,13 @@ impl WaterParams {
             match line {
                 Ok(line) => {
                     let mut splits = line.split(':');
-
+                    //split line into colon separated chunks
                     if splits.clone().count() != 5 {
                         return Err(GameError::ParseError("Invalid count of delimiters.".to_string()));
                     }
 
-                    let tile_min = next_u8(&mut splits, "Invalid minimum tile value.")?;
-                    let tile_max = next_u8(&mut splits, "Invalid maximum tile value.")?;
+                    let tile_min = next_u::<u16>(&mut splits, "Invalid minimum tile value.")?;
+                    let tile_max = next_u::<u16>(&mut splits, "Invalid maximum tile value.")?;
 
                     if tile_min > tile_max {
                         return Err(GameError::ParseError("tile_min > tile_max".to_string()));
@@ -572,10 +683,10 @@ impl WaterParams {
                             return Err(GameError::ParseError("Invalid count of delimiters.".to_string()));
                         }
 
-                        let r = next_u8(&mut csplits, "Invalid red value.")?;
-                        let g = next_u8(&mut csplits, "Invalid green value.")?;
-                        let b = next_u8(&mut csplits, "Invalid blue value.")?;
-                        let a = next_u8(&mut csplits, "Invalid alpha value.")?;
+                        let r = next_u::<u8>(&mut csplits, "Invalid red value.")?;
+                        let g = next_u::<u8>(&mut csplits, "Invalid green value.")?;
+                        let b = next_u::<u8>(&mut csplits, "Invalid blue value.")?;
+                        let a = next_u::<u8>(&mut csplits, "Invalid alpha value.")?;
 
                         Ok(Color::from_rgba(r, g, b, a))
                     };
@@ -603,7 +714,7 @@ impl WaterParams {
         !self.entries.is_empty()
     }
 
-    pub fn get_entry(&self, tile: u8) -> &WaterParamEntry {
+    pub fn get_entry(&self, tile: u16) -> &WaterParamEntry {
         static DEFAULT_ENTRY: WaterParamEntry = WaterParamEntry {
             color_top: Color::new(1.0, 1.0, 1.0, 1.0),
             color_middle: Color::new(1.0, 1.0, 1.0, 1.0),
