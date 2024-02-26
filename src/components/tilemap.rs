@@ -16,6 +16,7 @@ pub enum TileLayer {
     Background,
     Middleground,
     Foreground,
+    FarForeground,
     Snack,
 }
 
@@ -52,6 +53,7 @@ impl Tilemap {
             TileLayer::Background => &textures.tileset_bg,
             TileLayer::Middleground => &textures.tileset_mg,
             TileLayer::Foreground => &textures.tileset_fg,
+            _ => &textures.tileset_fg, // This will only be used with the PXM type, so this string won't matter anyway
         };
 
         let (layer_offset, layer_width, layer_height, uses_layers) = if let Some(pxpack_data) = &stage.data.pxpack_data
@@ -63,13 +65,31 @@ impl Tilemap {
                 TileLayer::Middleground => {
                     (pxpack_data.offset_mg as usize, pxpack_data.size_mg.0, pxpack_data.size_mg.1, true)
                 }
+                TileLayer::FarForeground =>{
+                    return Ok(()); // Do not attempt to draw the far foreground if our layers are from a pxpack
+                }
                 _ => (0, pxpack_data.size_fg.0, pxpack_data.size_fg.1, true),
             }
+        } else if stage.map.tiles.len() > (stage.map.width * stage.map.height) as usize //PXM layer mode detection
+        {
+            // Layer order:
+            // 0 foreground
+            // 1 far back
+            // 2 back
+            // 3 far front
+            match layer {
+                TileLayer::Background =>(1 * (stage.map.width * stage.map.height) as usize, stage.map.width, stage.map.height, true),
+                TileLayer::Middleground =>(2 * (stage.map.width * stage.map.height) as usize, stage.map.width, stage.map.height, true),
+                TileLayer::Foreground =>(0 * (stage.map.width * stage.map.height) as usize, stage.map.width, stage.map.height, true),
+                TileLayer::FarForeground =>(3 * (stage.map.width * stage.map.height) as usize, stage.map.width, stage.map.height, true),
+                TileLayer::Snack =>(0 * (stage.map.width * stage.map.height) as usize, stage.map.width, stage.map.height, false),
+            }
+
         } else {
             (0, stage.map.width, stage.map.height, false)
         };
 
-        if !uses_layers && layer == TileLayer::Middleground {
+        if !uses_layers && (layer == TileLayer::Middleground || layer == TileLayer::FarForeground) {
             return Ok(());
         }
 
