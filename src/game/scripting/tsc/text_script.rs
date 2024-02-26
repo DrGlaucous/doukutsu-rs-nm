@@ -1067,7 +1067,7 @@ impl TextScriptVM {
             TSCOpCode::CMP => {
                 let pos_x = read_cur_varint(&mut cursor)? as usize;
                 let pos_y = read_cur_varint(&mut cursor)? as usize;
-                let tile_type = read_cur_varint(&mut cursor)? as u8;
+                let tile_type = read_cur_varint(&mut cursor)? as u16;
 
                 if game_scene.stage.change_tile(pos_x, pos_y, tile_type) {
                     let mut npc = NPC::create(4, &state.npc_table);

@@ -1245,16 +1245,17 @@ impl GameScene {
                     continue;
                 }
 
-                let hit = (npc.npc_flags.shootable()
-                    && (npc.x - npc.hit_bounds.right as i32) < (bullet.x + bullet.enemy_hit_width as i32)
-                    && (npc.x + npc.hit_bounds.right as i32) > (bullet.x - bullet.enemy_hit_width as i32)
-                    && (npc.y - npc.hit_bounds.top as i32) < (bullet.y + bullet.enemy_hit_height as i32)
-                    && (npc.y + npc.hit_bounds.bottom as i32) > (bullet.y - bullet.enemy_hit_height as i32))
-                    || (npc.npc_flags.invulnerable()
-                        && (npc.x - npc.hit_bounds.right as i32) < (bullet.x + bullet.hit_bounds.right as i32)
-                        && (npc.x + npc.hit_bounds.right as i32) > (bullet.x - bullet.hit_bounds.left as i32)
-                        && (npc.y - npc.hit_bounds.top as i32) < (bullet.y + bullet.hit_bounds.bottom as i32)
-                        && (npc.y + npc.hit_bounds.bottom as i32) > (bullet.y - bullet.hit_bounds.top as i32));
+                let hit = npc.collides_with_bullet(bullet);
+                // let hit = (npc.npc_flags.shootable()
+                //     && (npc.x - npc.hit_bounds.right as i32) < (bullet.x + bullet.enemy_hit_width as i32)
+                //     && (npc.x + npc.hit_bounds.right as i32) > (bullet.x - bullet.enemy_hit_width as i32)
+                //     && (npc.y - npc.hit_bounds.top as i32) < (bullet.y + bullet.enemy_hit_height as i32)
+                //     && (npc.y + npc.hit_bounds.bottom as i32) > (bullet.y - bullet.enemy_hit_height as i32))
+                //     || (npc.npc_flags.invulnerable()
+                //         && (npc.x - npc.hit_bounds.right as i32) < (bullet.x + bullet.hit_bounds.right as i32)
+                //         && (npc.x + npc.hit_bounds.right as i32) > (bullet.x - bullet.hit_bounds.left as i32)
+                //         && (npc.y - npc.hit_bounds.top as i32) < (bullet.y + bullet.hit_bounds.bottom as i32)
+                //         && (npc.y + npc.hit_bounds.bottom as i32) > (bullet.y - bullet.hit_bounds.top as i32));
 
                 if !hit {
                     continue;
@@ -2014,6 +2015,8 @@ impl Scene for GameScene {
         self.water_renderer.draw(state, ctx, &self.frame, WaterLayer::Back)?;
         self.tilemap.draw(state, ctx, &self.frame, TileLayer::Foreground, stage_textures_ref, &self.stage)?;
         self.tilemap.draw(state, ctx, &self.frame, TileLayer::Snack, stage_textures_ref, &self.stage)?;
+        self.draw_npc_layer(state, ctx, NPCLayer::Foreground)?;
+        self.tilemap.draw(state, ctx, &self.frame, TileLayer::FarForeground, stage_textures_ref, &self.stage)?;
         self.water_renderer.draw(state, ctx, &self.frame, WaterLayer::Front)?;
 
         self.draw_carets(state, ctx)?;

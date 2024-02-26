@@ -585,7 +585,7 @@ impl Stage {
     }
 
     /// Returns map tile from foreground layer.
-    pub fn tile_at(&self, x: usize, y: usize) -> u8 {
+    pub fn tile_at(&self, x: usize, y: usize) -> u16 {
         if let Some(&tile) = self.map.tiles.get(y.wrapping_mul(self.map.width as usize).wrapping_add(x)) {
             tile
         } else {
@@ -594,7 +594,7 @@ impl Stage {
     }
 
     /// Changes map tile on foreground layer. Returns true if smoke should be emitted
-    pub fn change_tile(&mut self, x: usize, y: usize, tile_type: u8) -> bool {
+    pub fn change_tile(&mut self, x: usize, y: usize, tile_type: u16) -> bool {
         if let Some(ptr) = self.map.tiles.get_mut(y.wrapping_mul(self.map.width as usize).wrapping_add(x)) {
             if *ptr != tile_type {
                 *ptr = tile_type;
