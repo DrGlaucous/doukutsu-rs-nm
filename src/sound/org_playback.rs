@@ -129,7 +129,7 @@ impl OrgPlaybackEngine {
                 let index = if track.inst.inst as usize >= samples.samples.len() {samples.samples.len() - 1} else {track.inst.inst as usize} ;
                 *buf = RenderBuffer::new(samples.samples[index].clone());
             } else {
-                let index = if idx >= samples.samples.len() {samples.samples.len()} else {idx};
+                let index = if idx >= samples.samples.len() {samples.samples.len() - 1} else {idx};
                 *buf = RenderBuffer::new(samples.samples[index].clone());
             }
         }
