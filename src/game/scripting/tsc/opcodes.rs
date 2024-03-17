@@ -176,7 +176,7 @@ pub enum TSCOpCode {
     MNA,
     /// <CMPxxxx:yyyy:zzzz, Sets the tile at (xxxx,yyyy) to type zzzz
     CMP,
-    /// <SMPxxxx:yyyy:zzzz, Subtracts 1 from tile type at (xxxx,yyyy)
+    /// <SMPxxxx:yyyy, Subtracts 1 from tile type at (xxxx,yyyy)
     SMP,
 
     /// <CRE, Shows credits
@@ -265,6 +265,13 @@ pub enum TSCOpCode {
     /// <FRE related to player 2?
     FR2,
     // ---- Custom opcodes, for use by modders ----
+
+    /// <CMLwwww:xxxx:yyyy:zzzz, Sets the tile at (xxxx,yyyy) to type zzzz, on layer wwww [0/back, 1/mid, 2/fore, 3/far fore]
+    CML,
+    /// <SMLwwww:xxxx:yyyy, Subtracts 1 from tile type at (xxxx,yyyy) on layer wwww [0/back, 1/mid, 2/fore, 3/far fore]
+    SML,
+
+
 }
 
 #[derive(FromPrimitive, PartialEq, Copy, Clone)]

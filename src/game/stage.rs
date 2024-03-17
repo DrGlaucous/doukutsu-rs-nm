@@ -5,6 +5,7 @@ use byteorder::ReadBytesExt;
 use byteorder::LE;
 
 use crate::common::Color;
+use crate::components::tilemap::TileLayer;
 use crate::engine_constants::EngineConstants;
 use crate::framework::context::Context;
 use crate::framework::error::GameError::ResourceLoadError;
@@ -567,7 +568,21 @@ impl Stage {
 
     /// Changes map tile on foreground layer. Returns true if smoke should be emitted
     pub fn change_tile(&mut self, x: usize, y: usize, tile_type: u16) -> bool {
-        if let Some(ptr) = self.map.tiles.get_mut(y.wrapping_mul(self.map.width as usize).wrapping_add(x)) {
+        self.change_tile_layer(x, y, tile_type, TileLayer::Foreground)
+    }
+
+    /// Changes map tile on any layer. Returns true if smoke should be emitted
+    pub fn change_tile_layer(&mut self, x: usize, y: usize, tile_type: u16, layer: TileLayer) -> bool {
+        // y * width + x + (layer * width * height)
+        // Order in memory
+        let layer_offset = (self.map.width * self.map.height + match layer{
+            TileLayer::Background =>{1},
+            TileLayer::Middleground =>{2},
+            TileLayer::Foreground =>{0},
+            TileLayer::FarForeground =>{3},
+            TileLayer::Snack => {0},
+        }) as usize;
+        if let Some(ptr) = self.map.tiles.get_mut(y.wrapping_mul(self.map.width as usize).wrapping_add(x).wrapping_add(layer_offset)) {
             if *ptr != tile_type {
                 *ptr = tile_type;
                 return true;
@@ -576,6 +591,10 @@ impl Stage {
 
         false
     }
+
+
+
+
 }
 
 pub struct StageTexturePaths {
