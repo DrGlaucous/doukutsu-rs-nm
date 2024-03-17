@@ -29,6 +29,7 @@ use crate::game::weapon::WeaponType;
 use crate::graphics::font::{Font, Symbols};
 use crate::input::touch_controls::TouchControlType;
 use crate::scene::game_scene::GameScene;
+use crate::components::tilemap::TileLayer;
 
 const TSC_SUBSTITUTION_MAP_SIZE: usize = 1;
 
@@ -1082,6 +1083,46 @@ impl TextScriptVM {
 
                 exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
             }
+            TSCOpCode::SML => {
+                let layer = match read_cur_varint(&mut cursor)? {
+                    3 => TileLayer::FarForeground,
+                    0 => TileLayer::Background,
+                    1 => TileLayer::Middleground,
+                    _ => TileLayer::Foreground,
+                };
+                let pos_x = read_cur_varint(&mut cursor)? as usize;
+                let pos_y = read_cur_varint(&mut cursor)? as usize;
+
+                let tile_type = game_scene.stage.tile_at(pos_x, pos_y);
+                game_scene.stage.change_tile_layer(pos_x, pos_y, tile_type.wrapping_sub(1), layer);
+
+                exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
+            }
+            TSCOpCode::CML => {
+                let layer = match read_cur_varint(&mut cursor)? {
+                    3 => TileLayer::FarForeground,
+                    0 => TileLayer::Background,
+                    1 => TileLayer::Middleground,
+                    _ => TileLayer::Foreground,
+                };
+                let pos_x = read_cur_varint(&mut cursor)? as usize;
+                let pos_y = read_cur_varint(&mut cursor)? as usize;
+                let tile_type = read_cur_varint(&mut cursor)? as u16;
+
+                if game_scene.stage.change_tile_layer(pos_x, pos_y, tile_type, layer) {
+                    let mut npc = NPC::create(4, &state.npc_table);
+                    npc.cond.set_alive(true);
+                    npc.x = pos_x as i32 * 0x2000;
+                    npc.y = pos_y as i32 * 0x2000;
+
+                    let _ = game_scene.npc_list.spawn(0, npc.clone());
+                    let _ = game_scene.npc_list.spawn(0, npc.clone());
+                    let _ = game_scene.npc_list.spawn(0, npc);
+                }
+
+                exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
+            }
+
             TSCOpCode::MLp => {
                 let life = read_cur_varint(&mut cursor)? as u16;
                 game_scene.player1.life += life;
