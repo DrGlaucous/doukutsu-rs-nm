@@ -24,7 +24,10 @@ pub struct Map {
     pub width: u16,
     pub height: u16,
     pub tiles: Vec<u16>, // all tiledata is stored in here, even if there are multiple layers
-    pub attrib: [u8; 0x100],
+
+    //pub attrib: [u8; 0x100], //cannot be static array: size_of<u16>() is too large
+    pub attrib: Vec<u8>,
+
     pub tile_size: TileSize,
 }
 
@@ -161,7 +164,9 @@ impl Map {
         log::info!("Map size: {}x{}", width, height);
 
         //read attribute data
-        let mut attrib = [0u8; 0x100];
+        //let mut attrib = [0u8; 0x100];
+        let mut attrib = vec![0 as u8; fsize as usize - 8]; //-8 for header info
+
         if attrib_data.read_exact(&mut attrib).is_err() {
             log::warn!("Map attribute data is shorter than 256 bytes!");
         }
@@ -396,6 +401,9 @@ impl Map {
 
         // Copy the tiles out to a u16 vector
         let tiles_u16: Vec<u16> = tiles.iter().map(|&e| e as u16).collect();
+
+        //copy the attributes to a u8 vector
+        let attrib = Vec::from(attrib);
 
         Ok(Map { width: width_fg, height: height_fg, tiles: tiles_u16, attrib, tile_size: TileSize::Tile8x8 })
     }
