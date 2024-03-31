@@ -575,13 +575,13 @@ impl Stage {
     pub fn change_tile_layer(&mut self, x: usize, y: usize, tile_type: u16, layer: TileLayer) -> bool {
         // y * width + x + (layer * width * height)
         // Order in memory
-        let layer_offset = (self.map.width * self.map.height + match layer{
+        let layer_offset = self.map.width as usize * self.map.height as usize * match layer{
             TileLayer::Background =>{1},
             TileLayer::Middleground =>{2},
             TileLayer::Foreground =>{0},
             TileLayer::FarForeground =>{3},
             TileLayer::Snack => {0},
-        }) as usize;
+        };
         if let Some(ptr) = self.map.tiles.get_mut(y.wrapping_mul(self.map.width as usize).wrapping_add(x).wrapping_add(layer_offset)) {
             if *ptr != tile_type {
                 *ptr = tile_type;
