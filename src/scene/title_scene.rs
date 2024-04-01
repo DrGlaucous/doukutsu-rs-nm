@@ -97,7 +97,7 @@ pub struct TitleScene {
 impl TitleScene {
     pub fn new() -> Self {
         let fake_stage = Stage {
-            map: Map { width: 0, height: 0, tiles: vec![], attrib: [0; 0x100], tile_size: TileSize::Tile16x16 },
+            map: Map { width: 0, height: 0, tiles: vec![], attrib: vec![], tile_size: TileSize::Tile16x16 },
             data: StageData {
                 name: String::new(),
                 name_jp: String::new(),
