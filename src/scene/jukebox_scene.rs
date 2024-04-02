@@ -157,7 +157,7 @@ impl Scene for JukeboxScene {
         self.controller.update(state, ctx)?;
         self.controller.update_trigger();
 
-        self.background.tick()?;
+        self.background.tick(state, ctx, &self.textures)?;
 
         let mut song = self.selected_song as i16
             + if self.controller.trigger_right() {

@@ -1325,9 +1325,15 @@ impl GameScene {
         }
     }
 
-    fn tick_world(&mut self, state: &mut SharedGameState) -> GameResult {
+    fn tick_world(&mut self, state: &mut SharedGameState, ctx: &mut Context) -> GameResult {
+
+
         self.nikumaru.tick(state, &self.player1)?;
-        self.background.tick()?;
+        {
+            //scoping to keep the borrow checker happy
+            let stage_textures_ref = &*self.stage_textures.deref().borrow();
+            self.background.tick(state, ctx, stage_textures_ref)?;
+        }
         self.hud_player1.visible = self.player1.cond.alive();
         self.hud_player2.visible = self.player2.cond.alive();
         self.hud_player1.has_player2 = self.player2.cond.alive() && !self.player2.cond.hidden();
@@ -1862,7 +1868,7 @@ impl Scene for GameScene {
                     TextScriptExecutionState::MapSystem => (),
                     _ => {
                         if state.control_flags.tick_world() {
-                            self.tick_world(state)?;
+                            self.tick_world(state, ctx)?;
                         }
                     }
                 }

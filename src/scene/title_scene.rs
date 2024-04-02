@@ -299,7 +299,9 @@ impl Scene for TitleScene {
 
     fn tick(&mut self, state: &mut SharedGameState, ctx: &mut Context) -> GameResult {
         state.touch_controls.control_type = TouchControlType::None;
-        self.background.tick()?;
+
+        self.background.tick(state, ctx, &self.textures)?;
+
         self.controller.update(state, ctx)?;
         self.controller.update_trigger();
 
