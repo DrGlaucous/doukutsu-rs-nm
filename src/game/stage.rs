@@ -109,6 +109,8 @@ pub enum BackgroundType {
     OutsideUnknown,
     /// Used by CS+KAGE in waterway, it's just TiledParallax with bkCircle2 drawn behind water
     Waterway,
+    /// Use custom rendering from the BKG mod
+    Custom,
 }
 
 impl From<u8> for BackgroundType {
