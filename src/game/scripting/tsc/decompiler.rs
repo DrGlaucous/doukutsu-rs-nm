@@ -144,6 +144,11 @@ impl TextScript {
 
                             writeln!(&mut result, "{:?}({}, {}, {}, {})", op, par_a, par_b, par_c, par_d).unwrap();
                         }
+                        // String code
+                        TSCOpCode::BKG
+                        => {
+                            writeln!(&mut result, "{:?} (String-based code: Not trying to decompile...)", op).unwrap();
+                        }
                         TSCOpCode::_STR => {
                             let len = read_cur_varint(&mut cursor)?;
 

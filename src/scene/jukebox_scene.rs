@@ -157,7 +157,7 @@ impl Scene for JukeboxScene {
         self.controller.update(state, ctx)?;
         self.controller.update_trigger();
 
-        self.background.tick(state, ctx, &self.textures)?;
+        self.background.tick(state)?;
 
         let mut song = self.selected_song as i16
             + if self.controller.trigger_right() {
@@ -214,7 +214,7 @@ impl Scene for JukeboxScene {
     }
 
     fn draw(&self, state: &mut SharedGameState, ctx: &mut Context) -> GameResult {
-        self.background.draw(state, ctx, &self.frame, &self.textures, &self.stage)?;
+        self.background.draw(state, ctx, &self.frame, &self.textures, &self.stage, false)?;
 
         let block_size = 32.0;
         let buffer = 4.0;

@@ -270,6 +270,9 @@ pub enum TSCOpCode {
     CML,
     /// <SMLwwww:xxxx:yyyy, Subtracts 1 from tile type at (xxxx,yyyy) on layer wwww [0/back, 1/mid, 2/fore, 3/far fore]
     SML,
+    /// <BKGname_of_config$, Loads the BKG config file with name_of_config
+    BKG,
+
 
 
 }

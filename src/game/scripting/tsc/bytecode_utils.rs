@@ -79,6 +79,32 @@ pub fn put_string(buffer: &mut Vec<u8>, out: &mut Vec<u8>, encoding: TextScriptE
     out.append(&mut tmp_buf);
 }
 
+pub fn read_string(cursor: &mut Cursor<&[u8]>, size: usize) -> GameResult<String> {
+
+    //holds the string we get from the cursor
+    let mut strvec: Vec<u8> = Vec::with_capacity(size);
+
+    //shove all the bytes we get into the vector
+    for p in cursor.bytes().take(size)
+    {
+        match p
+        {
+            Ok(a) =>
+            {
+                strvec.push(a)
+            }
+            Err(_) =>{
+                return Err( ParseError(String::from("Problem reading string from TSC parser")) );
+            }
+        }
+    };
+
+    //turn that into a string
+    let str_string = String::from_utf8(strvec).unwrap();
+
+    Ok(str_string)
+}
+
 #[test]
 fn test_varint() {
     for n in -4000..=4000 {

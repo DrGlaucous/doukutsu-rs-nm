@@ -100,6 +100,20 @@ pub enum LightingMode {
     Ambient,
 }
 
+impl From<u8> for LightingMode {
+    fn from(val: u8) -> Self {
+        match val {
+            0 => Self::None,
+            1 => Self::BackgroundOnly,
+            2 => Self::Ambient,
+            _ => {
+                // log::warn!("Unknown background type: {}", val);
+                Self::None
+            }
+        }
+    }
+}
+
 const P2_OFFSCREEN_TEXT: &'static str = "P2";
 const CUTSCENE_SKIP_WAIT: u16 = 50;
 
@@ -1329,11 +1343,7 @@ impl GameScene {
 
 
         self.nikumaru.tick(state, &self.player1)?;
-        {
-            //scoping to keep the borrow checker happy
-            let stage_textures_ref = &*self.stage_textures.deref().borrow();
-            self.background.tick(state, ctx, stage_textures_ref)?;
-        }
+        self.background.tick(state)?;
         self.hud_player1.visible = self.player1.cond.alive();
         self.hud_player2.visible = self.player2.cond.alive();
         self.hud_player1.has_player2 = self.player2.cond.alive() && !self.player2.cond.hidden();
@@ -1994,7 +2004,7 @@ impl Scene for GameScene {
         }
 
         let stage_textures_ref = &*self.stage_textures.deref().borrow();
-        self.background.draw(state, ctx, &self.frame, stage_textures_ref, &self.stage)?;
+        self.background.draw(state, ctx, &self.frame, stage_textures_ref, &self.stage, false)?;
         self.tilemap.draw(state, ctx, &self.frame, TileLayer::Background, stage_textures_ref, &self.stage)?;
         self.draw_npc_layer(state, ctx, NPCLayer::Background)?;
         self.tilemap.draw(state, ctx, &self.frame, TileLayer::Middleground, stage_textures_ref, &self.stage)?;

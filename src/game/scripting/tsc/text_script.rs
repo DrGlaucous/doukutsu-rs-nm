@@ -5,7 +5,7 @@ use std::io;
 use std::io::Cursor;
 use std::io::Seek;
 use std::io::SeekFrom;
-use std::ops::Not;
+use std::ops::{Not, Deref};
 use std::rc::Rc;
 
 use num_traits::{clamp, FromPrimitive};
@@ -20,7 +20,7 @@ use crate::framework::error::GameResult;
 use crate::game::frame::UpdateTarget;
 use crate::game::npc::NPC;
 use crate::game::player::{ControlMode, TargetPlayer};
-use crate::game::scripting::tsc::bytecode_utils::read_cur_varint;
+use crate::game::scripting::tsc::bytecode_utils::{read_cur_varint, read_string};
 use crate::game::scripting::tsc::encryption::decrypt_tsc;
 use crate::game::scripting::tsc::opcodes::TSCOpCode;
 use crate::game::shared_game_state::ReplayState;
@@ -1206,46 +1206,6 @@ impl TextScriptVM {
 
                 exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
             }
-            TSCOpCode::SML => {
-                let layer = match read_cur_varint(&mut cursor)? {
-                    3 => TileLayer::FarForeground,
-                    0 => TileLayer::Background,
-                    1 => TileLayer::Middleground,
-                    _ => TileLayer::Foreground,
-                };
-                let pos_x = read_cur_varint(&mut cursor)? as usize;
-                let pos_y = read_cur_varint(&mut cursor)? as usize;
-
-                let tile_type = game_scene.stage.tile_at(pos_x, pos_y);
-                game_scene.stage.change_tile_layer(pos_x, pos_y, tile_type.wrapping_sub(1), layer);
-
-                exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
-            }
-            TSCOpCode::CML => {
-                let layer = match read_cur_varint(&mut cursor)? {
-                    3 => TileLayer::FarForeground,
-                    0 => TileLayer::Background,
-                    1 => TileLayer::Middleground,
-                    _ => TileLayer::Foreground,
-                };
-                let pos_x = read_cur_varint(&mut cursor)? as usize;
-                let pos_y = read_cur_varint(&mut cursor)? as usize;
-                let tile_type = read_cur_varint(&mut cursor)? as u16;
-
-                if game_scene.stage.change_tile_layer(pos_x, pos_y, tile_type, layer) {
-                    let mut npc = NPC::create(4, &state.npc_table);
-                    npc.cond.set_alive(true);
-                    npc.x = pos_x as i32 * 0x2000;
-                    npc.y = pos_y as i32 * 0x2000;
-
-                    let _ = game_scene.npc_list.spawn(0, npc.clone());
-                    let _ = game_scene.npc_list.spawn(0, npc.clone());
-                    let _ = game_scene.npc_list.spawn(0, npc);
-                }
-
-                exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
-            }
-
             TSCOpCode::MLp => {
                 let life = read_cur_varint(&mut cursor)? as u16;
                 game_scene.player1.life += life;
@@ -2032,6 +1992,59 @@ impl TextScriptVM {
 
                 exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
             }
+        
+            //new
+            TSCOpCode::SML => {
+                let layer = match read_cur_varint(&mut cursor)? {
+                    3 => TileLayer::FarForeground,
+                    0 => TileLayer::Background,
+                    1 => TileLayer::Middleground,
+                    _ => TileLayer::Foreground,
+                };
+                let pos_x = read_cur_varint(&mut cursor)? as usize;
+                let pos_y = read_cur_varint(&mut cursor)? as usize;
+
+                let tile_type = game_scene.stage.tile_at(pos_x, pos_y);
+                game_scene.stage.change_tile_layer(pos_x, pos_y, tile_type.wrapping_sub(1), layer);
+
+                exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
+            }
+            TSCOpCode::CML => {
+                let layer = match read_cur_varint(&mut cursor)? {
+                    3 => TileLayer::FarForeground,
+                    0 => TileLayer::Background,
+                    1 => TileLayer::Middleground,
+                    _ => TileLayer::Foreground,
+                };
+                let pos_x = read_cur_varint(&mut cursor)? as usize;
+                let pos_y = read_cur_varint(&mut cursor)? as usize;
+                let tile_type = read_cur_varint(&mut cursor)? as u16;
+
+                if game_scene.stage.change_tile_layer(pos_x, pos_y, tile_type, layer) {
+                    let mut npc = NPC::create(4, &state.npc_table);
+                    npc.cond.set_alive(true);
+                    npc.x = pos_x as i32 * 0x2000;
+                    npc.y = pos_y as i32 * 0x2000;
+
+                    let _ = game_scene.npc_list.spawn(0, npc.clone());
+                    let _ = game_scene.npc_list.spawn(0, npc.clone());
+                    let _ = game_scene.npc_list.spawn(0, npc);
+                }
+
+                exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
+            }
+
+            TSCOpCode::BKG => {
+
+                let textures = &mut*game_scene.stage_textures.deref().borrow_mut();
+                //get path
+                let len = read_cur_varint(&mut cursor)? as usize;
+                let filepath = read_string(&mut cursor, len).unwrap();
+                game_scene.background.load_bkg_custom(ctx, textures, &mut game_scene.stage, &mut game_scene.lighting_mode, &mut &filepath)?;
+                exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
+            }
+
+        
         }
 
         Ok(exec_state)
