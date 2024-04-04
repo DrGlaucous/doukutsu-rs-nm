@@ -300,7 +300,7 @@ impl Scene for TitleScene {
     fn tick(&mut self, state: &mut SharedGameState, ctx: &mut Context) -> GameResult {
         state.touch_controls.control_type = TouchControlType::None;
 
-        self.background.tick(state, ctx, &self.textures)?;
+        self.background.tick(state)?;
 
         self.controller.update(state, ctx)?;
         self.controller.update_trigger();
@@ -486,7 +486,7 @@ impl Scene for TitleScene {
     }
 
     fn draw(&self, state: &mut SharedGameState, ctx: &mut Context) -> GameResult {
-        self.background.draw(state, ctx, &self.frame, &self.textures, &self.stage)?;
+        self.background.draw(state, ctx, &self.frame, &self.textures, &self.stage, false)?;
 
         if self.current_menu == CurrentMenu::MainMenu {
             let batch = state.texture_set.get_or_load_batch(ctx, &state.constants, "Title")?;
