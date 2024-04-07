@@ -59,7 +59,9 @@ impl TextScript {
                         | TSCOpCode::HM2
                         | TSCOpCode::POP
                         | TSCOpCode::KE2
-                        | TSCOpCode::FR2 => {
+                        | TSCOpCode::FR2
+                        | TSCOpCode::BKR
+                        => {
                             writeln!(&mut result, "{:?}()", op).unwrap();
                         }
                         // One operand codes
@@ -102,7 +104,10 @@ impl TextScript {
                         | TSCOpCode::ACH
                         | TSCOpCode::S2MV
                         | TSCOpCode::S2PJ
-                        | TSCOpCode::PSH => {
+                        | TSCOpCode::PSH
+                        | TSCOpCode::BKD
+                        | TSCOpCode::BKE
+                        => {
                             let par_a = read_cur_varint(&mut cursor)?;
 
                             writeln!(&mut result, "{:?}({})", op, par_a).unwrap();
@@ -136,7 +141,12 @@ impl TextScript {
                             writeln!(&mut result, "{:?}({}, {}, {})", op, par_a, par_b, par_c).unwrap();
                         }
                         // Four operand codes
-                        TSCOpCode::TRA | TSCOpCode::MNP | TSCOpCode::SNP | TSCOpCode::CML => {
+                        TSCOpCode::TRA
+                        | TSCOpCode::MNP
+                        | TSCOpCode::SNP
+                        | TSCOpCode::CML
+                        | TSCOpCode::BKP
+                        => {
                             let par_a = read_cur_varint(&mut cursor)?;
                             let par_b = read_cur_varint(&mut cursor)?;
                             let par_c = read_cur_varint(&mut cursor)?;

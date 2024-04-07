@@ -1,3 +1,5 @@
+use std::borrow::BorrowMut;
+
 use crate::common::{Color, Rect};
 use crate::framework::context::Context;
 use crate::framework::error::GameResult;
@@ -19,8 +21,8 @@ pub struct ScrollFlags {
     pub autoscroll_y: bool,
     pub align_with_water_lvl: bool,
     pub draw_above_foreground: bool,
-    pub random_scroll_speed_x: bool,
-    pub random_scroll_speed_y: bool,
+    pub random_offset_x: bool,
+    pub random_offset_y: bool,
     pub lock_to_x_axis: bool,
     pub lock_to_y_axis: bool,
     pub randomize_all_parameters: bool,
@@ -32,8 +34,10 @@ pub struct AnimationStyle {
     pub frame_count: u32,
     pub frame_start: u32,
     pub animation_speed: u32, //ticks between frame change
-    pub scroll_speed_x: f32,
-    pub scroll_speed_y: f32,
+    pub follow_speed_x: f32, //for player-following movement
+    pub follow_speed_y: f32,
+    pub autoscroll_speed_x: f32, //for automatic movement
+    pub autoscroll_speed_y: f32,
     pub scroll_flags: ScrollFlags,
 
     //internal only: do not save to or load from JSON
@@ -66,9 +70,15 @@ pub struct LayerConfig {
 
     //internal only: do not save to or load from JSON
     #[serde(skip)]
-    pub layer_x_value: f32, //I think these are the starting positions for each bitmap?
+    pub layer_x_value: f32, //I think these are the starting positions for each bitmap when drawn on the screen
     #[serde(skip)]
     pub layer_y_value: f32,
+
+    //calculate additional frame-realtive offsets (like distant scrolling) and place them here so the other offset functions can get at them
+    #[serde(skip)]
+    pub frame_x_offset: f32,
+    #[serde(skip)]
+    pub frame_y_offset: f32,
 
 }
 
@@ -91,8 +101,10 @@ impl LayerConfig {
                 frame_count: 0,
                 frame_start: 0,
                 animation_speed: 0,
-                scroll_speed_x: 0.0,
-                scroll_speed_y: 0.0,
+                follow_speed_x: 0.0,
+                follow_speed_y: 0.0,
+                autoscroll_speed_x: 0.0,
+                autoscroll_speed_y: 0.0,
                 scroll_flags: ScrollFlags{
                     follow_pc_x: false,
                     follow_pc_y: false,
@@ -100,8 +112,8 @@ impl LayerConfig {
                     autoscroll_y: false,
                     align_with_water_lvl: false,
                     draw_above_foreground: false,
-                    random_scroll_speed_x: false,
-                    random_scroll_speed_y: false,
+                    random_offset_x: false,
+                    random_offset_y: false,
                     lock_to_x_axis: false,
                     lock_to_y_axis: false,
                     randomize_all_parameters: false,
@@ -109,8 +121,10 @@ impl LayerConfig {
             },
 
             //non-config items
-            layer_x_value: 0.0,
+            layer_x_value: 0.0, //current location of the layer on the window
             layer_y_value: 0.0,
+            frame_x_offset: 0.0, //extra offsets to apply from the camera
+            frame_y_offset: 0.0,
 
         }
     }
@@ -171,12 +185,67 @@ impl BkgConfig {
         self
     }
 
-
     //using this to get the template for other BKG files, it serves no other real purpose
     pub fn save(&self, ctx: &Context, path: &String) -> GameResult {
         let file = filesystem::user_create(ctx, "/".to_string() + path + ".json")?;
         serde_json::to_writer_pretty(file, self)?;
 
+        Ok(())
+    }
+
+    pub fn update_parameter(&mut self, layer_no: usize, parameter: usize, value: usize) -> GameResult {
+        
+        //ensure that there is a valid layer to alter
+        if self.layers.len() > 0 {
+            //handle OOB layers
+            let layer_no = if layer_no >= self.layers.len() {self.layers.len() - 1} else {layer_no};
+
+
+            let layer_ref = self.layers[layer_no].borrow_mut();
+            let value = value as u32;
+            match parameter
+            {
+                0 => layer_ref.layer_enabled = value != 0,
+                1 => layer_ref.bmp_x_offset = value,
+                2 => layer_ref.bmp_y_offset = value,
+                3 => layer_ref.bmp_width = value,
+                4 => layer_ref.bmp_height = value,
+                5 => layer_ref.draw_repeat_x = value,
+                6 => layer_ref.draw_repeat_y = value,
+                7 => layer_ref.draw_repeat_gap_x = value,
+                8 => layer_ref.draw_repeat_gap_y = value,
+                9 => layer_ref.draw_corner_offset_x = value as f32,
+                10 => layer_ref.draw_corner_offset_y = value as f32,
+
+                //animation_style
+                11 => layer_ref.animation_style.frame_count = value,
+                12 => layer_ref.animation_style.frame_start = value,
+                13 => layer_ref.animation_style.animation_speed = value,
+                14 => layer_ref.animation_style.follow_speed_x = value as f32,
+                15 => layer_ref.animation_style.follow_speed_y = value as f32,
+                16 => layer_ref.animation_style.autoscroll_speed_x = value as f32,
+                17 => layer_ref.animation_style.autoscroll_speed_y = value as f32,
+
+                //scroll flags (set from bitfield)
+                18 => {
+                    layer_ref.animation_style.scroll_flags.follow_pc_x = 0 < (value & 1 << 0);
+                    layer_ref.animation_style.scroll_flags.follow_pc_y = 0 < (value & 1 << 1);
+                    layer_ref.animation_style.scroll_flags.autoscroll_x = 0 < (value & 1 << 2);
+                    layer_ref.animation_style.scroll_flags.autoscroll_y = 0 < (value & 1 << 3);
+                    layer_ref.animation_style.scroll_flags.align_with_water_lvl = 0 < (value & 1 << 4);
+                    layer_ref.animation_style.scroll_flags.draw_above_foreground = 0 < (value & 1 << 5);
+                    layer_ref.animation_style.scroll_flags.random_offset_x = 0 < (value & 1 << 6);
+                    layer_ref.animation_style.scroll_flags.random_offset_y = 0 < (value & 1 << 7);
+                    layer_ref.animation_style.scroll_flags.lock_to_x_axis = 0 < (value & 1 << 8);
+                    layer_ref.animation_style.scroll_flags.lock_to_y_axis = 0 < (value & 1 << 9);
+                    layer_ref.animation_style.scroll_flags.randomize_all_parameters = 0 < (value & 1 << 10);
+                }
+                //invalid parameter: do nothing
+                _ => {}
+            }
+
+        }
+        
         Ok(())
     }
 
@@ -205,6 +274,11 @@ pub struct Background {
     pub bk_config: BkgConfig,
     rng: Xoroshiro32PlusPlus,//::new(0),
 
+    //cache original map values
+    pub cache_background_path: String,
+    pub cache_background_type: BackgroundType,
+    pub cache_background_lighting: LightingMode,
+
 }
 
 impl Background {
@@ -213,7 +287,11 @@ impl Background {
             tick: 0,
             prev_tick: 0,
             bk_config: BkgConfig::default(),
-            rng: Xoroshiro32PlusPlus::new(0),
+            rng: Xoroshiro32PlusPlus::new(4873), //rando-starting number
+
+            cache_background_path: String::new(),
+            cache_background_type: BackgroundType::Black,
+            cache_background_lighting: LightingMode::None,
 
         }
     }
@@ -227,28 +305,45 @@ impl Background {
         path: &String,
     ) -> GameResult<()> {
 
-        match BkgConfig::load(ctx, path)
-        {
-            //return gotten config or do nothing if none found (for me, create template to get started)
-            Ok(config) => {
-                textures.background = config.bmp_filename.clone();
-                self.bk_config = config.upgrade();
-                stage.data.background_type = BackgroundType::Custom;
-                *lighting_mode = LightingMode::from(self.bk_config.lighting_mode);
-            }
-            //if doesn't exsist, return the default config (I also used this to create the first BKG templates for later modification)
-            Err(_) => {
-                let config = BkgConfig::default();
-                config.save(ctx, &textures.background)?;
-            }
-        };
+        //cache old data
+        self.cache_background_path = textures.background.clone();
+        self.cache_background_type = stage.data.background_type.clone();
+        self.cache_background_lighting = *lighting_mode;
 
-        // //if the config file is valid, load it in
-        // if let Ok(config) = BkgConfig::load(ctx, path) {
-        //     textures.background = config.filename.clone();
-        //     self.bk_config = config.upgrade();
-        //     stage.data.background_type = BackgroundType::Custom;
-        // }
+        // match BkgConfig::load(ctx, path)
+        // {
+        //     //return gotten config or do nothing if none found (for me, create template to get started)
+        //     Ok(config) => {
+        //         textures.background = config.bmp_filename.clone();
+        //         self.bk_config = config.upgrade();
+        //         stage.data.background_type = BackgroundType::Custom;
+        //         *lighting_mode = LightingMode::from(self.bk_config.lighting_mode);
+        //     }
+        //     //if doesn't exsist, return the default config (I also used this to create the first BKG templates for later modification)
+        //     Err(_) => {
+        //         let config = BkgConfig::default();
+        //         config.save(ctx, &textures.background)?;
+        //     }
+        // };
+
+        //if the config file is valid, load it in
+        if let Ok(config) = BkgConfig::load(ctx, path) {
+            textures.background = config.bmp_filename.clone(); //we need to check the validity of the filename here to stop the program from crashing, but this not essential for function
+            self.bk_config = config.upgrade();
+            stage.data.background_type = BackgroundType::Custom;
+            *lighting_mode = LightingMode::from(self.bk_config.lighting_mode);
+        }
+
+        //init random parameters if configured
+        for layer in self.bk_config.layers.as_mut_slice() {
+            if layer.animation_style.scroll_flags.randomize_all_parameters {
+                layer.draw_corner_offset_x = self.rng.range(0..(layer.draw_corner_offset_x as i32)) as f32;
+                layer.draw_corner_offset_y = self.rng.range(0..(layer.draw_corner_offset_y as i32)) as f32;
+                layer.animation_style.animation_speed = self.rng.range((layer.animation_style.animation_speed as i32)..(layer.animation_style.animation_speed as i32 * 2)) as u32;
+                layer.animation_style.ani_wait = self.rng.range(0..layer.animation_style.animation_speed as i32) as u32;
+                layer.animation_style.frame_start = self.rng.range(0..layer.animation_style.frame_count as i32) as u32;
+            }
+        }
 
         Ok(())
 
@@ -257,9 +352,9 @@ impl Background {
     pub fn tick(
         &mut self,
         state: &mut SharedGameState,
+        frame: &Frame,
     ) -> GameResult<()> {
         self.tick = self.tick.wrapping_add(1);
-
 
         for layer in self.bk_config.layers.as_mut_slice() {
             if !layer.layer_enabled {continue;}
@@ -281,65 +376,117 @@ impl Background {
             //let equivalent_tick = (self.tick as u32 / layer.animation_style.animation_speed) % layer.animation_style.frame_count;
 
 
-            //advance location offsets
+            ////advance location offsets
+
+            //for ease of refrence
             let scroll_flags = &layer.animation_style.scroll_flags;
 
-            //if-chain for each flag type
+            //reset frame offsets so background location resets with no-flag conditions
+            let (frame_x, frame_y) = frame.xy_interpolated(state.frame_time);
 
-            //handle setting bitmap start offsets based on where they are in the window rect
-            if scroll_flags.autoscroll_x {
-                layer.layer_x_value -= layer.animation_style.scroll_speed_x;
+            layer.frame_x_offset = 0.0;
+            layer.frame_y_offset = 0.0;
+
+            if scroll_flags.follow_pc_x {
+                layer.frame_x_offset -= frame_x as f32 * layer.animation_style.follow_speed_x;
+            }
+            if scroll_flags.lock_to_y_axis {
+                layer.frame_x_offset -= frame_x as f32;
+            }
+
+            if scroll_flags.align_with_water_lvl {
+                layer.frame_y_offset += (state.water_level / 0x200) as f32 - frame_y;
+            }
+            if scroll_flags.follow_pc_y {
+                layer.frame_y_offset -= frame_y as f32 * layer.animation_style.follow_speed_y;
+            }
+            if scroll_flags.lock_to_x_axis {
+                layer.frame_y_offset -= frame_y as f32;
+            }
+
+
+
+            //if-chain for each flag type:
+
+            //animate autoscrolling (looping is handled in the conditions below)
+            if scroll_flags.autoscroll_x {layer.layer_x_value -= layer.animation_style.autoscroll_speed_x;}
+            if scroll_flags.autoscroll_y {layer.layer_y_value -= layer.animation_style.autoscroll_speed_y;}
+
+            //looping for infinite-width tilesets:
+            if layer.draw_repeat_x == 0 {
+                //offset just behind left wall and shift in
+                if layer.layer_x_value + layer.frame_x_offset >  0.0 {
+                    layer.layer_x_value -= (layer.bmp_width + layer.draw_repeat_gap_x) as f32;
+                }
+                else if layer.layer_x_value + layer.frame_x_offset < 0.0  - (layer.bmp_width + layer.draw_repeat_gap_x) as f32 {
+                    layer.layer_x_value += (layer.bmp_width + layer.draw_repeat_gap_x) as f32;
+                }
+            }
+            //if the bitmap is set to repeat and the bitmap count is finite, handle looping it
+            else if scroll_flags.autoscroll_x {
+                //layer.layer_x_value -= layer.animation_style.scroll_speed_x;
 
                 //if layer's right corner offset by the times it should be draw is less than 0, shift it over by one bitmap width and window width
-                if layer.layer_x_value +
-                layer.draw_corner_offset_x +
-                (((layer.bmp_width + layer.draw_repeat_gap_x) * layer.draw_repeat_x) as f32) < 0.0 {
-                    layer.layer_x_value += (layer.bmp_width + layer.draw_repeat_gap_x) as f32 + state.canvas_size.0 as f32;
+                if layer.layer_x_value + layer.draw_corner_offset_x +
+                (((layer.bmp_width + layer.draw_repeat_gap_x) * layer.draw_repeat_x) as f32) +
+                layer.frame_x_offset < 0.0 {
 
-                    //if y movement is randomized, add a random value +- animation speed to the y movement
-                    if scroll_flags.random_scroll_speed_y {
+                    //move whole layerset to the right side of the viewspace
+                    layer.layer_x_value += ((layer.bmp_width + layer.draw_repeat_gap_x) * layer.draw_repeat_x) as f32 + state.canvas_size.0;
+
+                    //if y movement is randomized, add a random value +- animation speed to the y position
+                    if scroll_flags.random_offset_y {
                         layer.layer_y_value += self.rng.range(-(layer.animation_style.animation_speed as i32)..(layer.animation_style.animation_speed as i32)) as f32;
                     }
                 }
 
                 //if layer's left corner is beyond the window width
-                if layer.layer_x_value + layer.draw_corner_offset_x > (0.0) {
+                else if layer.layer_x_value + layer.draw_corner_offset_x + layer.frame_x_offset > state.canvas_size.0{
 
-                    //subtract window width
-                    layer.layer_x_value -= state.canvas_size.0 as f32;
+                    //move whole layer set to the left side of the viewspace
+                    layer.layer_x_value -= ((layer.bmp_width + layer.draw_repeat_gap_x) * layer.draw_repeat_x) as f32 + state.canvas_size.0;
 
-                    //wait... why is this done potentially 2x? (does it only happen when the x value advances beyond the frame perhaps?)
-                    if scroll_flags.random_scroll_speed_y {
+                    if scroll_flags.random_offset_y {
                         layer.layer_y_value += self.rng.range(-(layer.animation_style.animation_speed as i32)..(layer.animation_style.animation_speed as i32)) as f32;
                     }
 
                 }
             }
 
+
             //same as above but for y
-            if scroll_flags.autoscroll_y {
-                layer.layer_y_value -= layer.animation_style.scroll_speed_y;
+            if layer.draw_repeat_y == 0 {
+                //offset just behind left wall, and shift in
+                if layer.layer_y_value + layer.frame_y_offset >  0.0 {
+                    layer.layer_y_value -= (layer.bmp_height + layer.draw_repeat_gap_y) as f32;
+                }
+                else if layer.layer_y_value + layer.frame_y_offset < 0.0  - (layer.bmp_height + layer.draw_repeat_gap_y) as f32 {
+                    layer.layer_y_value += (layer.bmp_height + layer.draw_repeat_gap_y) as f32;
+                }
+            }
+            else if scroll_flags.autoscroll_y {
+                //layer.layer_y_value -= layer.animation_style.scroll_speed_y;
 
                 //if layer's right corner offset by the times it should be draw is less than 0, shift it over by one bitmap width and window width
-                if layer.layer_y_value +
-                layer.draw_corner_offset_y +
-                (((layer.bmp_height + layer.draw_repeat_gap_y) * layer.draw_repeat_y) as f32) < 0.0 {
-                    layer.layer_y_value += (layer.bmp_height + layer.draw_repeat_gap_y) as f32 + state.canvas_size.1 as f32;
+                if layer.layer_y_value + layer.draw_corner_offset_y +
+                (((layer.bmp_height + layer.draw_repeat_gap_y) * layer.draw_repeat_y) as f32) + layer.frame_y_offset < 0.0{
 
-                    //if y movement is randomized, add a random value +- animation speed to the y movement
-                    if scroll_flags.random_scroll_speed_y {
+                    //move whole layerset to the bottom of the viewspace
+                    layer.layer_y_value += ((layer.bmp_height + layer.draw_repeat_gap_y) * layer.draw_repeat_y) as f32 + state.canvas_size.1;
+
+                    //if y movement is randomized, add a random value +- animation speed to the x position
+                    if scroll_flags.random_offset_x {
                         layer.layer_y_value += self.rng.range(-(layer.animation_style.animation_speed as i32)..(layer.animation_style.animation_speed as i32)) as f32;
                     }
                 }
 
                 //if layer's left corner is beyond the window width
-                if layer.layer_y_value + layer.draw_corner_offset_y > 0.0 {
+                else if layer.layer_y_value + layer.draw_corner_offset_y + layer.frame_y_offset > state.canvas_size.1{
 
-                    //subtract window height
-                    layer.layer_y_value -= state.canvas_size.1 as f32;
+                    //move whole layer set to the bottom of the viewspace
+                    layer.layer_y_value -= ((layer.bmp_height + layer.draw_repeat_gap_y) * layer.draw_repeat_y) as f32 + state.canvas_size.1;
 
-                    //wait... why is this done potentially 2x? (does it only happen when the x value advances beyond the frame perhaps?)
-                    if scroll_flags.random_scroll_speed_y {
+                    if scroll_flags.random_offset_x {
                         layer.layer_y_value += self.rng.range(-(layer.animation_style.animation_speed as i32)..(layer.animation_style.animation_speed as i32)) as f32;
                     }
 
@@ -509,93 +656,71 @@ impl Background {
             }
 
             BackgroundType::Custom => {
-                //start with empty slate
-                graphics::clear(ctx, stage.data.background_color);
 
-                //let (bg_total_width, bg_total_height) = (batch.width() as i32, batch.height() as i32);
+                //start with empty slate
+                if !is_front {graphics::clear(ctx, stage.data.background_color);}
 
                 for layer in self.bk_config.layers.as_slice() {
                     if !layer.layer_enabled ||
-                    (is_front && !layer.animation_style.scroll_flags.draw_above_foreground) //layer is not flagged to draw above the foreground
+                    (is_front && !layer.animation_style.scroll_flags.draw_above_foreground) || //layer is not flagged to draw above the foreground
+                    (!is_front && layer.animation_style.scroll_flags.draw_above_foreground)
                     {continue;}
 
-                    let (xoff, yoff) = (layer.bmp_x_offset + layer.bmp_width * layer.animation_style.frame_start, layer.bmp_y_offset + layer.bmp_height * layer.animation_style.frame_start);
 
+                    let (xoff, yoff) = (layer.bmp_x_offset + layer.bmp_width * layer.animation_style.frame_start, layer.bmp_y_offset + layer.bmp_height * layer.animation_style.frame_start);
                     let layer_rc = Rect::new(
                         xoff as u16,
                         yoff as u16,
                         (xoff + layer.bmp_width) as u16,
                         (yoff + layer.bmp_height) as u16);
                     
-                    //everything below this point can probably be moved to the draw function:
-                    {
-
-                        let (cam_x, cam_y) = (frame_x % (batch.width() as f32), frame_y % (batch.height() as f32));
 
 
-                        let scroll_flags = &layer.animation_style.scroll_flags;
+                    //not sure if we need these to be descrete
+                    let (rep_x, rep_y) = (layer.draw_repeat_x, layer.draw_repeat_y);
 
-                        //not sure if we need these to be descrete
-                        let (rep_x, rep_y) = (layer.draw_repeat_x, layer.draw_repeat_y);
+                    //start here and draw bitmap, stepping each time by these coords
+                    let mut y_off = layer.layer_y_value as f32;
 
-                        //start here and draw bitmap, stepping each time by these coords
-                        let mut y_off = layer.layer_y_value as f32;
+                    //apply misc. camera/water offsets
+                    y_off += layer.frame_y_offset;
 
-                        if scroll_flags.align_with_water_lvl {
-                            y_off += (state.water_level * 0x200) as f32 - cam_y;
-                        }
+                    //apply map corner offset
+                    y_off += layer.draw_corner_offset_y;
+
+                    let mut y = 0;
+                    while (y < rep_y || rep_y == 0) && y_off < (state.canvas_size.1 as f32) * 16.0 {
+                        
+                        //need this to reset for each layer
+                        let mut x_off = layer.layer_x_value as f32;
 
                         //apply map corner offset
-                        y_off += layer.draw_corner_offset_y;
+                        x_off += layer.draw_corner_offset_x;
 
-                        if scroll_flags.follow_pc_y {
-                            y_off -= cam_y as f32 * layer.animation_style.scroll_speed_y;
+                        //apply camera offset
+                        x_off += layer.frame_x_offset;
+
+
+                        //while loop (x-axis)
+                        let mut x = 0;
+                        while (x < rep_x || rep_x == 0) && x_off < (state.canvas_size.0 as f32) * 16.0 {
+
+                            //condition taken care of earler in the draw process
+                            //if scroll_flags.draw_above_foreground {}
+
+                            batch.add_rect(x_off as f32, y_off as f32, &layer_rc);
+
+                            //draw bitmap here
+                            //x: xOff y: yOff
+                            x_off += (layer.bmp_width + layer.draw_repeat_gap_x) as f32;
+                            x += 1;
                         }
 
-                        if scroll_flags.lock_to_x_axis {
-                            y_off -= cam_y as f32;
-                        }
-
-                        let mut y = 0;
-                        while y < rep_y && y_off < (state.canvas_size.1 as f32) * 16.0 {
-                            
-                            //need this to reset for each layer
-                            let mut x_off = layer.layer_x_value as f32;
-
-                            //apply map corner offset
-                            x_off += layer.draw_corner_offset_x;
-
-                            if scroll_flags.follow_pc_x {
-                                //TODO: get camera position
-                                x_off -= cam_x as f32 * layer.animation_style.scroll_speed_x;
-                            }
-
-                            if scroll_flags.lock_to_y_axis {
-                                //TODO: get camera position
-                                x_off -= cam_x as f32;
-                            }
-
-
-                            //while loop (x-axis)
-                            let mut x = 0;
-                            while x < rep_x && x_off < (state.canvas_size.0 as f32) * 16.0 {
-
-                                //condition taken care of earler in the draw process
-                                //if scroll_flags.draw_above_foreground {}
-
-                                batch.add_rect(x_off as f32, y_off as f32, &layer_rc);
-
-                                //draw bitmap here
-                                //x: xOff y: yOff
-                                x_off += (layer.bmp_width + layer.draw_repeat_gap_x) as f32;
-                                x += 1;
-                            }
-
-                            y_off += (layer.bmp_height + layer.draw_repeat_gap_y) as f32;
-                            
-                            y += 1;
-                        }
+                        y_off += (layer.bmp_height + layer.draw_repeat_gap_y) as f32;
+                        
+                        y += 1;
                     }
+                
 
 
 

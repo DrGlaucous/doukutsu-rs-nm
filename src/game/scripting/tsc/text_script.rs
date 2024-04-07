@@ -1920,6 +1920,30 @@ impl TextScriptVM {
                 game_scene.background.load_bkg_custom(ctx, textures, &mut game_scene.stage, &mut game_scene.lighting_mode, &mut &filepath)?;
                 exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
             }
+            TSCOpCode::BKD | TSCOpCode::BKE => {
+                let layer_no = read_cur_varint(&mut cursor)? as usize;
+
+                game_scene.background.bk_config.update_parameter(layer_no, 0, if op == TSCOpCode::BKD {0} else {1})?;
+
+                exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
+            }
+            TSCOpCode::BKP => {
+                let layer_no = read_cur_varint(&mut cursor)? as usize;
+                let parameter = read_cur_varint(&mut cursor)? as usize;
+                let value = read_cur_varint(&mut cursor)? as usize;
+
+                game_scene.background.bk_config.update_parameter(layer_no, parameter, value)?;
+
+                exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
+
+            }
+            TSCOpCode::BKR => {                
+                game_scene.stage.data.background_type = game_scene.background.cache_background_type;
+                game_scene.stage_textures.borrow_mut().background = game_scene.background.cache_background_path.clone();
+                game_scene.lighting_mode = game_scene.background.cache_background_lighting;
+                exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
+            }
+
 
         
         }
