@@ -412,14 +412,33 @@ impl Background {
             if scroll_flags.autoscroll_x {layer.layer_x_value -= layer.animation_style.autoscroll_speed_x;}
             if scroll_flags.autoscroll_y {layer.layer_y_value -= layer.animation_style.autoscroll_speed_y;}
 
-            //looping for infinite-width tilesets:
+            let full_width = (layer.bmp_width + layer.draw_repeat_gap_x) as f32;
+            let full_height = (layer.bmp_height + layer.draw_repeat_gap_y) as f32;
+
+            //looping for infinite-width tilesets: (problematic method)
+            // if layer.draw_repeat_x == 0 {
+            //     //offset just behind left wall and shift in
+            //     if layer.layer_x_value  + layer.frame_x_offset + layer.draw_corner_offset_x > 0.0 {
+            //         //see how many multiples of the full width we need to shift over (simple final-initial calculation), mainly to counteract large draw_corner_offset values
+            //         let offset_dist = (0.0 - layer.draw_corner_offset_x) - (layer.layer_x_value  + layer.frame_x_offset);
+            //         let time_count = (offset_dist / full_width).floor();
+            //         layer.layer_x_value += time_count * full_width;
+            //     }
+            //     else if layer.layer_x_value + layer.frame_x_offset + layer.draw_corner_offset_x < 0.0 - full_width {
+            //         let offset_dist = (0.0 - layer.draw_corner_offset_x - full_width) - (layer.layer_x_value + layer.frame_x_offset);
+            //         let time_count = (offset_dist / full_width).floor();
+            //         layer.layer_x_value += full_width * time_count;
+            //     }
+            // }
+
+            //looping for infinite-width tilesets: (note: it takes several cycles to get this within range if corner offsets are massve: that's what the code above tried to solve, but it introduces other problems I don't want to deal with)
             if layer.draw_repeat_x == 0 {
-                //offset just behind left wall and shift in
-                if layer.layer_x_value + layer.frame_x_offset >  0.0 {
-                    layer.layer_x_value -= (layer.bmp_width + layer.draw_repeat_gap_x) as f32;
+                //offset just behind left wall, and shift in
+                if layer.layer_x_value + layer.frame_x_offset + layer.draw_corner_offset_x >  0.0 {                    
+                    layer.layer_x_value -= full_width;
                 }
-                else if layer.layer_x_value + layer.frame_x_offset < 0.0  - (layer.bmp_width + layer.draw_repeat_gap_x) as f32 {
-                    layer.layer_x_value += (layer.bmp_width + layer.draw_repeat_gap_x) as f32;
+                else if layer.layer_x_value + layer.frame_x_offset + layer.draw_corner_offset_x < 0.0  - full_width {
+                    layer.layer_x_value += full_width;
                 }
             }
             //if the bitmap is set to repeat and the bitmap count is finite, handle looping it
@@ -428,11 +447,11 @@ impl Background {
 
                 //if layer's right corner offset by the times it should be draw is less than 0, shift it over by one bitmap width and window width
                 if layer.layer_x_value + layer.draw_corner_offset_x +
-                (((layer.bmp_width + layer.draw_repeat_gap_x) * layer.draw_repeat_x) as f32) +
+                (full_width * layer.draw_repeat_x as f32) +
                 layer.frame_x_offset < 0.0 {
 
                     //move whole layerset to the right side of the viewspace
-                    layer.layer_x_value += ((layer.bmp_width + layer.draw_repeat_gap_x) * layer.draw_repeat_x) as f32 + state.canvas_size.0;
+                    layer.layer_x_value += (full_width * layer.draw_repeat_x as f32) + state.canvas_size.0;
 
                     //if y movement is randomized, add a random value +- animation speed to the y position
                     if scroll_flags.random_offset_y {
@@ -444,7 +463,7 @@ impl Background {
                 else if layer.layer_x_value + layer.draw_corner_offset_x + layer.frame_x_offset > state.canvas_size.0{
 
                     //move whole layer set to the left side of the viewspace
-                    layer.layer_x_value -= ((layer.bmp_width + layer.draw_repeat_gap_x) * layer.draw_repeat_x) as f32 + state.canvas_size.0;
+                    layer.layer_x_value -= (full_width * layer.draw_repeat_x as f32) + state.canvas_size.0;
 
                     if scroll_flags.random_offset_y {
                         layer.layer_y_value += self.rng.range(-(layer.animation_style.animation_speed as i32)..(layer.animation_style.animation_speed as i32)) as f32;
@@ -457,11 +476,11 @@ impl Background {
             //same as above but for y
             if layer.draw_repeat_y == 0 {
                 //offset just behind left wall, and shift in
-                if layer.layer_y_value + layer.frame_y_offset >  0.0 {
-                    layer.layer_y_value -= (layer.bmp_height + layer.draw_repeat_gap_y) as f32;
+                if layer.layer_y_value + layer.frame_y_offset + layer.draw_corner_offset_y >  0.0 {
+                    layer.layer_y_value -= full_height;
                 }
-                else if layer.layer_y_value + layer.frame_y_offset < 0.0  - (layer.bmp_height + layer.draw_repeat_gap_y) as f32 {
-                    layer.layer_y_value += (layer.bmp_height + layer.draw_repeat_gap_y) as f32;
+                else if layer.layer_y_value + layer.frame_y_offset + layer.draw_corner_offset_y < 0.0  - full_height {
+                    layer.layer_y_value += full_height;
                 }
             }
             else if scroll_flags.autoscroll_y {
@@ -469,10 +488,10 @@ impl Background {
 
                 //if layer's right corner offset by the times it should be draw is less than 0, shift it over by one bitmap width and window width
                 if layer.layer_y_value + layer.draw_corner_offset_y +
-                (((layer.bmp_height + layer.draw_repeat_gap_y) * layer.draw_repeat_y) as f32) + layer.frame_y_offset < 0.0{
+                (full_height * layer.draw_repeat_y as f32) + layer.frame_y_offset < 0.0{
 
                     //move whole layerset to the bottom of the viewspace
-                    layer.layer_y_value += ((layer.bmp_height + layer.draw_repeat_gap_y) * layer.draw_repeat_y) as f32 + state.canvas_size.1;
+                    layer.layer_y_value += (full_height * layer.draw_repeat_y as f32) + state.canvas_size.1;
 
                     //if y movement is randomized, add a random value +- animation speed to the x position
                     if scroll_flags.random_offset_x {
@@ -484,7 +503,7 @@ impl Background {
                 else if layer.layer_y_value + layer.draw_corner_offset_y + layer.frame_y_offset > state.canvas_size.1{
 
                     //move whole layer set to the bottom of the viewspace
-                    layer.layer_y_value -= ((layer.bmp_height + layer.draw_repeat_gap_y) * layer.draw_repeat_y) as f32 + state.canvas_size.1;
+                    layer.layer_y_value -= (full_height * layer.draw_repeat_y as f32) + state.canvas_size.1;
 
                     if scroll_flags.random_offset_x {
                         layer.layer_y_value += self.rng.range(-(layer.animation_style.animation_speed as i32)..(layer.animation_style.animation_speed as i32)) as f32;
@@ -667,7 +686,7 @@ impl Background {
                     {continue;}
 
 
-                    let (xoff, yoff) = (layer.bmp_x_offset + layer.bmp_width * layer.animation_style.frame_start, layer.bmp_y_offset + layer.bmp_height * layer.animation_style.frame_start);
+                    let (xoff, yoff) = (layer.bmp_x_offset + layer.bmp_width * layer.animation_style.frame_start, layer.bmp_y_offset);
                     let layer_rc = Rect::new(
                         xoff as u16,
                         yoff as u16,
