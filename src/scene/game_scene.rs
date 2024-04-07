@@ -1343,7 +1343,7 @@ impl GameScene {
 
 
         self.nikumaru.tick(state, &self.player1)?;
-        self.background.tick(state)?;
+        self.background.tick(state, &self.frame)?;
         self.hud_player1.visible = self.player1.cond.alive();
         self.hud_player2.visible = self.player2.cond.alive();
         self.hud_player1.has_player2 = self.player2.cond.alive() && !self.player2.cond.hidden();
@@ -2029,7 +2029,7 @@ impl Scene for GameScene {
         self.draw_npc_layer(state, ctx, NPCLayer::Foreground)?;
         self.tilemap.draw(state, ctx, &self.frame, TileLayer::FarForeground, stage_textures_ref, &self.stage)?;
         self.water_renderer.draw(state, ctx, &self.frame, WaterLayer::Front)?;
-
+        self.background.draw(state, ctx, &self.frame, stage_textures_ref, &self.stage, true)?;
         self.draw_carets(state, ctx)?;
         self.player1.exp_popup.draw(state, ctx, &self.frame)?;
         self.player1.damage_popup.draw(state, ctx, &self.frame)?;

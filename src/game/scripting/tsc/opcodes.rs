@@ -270,8 +270,18 @@ pub enum TSCOpCode {
     CML,
     /// <SMLwwww:xxxx:yyyy, Subtracts 1 from tile type at (xxxx,yyyy) on layer wwww [0/back, 1/mid, 2/fore, 3/far fore]
     SML,
+
+
     /// <BKGname_of_config$, Loads the BKG config file with name_of_config
     BKG,
+    /// <BKDwwww, Disable the backgroubd layer wwww (out-of-range layers will be set to the last layer)
+    BKD,
+    /// <BKEwwww, Enable background layer (simmilar to BKD)
+    BKE,
+    /// <BKPwwww:xxxx:yyyy, Set BKG parameter xxxx for wwww to value yyyy (TODO: negatives and floating points)
+    BKP,
+    /// <BKR, Restores background to default parameters for the map, simmilar to a TRA command
+    BKR,
 
 
 
