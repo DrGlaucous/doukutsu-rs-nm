@@ -278,7 +278,7 @@ pub enum TSCOpCode {
     BKD,
     /// <BKEwwww, Enable background layer (simmilar to BKD)
     BKE,
-    /// <BKPwwww:xxxx:yyyy, Set BKG parameter xxxx for wwww to value yyyy (TODO: negatives and floating points)
+    /// <BKPwwww:xxxx:yyyy, Set BKG parameter xxxx for layer wwww to value yyyy (TODO: negatives and floating points)
     BKP,
     /// <BKR, Restores background to default parameters for the map, simmilar to a TRA command
     BKR,
