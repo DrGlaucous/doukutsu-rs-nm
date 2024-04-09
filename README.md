@@ -10,7 +10,7 @@ Additions:
 - NOXID-type layer support, (where NOXID is the first user to implement this type of layering system), allowing for multiple tile layers to be drawn on top of each other
 - That's all she wrote! *(for now)*
 
-To see how to use these features for modifying the game, please take a look at the the [Documentation](Documentation) page.
+To see how to use these features for modifying the game, please take a look at the the [Documentation](Documentation.md) page.
 
 Also, for more info for modding Cave Story in general, please see the [Community Wiki page](https://wiki.doukutsu.club/).
 
