@@ -608,9 +608,8 @@ impl Stage {
         let layer_offset = self.map.width as usize * self.map.height as usize * match layer{
             TileLayer::Background =>{1},
             TileLayer::Middleground =>{2},
-            TileLayer::Foreground =>{0},
             TileLayer::FarForeground =>{3},
-            TileLayer::Snack => {0},
+            _ => {0},
         };
         if let Some(ptr) = self.map.tiles.get_mut(y.wrapping_mul(self.map.width as usize).wrapping_add(x).wrapping_add(layer_offset)) {
             if *ptr != tile_type {

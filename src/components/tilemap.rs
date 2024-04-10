@@ -15,6 +15,7 @@ pub struct Tilemap {
 pub enum TileLayer {
     Background,
     Middleground,
+    ForegroundBack, // Stand-in for "Foreground" when working in layers mode
     Foreground,
     FarForeground,
     Snack,
@@ -56,19 +57,19 @@ impl Tilemap {
             _ => &textures.tileset_fg, // This will only be used with the PXM type, so this string won't matter anyway
         };
 
-        let (layer_offset, layer_width, layer_height, uses_layers) = if let Some(pxpack_data) = &stage.data.pxpack_data
+        let (layer_offset, layer_width, layer_height, uses_layers, part_of_layers) = if let Some(pxpack_data) = &stage.data.pxpack_data
         {
             match layer {
                 TileLayer::Background => {
-                    (pxpack_data.offset_bg as usize, pxpack_data.size_bg.0, pxpack_data.size_bg.1, true)
+                    (pxpack_data.offset_bg as usize, pxpack_data.size_bg.0, pxpack_data.size_bg.1, true, true)
                 }
                 TileLayer::Middleground => {
-                    (pxpack_data.offset_mg as usize, pxpack_data.size_mg.0, pxpack_data.size_mg.1, true)
+                    (pxpack_data.offset_mg as usize, pxpack_data.size_mg.0, pxpack_data.size_mg.1, true, true)
                 }
-                TileLayer::FarForeground =>{
+                TileLayer::FarForeground | TileLayer::ForegroundBack =>{
                     return Ok(()); // Do not attempt to draw the far foreground if our layers are from a pxpack
                 }
-                _ => (0, pxpack_data.size_fg.0, pxpack_data.size_fg.1, true),
+                _ => (0, pxpack_data.size_fg.0, pxpack_data.size_fg.1, true, true), // Foreground or Snack
             }
         } else if stage.map.tiles.len() > (stage.map.width * stage.map.height) as usize //PXM layer mode detection
         {
@@ -78,18 +79,24 @@ impl Tilemap {
             // 2 back
             // 3 far front
             match layer {
-                TileLayer::Background =>(1 * (stage.map.width * stage.map.height) as usize, stage.map.width, stage.map.height, true),
-                TileLayer::Middleground =>(2 * (stage.map.width * stage.map.height) as usize, stage.map.width, stage.map.height, true),
-                TileLayer::Foreground =>(0 * (stage.map.width * stage.map.height) as usize, stage.map.width, stage.map.height, true),
-                TileLayer::FarForeground =>(3 * (stage.map.width * stage.map.height) as usize, stage.map.width, stage.map.height, true),
-                TileLayer::Snack =>(0 * (stage.map.width * stage.map.height) as usize, stage.map.width, stage.map.height, false),
+                TileLayer::Background =>(1 * (stage.map.width * stage.map.height) as usize, stage.map.width, stage.map.height, true, true),
+                TileLayer::Middleground =>(2 * (stage.map.width * stage.map.height) as usize, stage.map.width, stage.map.height, true, true),
+                TileLayer::FarForeground =>(3 * (stage.map.width * stage.map.height) as usize, stage.map.width, stage.map.height, true, true),
+                //Treat these layers like a "normal" pxm
+                TileLayer::Foreground
+                | TileLayer::ForegroundBack
+                | TileLayer::Snack =>(0 * (stage.map.width * stage.map.height) as usize, stage.map.width, stage.map.height, false, true),
             }
 
         } else {
-            (0, stage.map.width, stage.map.height, false)
+            (0, stage.map.width, stage.map.height, false, false)
         };
 
-        if !uses_layers && (layer == TileLayer::Middleground || layer == TileLayer::FarForeground) {
+        // part_of_layers solves the problem of a background double-redraw if using a non-layered pxm
+        if !uses_layers && !part_of_layers && (
+            layer == TileLayer::Middleground ||
+            layer == TileLayer::FarForeground ||
+            layer == TileLayer::ForegroundBack) {
             return Ok(());
         }
 
@@ -139,7 +146,7 @@ impl Tilemap {
                         rect.right = rect.left + tile_size;
                         rect.bottom = rect.top + tile_size;
                     }
-                    TileLayer::Background => {
+                    TileLayer::Background | TileLayer::ForegroundBack => {
                         if stage.map.attrib[tile as usize] >= 0x20 {
                             continue;
                         }
