@@ -2013,6 +2013,8 @@ impl Scene for GameScene {
             self.draw_light_map(state, ctx)?;
         }
 
+        self.tilemap.draw(state, ctx, &self.frame, TileLayer::ForegroundBack, stage_textures_ref, &self.stage)?;
+
         self.boss.draw(state, ctx, &self.frame)?;
         self.draw_npc_layer(state, ctx, NPCLayer::Middleground)?;
         self.draw_bullets(state, ctx)?;
