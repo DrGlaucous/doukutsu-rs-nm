@@ -83,6 +83,7 @@ pub trait SpriteBatch {
 
 pub struct DummyBatch;
 
+//just enough variable to be used in headless mode
 impl SpriteBatch for DummyBatch {
     fn width(&self) -> usize {
         1
@@ -161,6 +162,7 @@ impl SpriteBatch for DummyBatch {
     }
 }
 
+//just glow batch or main batch, contains a backend texture and dimension metadata
 pub struct SubBatch {
     batch: Box<dyn BackendTexture>,
     width: u16,
@@ -171,6 +173,7 @@ pub struct SubBatch {
     scale_y: f32,
 }
 
+//holds a standard sprite batch as well as an optional glow batch, all loaded batches are this
 pub struct CombinedBatch {
     main_batch: SubBatch,
     glow_batch: Option<SubBatch>,
@@ -475,8 +478,9 @@ impl SpriteBatch for CombinedBatch {
     }
 }
 
+//only used one time, in shared_game_state, this holds all the textures currently loaded into the game
 pub struct TextureSet {
-    pub tex_map: HashMap<String, Box<dyn SpriteBatch>>,
+    pub tex_map: HashMap<String, Box<dyn SpriteBatch>>, //like a python "dictionary"
     dummy_batch: Box<dyn SpriteBatch>,
 }
 
@@ -485,10 +489,12 @@ impl TextureSet {
         TextureSet { tex_map: HashMap::new(), dummy_batch: Box::new(DummyBatch) }
     }
 
+    //clear all loaded textures
     pub fn unload_all(&mut self) {
         self.tex_map.clear();
     }
 
+    //take a loaded bitmap and if part of it is black, make that part transparent
     fn make_transparent(rgba: &mut RgbaImage) {
         for (r, g, b, a) in rgba.iter_mut().tuples() {
             if *r == 0 && *g == 0 && *b == 0 {
@@ -497,6 +503,7 @@ impl TextureSet {
         }
     }
 
+    //load an image from a file and create a texture object from it (NOT a sub-batch)
     fn load_image(&self, ctx: &mut Context, roots: &Vec<String>, path: &str) -> GameResult<Box<dyn BackendTexture>> {
         let img = {
             let mut buf = [0u8; 8];
@@ -516,10 +523,12 @@ impl TextureSet {
         create_texture(ctx, width as u16, height as u16, &img)
     }
 
+    //check if this texture exsists in the files (all extension types)
     pub fn find_texture(&self, ctx: &mut Context, roots: &Vec<String>, name: &str) -> Option<String> {
         FILE_TYPES.iter().map(|ext| [name, ext].join("")).find(|path| filesystem::exists_find(ctx, roots, path))
     }
 
+    //load in the bitmaps for normal and "glow" mode and assign each to a sub-batch, then to a combined batch
     pub fn load_texture(
         &self,
         ctx: &mut Context,
@@ -529,27 +538,29 @@ impl TextureSet {
         let path = self
             .find_texture(ctx, &constants.base_paths, name)
             .ok_or_else(|| GameError::ResourceLoadError(format!("Texture \"{}\" is missing.", name)))?;
-
+        //is glow ever used?
         let glow_path = self.find_texture(ctx, &constants.base_paths, &[name, ".glow"].join(""));
 
         info!("Loading texture: {} -> {}", name, path);
 
+        //pass in a texture and constants, and this will create a sub-batch
         fn make_batch(name: &str, constants: &EngineConstants, batch: Box<dyn BackendTexture>) -> SubBatch {
             let size = batch.dimensions();
 
             let orig_dimensions = constants.tex_sizes.get(name).unwrap_or(&size);
 
             let scale =
+                // see the difference between the bitmap size and the original dimensions
                 if f32::abs((orig_dimensions.0 as f32 / size.0 as f32) - (orig_dimensions.1 as f32 / size.1 as f32))
                     <= f32::EPSILON
                 {
                     orig_dimensions.0 as f32 / size.0 as f32
                 } else if constants.is_cs_plus && constants.base_paths.iter().any(|p| p.contains("/ogph")) {
-                    1.0
+                    1.0 //cs+ with original graphic mode
                 } else if constants.is_cs_plus {
-                    0.5
+                    0.5 //cs+ double scale
                 } else {
-                    1.0
+                    1.0 //normal scale
                 };
 
             let width = (size.0 as f32 * scale) as _;
@@ -576,6 +587,7 @@ impl TextureSet {
         Ok(Box::new(CombinedBatch { main_batch, glow_batch }))
     }
 
+    //check our loaded textures for this one, and if it's not found, load it in
     pub fn get_or_load_batch(
         &mut self,
         ctx: &mut Context,

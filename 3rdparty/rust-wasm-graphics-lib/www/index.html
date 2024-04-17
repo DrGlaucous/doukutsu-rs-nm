@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>rust-wasm-graphics-lib test</title>
+    <style>
+      .toggle { display: inline-block; width: 40%; }
+    </style>
+  </head>
+  <body>
+    <canvas id="main-canvas"></canvas>
+    <div class="controls">
+      <div>
+        <input id="cb_clear" type="checkbox" checked />
+        <label for="cb_clear">Clear canvas for each frame</label>
+      </div>
+      <hr />
+      <div class="toggle">
+        <input id="cb_demo_fill_polygon" type="checkbox" />
+        <label for="cb_demo_fill_polygon">Toggle filled polygon</label>
+      </div>
+      <div class="toggle">
+        <input id="cb_demo_fill_rect" type="checkbox" />
+        <label for="cb_demo_fill_rect">Toggle filled rectangle</label>
+      </div>
+      <div class="toggle">
+        <input id="cb_demo_fill_triangle_rot" type="checkbox" />
+        <label for="cb_demo_fill_triangle_rot">Toggle filled rotating triangle</label>
+      </div>
+      <div class="toggle">
+        <input id="cb_demo_fill_triangle" type="checkbox" />
+        <label for="cb_demo_fill_triangle">Toggle filled triangle</label>
+      </div>
+      <div class="toggle">
+        <input id="cb_demo_hlines" type="checkbox" />
+        <label for="cb_demo_hlines">Toggle horizontal lines</label>
+      </div>
+      <div class="toggle">
+        <input id="cb_demo_lines" type="checkbox" />
+        <label for="cb_demo_lines">Toggle lines</label>
+      </div>
+      <div class="toggle">
+        <input id="cb_demo_polygon" type="checkbox" />
+        <label for="cb_demo_polygon">Toggle polygon</label>
+      </div>
+      <div class="toggle">
+        <input id="cb_demo_rect" type="checkbox" />
+        <label for="cb_demo_rect">Toggle rectangle</label>
+      </div>
+      <div class="toggle">
+        <input id="cb_demo_rotating_line" type="checkbox" />
+        <label for="cb_demo_rotating_line">Toggle rotating line</label>
+      </div>
+      <div class="toggle">
+        <input id="cb_demo_sprite" type="checkbox" />
+        <label for="cb_demo_sprite">Toggle sprite</label>
+      </div>
+      <div class="toggle">
+        <input id="cb_demo_textured_triangle" type="checkbox" />
+        <label for="cb_demo_textured_triangle">Toggle textured triangle</label>
+      </div>
+      <div class="toggle">
+        <input id="cb_demo_vlines" type="checkbox" />
+        <label for="cb_demo_vlines">Toggle vertical lines</label>
+      </div>
+    </div>
+    <script src="./bootstrap.js"></script>
+  </body>
+</html>

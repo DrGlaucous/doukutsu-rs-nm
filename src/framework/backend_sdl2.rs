@@ -43,6 +43,11 @@ use crate::game::shared_game_state::WindowMode;
 use crate::game::Game;
 use crate::game::GAME_SUSPENDED;
 
+#[cfg(feature = "render-software")]
+use crate::framework::render_software;
+#[cfg(feature = "render-software")]
+use crate::framework::render_software::SoftwareRenderer;
+
 pub struct SDL2Backend {
     context: Sdl,
     size_hint: (u16, u16),
@@ -70,7 +75,7 @@ impl Backend for SDL2Backend {
     }
 }
 
-enum WindowOrCanvas {
+pub enum WindowOrCanvas {
     None,
     Win(Window),
     Canvas(WindowCanvas, TextureCreator<WindowContext>),
@@ -149,13 +154,13 @@ struct SDL2EventLoop {
     opengl_available: RefCell<bool>,
 }
 
-struct SDL2Context {
-    video: VideoSubsystem,
-    window: WindowOrCanvas,
-    gl_context: Option<sdl2::video::GLContext>,
-    blend_mode: sdl2::render::BlendMode,
-    fullscreen_type: sdl2::video::FullscreenType,
-    game_controller: GameControllerSubsystem,
+pub struct SDL2Context {
+    pub video: VideoSubsystem,
+    pub window: WindowOrCanvas,
+    pub gl_context: Option<sdl2::video::GLContext>,
+    pub blend_mode: sdl2::render::BlendMode,
+    pub fullscreen_type: sdl2::video::FullscreenType,
+    pub game_controller: GameControllerSubsystem,
 }
 
 impl SDL2EventLoop {
@@ -444,6 +449,24 @@ impl BackendEventLoop for SDL2EventLoop {
             }
         }
 
+        //try software rendering
+        #[cfg(feature = "render-software")]
+        {
+            //create the canvas and stuff, also get the window size while we're at it.
+            let size_hint = {
+                let mut refs = self.refs.borrow_mut();
+                let window = std::mem::take(&mut refs.window);
+                refs.window = window.make_canvas()?;
+                refs.window.window().size()
+            };
+
+            //self.refs.borrow_mut().window = self.refs.borrow_mut().window.make_canvas()?;
+
+
+            return SoftwareRenderer::new(Some(self.refs.clone()), size_hint);
+        }
+
+        //#[cfg(feature = "render-software")]
         #[cfg(feature = "render-opengl")]
         if *self.opengl_available.borrow() {
             let mut imgui = init_imgui()?;
@@ -485,12 +508,12 @@ impl BackendEventLoop for SDL2EventLoop {
                 GLContext { gles2_mode: false, is_sdl: true, get_proc_address, swap_buffers, user_data, ctx };
 
             return Ok(Box::new(OpenGLRenderer::new(gl_context, UnsafeCell::new(imgui))));
-        } else {
+        } 
+        {
             let mut refs = self.refs.borrow_mut();
             let window = std::mem::take(&mut refs.window);
             refs.window = window.make_canvas()?;
         }
-
         SDL2Renderer::new(self.refs.clone())
     }
 
@@ -550,7 +573,7 @@ impl SDL2Renderer {
     #[allow(clippy::new_ret_no_self)]
     pub fn new(refs: Rc<RefCell<SDL2Context>>) -> GameResult<Box<dyn BackendRenderer>> {
         let mut imgui = init_imgui()?;
-
+        
         imgui.set_renderer_name("SDL2Renderer".to_owned());
         let imgui_font_tex = {
             let refs = refs.clone();
