@@ -149,7 +149,7 @@ impl WindowOrCanvas {
 }
 
 struct SDL2EventLoop {
-    event_pump: EventPump,
+    event_pump: Rc<RefCell<EventPump>>, //new: wrapped in refCounter
     refs: Rc<RefCell<SDL2Context>>,
     opengl_available: RefCell<bool>,
 }
@@ -201,7 +201,7 @@ impl SDL2EventLoop {
         let opengl_available = if let Ok(v) = std::env::var("CAVESTORY_NO_OPENGL") { v != "1" } else { true };
 
         let event_loop = SDL2EventLoop {
-            event_pump,
+            event_pump: Rc::new(RefCell::new(event_pump)),
             refs: Rc::new(RefCell::new(SDL2Context {
                 video,
                 window: WindowOrCanvas::Win(window),
@@ -259,7 +259,7 @@ impl BackendEventLoop for SDL2EventLoop {
                 }
             }
 
-            for event in self.event_pump.poll_iter() {
+            for event in self.event_pump.borrow_mut().poll_iter() {
                 imgui_sdl2.handle_event(imgui, &event);
 
                 match event {
@@ -426,7 +426,7 @@ impl BackendEventLoop for SDL2EventLoop {
             imgui_sdl2.prepare_frame(
                 imgui.io_mut(),
                 self.refs.deref().borrow().window.window(),
-                &self.event_pump.mouse_state(),
+                &self.event_pump.borrow_mut().mouse_state(),
             );
 
             game.draw(ctx).unwrap();
@@ -450,6 +450,9 @@ impl BackendEventLoop for SDL2EventLoop {
         }
 
         //try software rendering
+        //(it's ass, but I'm just using this to set up the basic renderer.
+        //I don't want to bother working with SDL surfaces when in the end, it's all just going to go into retroarch)
+        //I need the window surface, but I can't get at it without the event pump
         #[cfg(feature = "render-software")]
         {
             //create the canvas and stuff, also get the window size while we're at it.
@@ -462,11 +465,10 @@ impl BackendEventLoop for SDL2EventLoop {
 
             //self.refs.borrow_mut().window = self.refs.borrow_mut().window.make_canvas()?;
 
-
-            return SoftwareRenderer::new(Some(self.refs.clone()), size_hint);
+            return SoftwareRenderer::new(Some(self.refs.clone()), self.event_pump.clone(), size_hint);
         }
 
-        //#[cfg(feature = "render-software")]
+
         #[cfg(feature = "render-opengl")]
         if *self.opengl_available.borrow() {
             let mut imgui = init_imgui()?;

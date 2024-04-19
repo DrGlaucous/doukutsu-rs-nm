@@ -545,13 +545,13 @@ impl Scene for TitleScene {
 
         //test drawing
         {
-            //let rect = Rect::new(0, 0, state.screen_size.0 as isize + 1, state.screen_size.1 as isize + 1);
-            //let dim_color = Color::from_rgba(255, 255, 0, 0);
-            //graphics::draw_rect(ctx, rect, dim_color)?;
+            // let rect = Rect::new(0, 0, state.screen_size.0 as isize + 1, state.screen_size.1 as isize + 1);
+            // let dim_color = Color::from_rgba(255, 255, 0, 0);
+            // graphics::draw_rect(ctx, rect, dim_color)?;
 
-            let dim_color = Color::from_rgba(255, 0, 0, 255);
-            let rect = Rect::new(20, 20, 40, 40);
-            graphics::draw_outline_rect(ctx, rect, 1, dim_color)?;
+            // let dim_color = Color::from_rgba(255, 0, 0, 255);
+            // let rect = Rect::new(20, 20, 40, 40);
+            // graphics::draw_outline_rect(ctx, rect, 1, dim_color)?;
         }
 
         Ok(())

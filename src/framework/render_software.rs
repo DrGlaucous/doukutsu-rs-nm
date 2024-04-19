@@ -71,7 +71,9 @@ use sdl2::surface::Surface;
 use sdl2::video::GLProfile;
 use sdl2::video::Window;
 use sdl2::video::WindowContext;
+use sdl2::video::WindowSurfaceRef;
 use sdl2::{controller, keyboard, pixels, EventPump, GameControllerSubsystem, Sdl, VideoSubsystem};
+
 
 use rust_wasm_graphics_lib::canvas::{self, Canvas};
 use rust_wasm_graphics_lib::drawing;
@@ -101,30 +103,75 @@ use crate::framework::backend_sdl2::SDL2Context;
 
 
 
-//see if this is ligher weight than the triangle functions
+//see if this is ligher weight than the triangle functions (most likely: yes)
 pub fn draw_to_canvas_rect(
     canv_dst: &mut Canvas,
     canv_src: &Canvas,
-    x: usize,
-    y: usize,
     rect_src: &Rect<isize>,
+    x: isize,
+    y: isize,
 ) {
+
     //handle OOB cases
-    if x >= canv_dst.width() ||
-    y >= canv_dst.height() ||
-    rect_src.width() == 0 ||
-    rect_src.height() == 0 {
+    if x >= canv_dst.width() as isize || //left corner is beyond canvas' right side
+    y >= canv_dst.height() as isize || //bottom
+    (x + canv_src.width() as isize) < 0 || //right corner is beyond canvas' left side
+    (y + canv_src.height() as isize) < 0 || //top
+    rect_src.width() == 0 || //source rect is 0
+    rect_src.height() == 0
+    {
         return
     }
 
-    let dest_buffer = canv_dst.buffer_mut();
+    //do this so we can edit these values
+    let mut rect_src = rect_src.clone();
+    let (mut x, mut y) = (x, y);
 
-    // dest_buffer
-    //     .as_mut_slice()
-    //     .chunks_mut(canv_dst.width())
-    //     .skip(y) //skip over the unused top of the destination
-    //     .take()
 
+    //OOB trimming
+
+    //left/top trimming
+    if x < 0 {
+        rect_src.left -= x;
+        x -= x;
+    }
+    if y < 0 {
+        rect_src.left -= y;
+        y -= y;
+    }
+
+    //right/bottom trimming
+    if x + rect_src.width() > canv_dst.width() as isize {
+        let diff = x + rect_src.width() - canv_dst.width() as isize;
+        rect_src.right -= diff;
+    }
+    if y + rect_src.height() > canv_dst.height() as isize {
+        let diff = y + rect_src.height() - canv_dst.height() as isize;
+        rect_src.bottom -= diff;
+    }
+
+    //rect is now guaranteed to be between [0-dest_rect_width/height]
+
+
+
+    //let dest_buffer = canv_dst.buffer_mut();
+    let sour_buffer = canv_src.buffer();
+    for sy in 0..(rect_src.height() as usize) {
+        for sx in 0..(rect_src.width() as usize) {
+            let dy = sy + y as usize;
+            let dx =  sx + x as usize;
+            let d_idx = canv_dst.buffer_index(dx, dy);
+            let s_idx = canv_src.buffer_index(sx, sy);
+            canv_dst.buffer_mut()[d_idx] = sour_buffer[s_idx];
+        }
+    }
+
+
+
+    //same as a pre-exsisting function, but inlined so its faster
+    //index of buffer from source canvas
+    //let src_width = canv_src.width();
+    //let bf_idx = (rect_src.top as usize * src_width) + rect_src.left as usize;
 
 
 }
@@ -208,6 +255,9 @@ impl BackendTexture for SoftwareTexture {
                                         &vertices[0], &vertices[1], &vertices[2], UVWrapMode::Clamp);
                                     drawing::shape::textured_triangle(upstream_canvas.deref_mut(), &mut self_texture,
                                         &vertices[3], &vertices[4], &vertices[5], UVWrapMode::Clamp);
+
+                                    //let src = Rect::new(src.left as isize, src.top as isize, src.right as isize, src.bottom as isize);
+                                    //draw_to_canvas_rect(&mut upstream_canvas, &self_texture, &src, dst.left, dst.top);
                                 }
                             }
                             
@@ -258,14 +308,17 @@ pub struct BalSdl {
     pub sdl_refs : Rc<RefCell<SDL2Context>>, //refrence to the window we're drawing to
     //note: Textures are hardware accelerated, Surfaces are software accelerated
     texture: Texture, //input hole to put our rendered images
-    surface: Surface<'static>,
+    //surface: Surface<'static>,
+
+    //unused other than to create a window surface refrence
+    event_pump: Rc<RefCell<EventPump>>,
 
     width: u32, //width and height of the texture
     height: u32,
 }
 
 impl BalSdl {
-    pub fn new(refs: Rc<RefCell<SDL2Context>>) -> GameResult<Box<dyn BalPresent>> {
+    pub fn new(refs: Rc<RefCell<SDL2Context>>, event_pump: Rc<RefCell<EventPump>>) -> GameResult<Box<dyn BalPresent>> {
 
 
         let (width, height) = refs.borrow_mut().window.window().size();
@@ -281,17 +334,22 @@ impl BalSdl {
                 GameError::RenderError(e.to_string())
             })?;
 
-        let masks = PixelFormatEnum::BGRA32;
-        let mut surface = Surface::new(width, height, masks)
-            .map_err(|e| {
-            log::info!("{}", e.to_string());
-            GameError::RenderError(e.to_string())
-        })?;
+        // let masks = PixelFormatEnum::BGRA32;
+        // let mut surface = Surface::new(width, height, masks)
+        //     .map_err(|e| {
+        //     log::info!("{}", e.to_string());
+        //     GameError::RenderError(e.to_string())
+        // })?;
+        // if let Result::Ok(surf) = refs.borrow_mut().window.window().surface(event_pump.borrow().deref())
+        // {
+        //     surf.update_window(); //updates window and keeps ref (software-equivalent of present())
+        //     //surf.finish(); //updates window and deletes ref
+        // }
 
 
         Ok(Box::new(BalSdl {
             texture: texture,
-            surface: surface,
+            event_pump: event_pump,
             sdl_refs: refs,
             width: width,
             height: height,
@@ -392,8 +450,6 @@ impl BalPresent for BalSdl {
 
         canvas.present();
 
-
-
         Ok(())
 
 
@@ -431,14 +487,14 @@ impl SoftwareRenderer {
 
     //we need this to take multiple refence types
     #[allow(clippy::new_ret_no_self)]
-    pub fn new(refs_sdl: Option<Rc<RefCell<SDL2Context>>>, size_hint: (u32, u32)) -> GameResult<Box<dyn BackendRenderer>> {
+    pub fn new(refs_sdl: Option<Rc<RefCell<SDL2Context>>>, event_pump: Rc<RefCell<EventPump>>, size_hint: (u32, u32)) -> GameResult<Box<dyn BackendRenderer>> {
         
         let mut imgui = init_imgui()?;
         imgui.io_mut().display_size = [size_hint.0 as f32, size_hint.1 as f32];
         imgui.fonts().build_alpha8_texture();
 
         //todo: take other types of refs (implement things like BalGl)
-        let presenter = BalSdl::new(refs_sdl.unwrap())?;
+        let presenter = BalSdl::new(refs_sdl.unwrap(), event_pump)?;
 
         Ok(Box::new(SoftwareRenderer{
             presenter: presenter,
