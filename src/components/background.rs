@@ -1,14 +1,15 @@
 use std::borrow::BorrowMut;
+use std::env;
 
 use crate::common::{Color, Rect};
 use crate::framework::context::Context;
 use crate::framework::error::GameResult;
 use crate::framework::{filesystem, graphics};
 use crate::game::frame::Frame;
-use crate::game::shared_game_state::SharedGameState;
+use crate::game::shared_game_state::{SharedGameState, TileSize};
 use crate::game::stage::{BackgroundType, Stage, StageTexturePaths};
 use crate::scene::game_scene::LightingMode;
-//use crate::framework::error::GameError::ResourceLoadError;
+use crate::framework::error::GameError::ParseError;
 use crate::framework::error::GameError;
 use crate::util::rng::{Xoroshiro32PlusPlus, RNG};
 
@@ -26,6 +27,15 @@ pub struct ScrollFlags {
     pub lock_to_x_axis: bool,
     pub lock_to_y_axis: bool,
     pub randomize_all_parameters: bool,
+    //introduced with json version 2
+    #[serde(default = "default_false")]
+    pub add_screen_width: bool,
+    #[serde(default = "default_false")]
+    pub add_screen_height: bool,
+    #[serde(default = "default_true")]
+    pub relative_to_pillarbox: bool,
+    #[serde(default = "default_true")]
+    pub relative_to_letterbox: bool,
 
 }
 
@@ -80,6 +90,10 @@ pub struct LayerConfig {
     #[serde(skip)]
     pub frame_y_offset: f32,
 
+    //coordinates to use for refrencing the screen edge, can be unique for each layer
+    #[serde(skip)]
+    pub edge_coords: Rect<f32>,
+
 }
 
 impl LayerConfig {
@@ -117,6 +131,10 @@ impl LayerConfig {
                     lock_to_x_axis: false,
                     lock_to_y_axis: false,
                     randomize_all_parameters: false,
+                    add_screen_width: false,
+                    add_screen_height: false,
+                    relative_to_pillarbox: true,
+                    relative_to_letterbox: true,
                 }
             },
 
@@ -125,6 +143,7 @@ impl LayerConfig {
             layer_y_value: 0.0,
             frame_x_offset: 0.0, //extra offsets to apply from the camera
             frame_y_offset: 0.0,
+            edge_coords: Rect::new(0.0, 0.0, 0.0, 0.0),
 
         }
     }
@@ -138,12 +157,24 @@ pub struct BkgConfig {
     pub bmp_filename: String,
     pub lighting_mode: u8,
     pub layers : Vec<LayerConfig>,
+
+    //#[serde(skip)]
+    //path: String, //keep the path we loaded with so we can upgrade if needed
+
 }
 
 #[inline(always)]
 fn current_version() -> u32 {
-    1
+    2
 }
+
+fn default_false() -> bool {
+    false
+}
+fn default_true() -> bool {
+    true
+}
+
 
 
 impl BkgConfig {
@@ -170,16 +201,20 @@ impl BkgConfig {
     }
 
     //a near-clone of the upgrade path in settings.rs, in case more featues need to be added, old config files can be updated to match
-    pub fn upgrade(mut self) -> Self {
+    pub fn upgrade(mut self, path: &String) -> Self {
 
         let initial_version = self.version;
 
-        //if self.version == 1 {}
-        //if self.version == 2 {}
-
+        if self.version == 1 {
+            self.version = 2;
+        }
 
         if self.version != initial_version {
-            log::info!("Upgraded bkg file from version {} to {}.", initial_version, self.version);
+            log::info!("Upgraded bkg file \"{}\" from version {} to {}.", path, initial_version, self.version);
+
+            if let Err(r) = self.write_out(path) {
+                log::error!("Failed to save updated bkg file: {}", r);
+            }
         }
 
         self
@@ -189,7 +224,6 @@ impl BkgConfig {
     pub fn save(&self, ctx: &Context, path: &String) -> GameResult {
         let file = filesystem::user_create(ctx, "/".to_string() + path + ".json")?;
         serde_json::to_writer_pretty(file, self)?;
-
         Ok(())
     }
 
@@ -239,6 +273,10 @@ impl BkgConfig {
                     layer_ref.animation_style.scroll_flags.lock_to_x_axis = 0 < (value & 1 << 8);
                     layer_ref.animation_style.scroll_flags.lock_to_y_axis = 0 < (value & 1 << 9);
                     layer_ref.animation_style.scroll_flags.randomize_all_parameters = 0 < (value & 1 << 10);
+                    layer_ref.animation_style.scroll_flags.add_screen_width = 0 < (value & 1 << 11);
+                    layer_ref.animation_style.scroll_flags.add_screen_height = 0 < (value & 1 << 12);
+                    layer_ref.animation_style.scroll_flags.relative_to_pillarbox= 0 < (value & 1 << 13);
+                    layer_ref.animation_style.scroll_flags.relative_to_letterbox = 0 < (value & 1 << 14);
                 }
                 //invalid parameter: do nothing
                 _ => {}
@@ -249,6 +287,62 @@ impl BkgConfig {
         Ok(())
     }
 
+    //write self to ./data/bkg/path.json (filesystem only allows writing to the user directory)
+    fn write_out(&self, path: &String) -> GameResult {
+        
+        //get path of current executable (one layer above ./data) (lifted from vanilla.rs)
+        #[cfg(not(any(target_os = "android", target_os = "horizon")))]
+        let mut data_root_path = env::current_dir().unwrap();
+
+        #[cfg(target_os = "android")]
+        let mut data_root_path = PathBuf::from(ndk_glue::native_activity().internal_data_path().to_string_lossy().to_string());
+
+        #[cfg(target_os = "horizon")]
+        let mut data_root_path = PathBuf::from("sdmc:/switch/doukutsu-rs/");
+
+        //other environment checks (if other path is incorrect, get the path of self and remove the "self" part)
+        #[cfg(not(any(target_os = "android", target_os = "horizon")))]
+        if !data_root_path.is_file() {
+            data_root_path = env::current_exe().unwrap();
+            data_root_path.pop();
+        }
+
+
+
+        //get location of ./data (lifted from shared_game_state.rs)
+        let datadir = match option_env!("VANILLA_EXT_OUTDIR") {
+            Some(outdir) => outdir,
+            None => "data",
+        };
+
+        data_root_path.push(datadir);
+        data_root_path.push("bkg");
+
+        //try to create folders if they do not already exsist (clone of deep_create_dir_if_not_exists)
+        if !data_root_path.is_dir() {
+            let result = std::fs::create_dir_all(data_root_path.clone());
+            if result.is_err() {
+                return Err(ParseError(format!("Failed to create directory structure: {}", result.unwrap_err())));
+            }
+        }
+
+        //push filename
+        data_root_path.push(path.clone() + ".json");
+
+        //make file object from path
+        let bkg_file = match std::fs::File::create(data_root_path) {
+            Ok(file) => file,
+            Err(_) => {
+                return Err(ParseError("Failed to create BKG file.".to_string()));
+            }
+        };
+
+        //write out
+        serde_json::to_writer_pretty(bkg_file, self)?;
+
+        Ok(())
+
+    }
 }
 
 impl Default for BkgConfig{
@@ -310,26 +404,10 @@ impl Background {
         self.cache_background_type = stage.data.background_type.clone();
         self.cache_background_lighting = *lighting_mode;
 
-        // match BkgConfig::load(ctx, path)
-        // {
-        //     //return gotten config or do nothing if none found (for me, create template to get started)
-        //     Ok(config) => {
-        //         textures.background = config.bmp_filename.clone();
-        //         self.bk_config = config.upgrade();
-        //         stage.data.background_type = BackgroundType::Custom;
-        //         *lighting_mode = LightingMode::from(self.bk_config.lighting_mode);
-        //     }
-        //     //if doesn't exsist, return the default config (I also used this to create the first BKG templates for later modification)
-        //     Err(_) => {
-        //         let config = BkgConfig::default();
-        //         config.save(ctx, &textures.background)?;
-        //     }
-        // };
-
         //if the config file is valid, load it in
         if let Ok(config) = BkgConfig::load(ctx, path) {
             textures.background = config.bmp_filename.clone(); //we need to check the validity of the filename here to stop the program from crashing, but this not essential for function
-            self.bk_config = config.upgrade();
+            self.bk_config = config.upgrade(path);
             stage.data.background_type = BackgroundType::Custom;
             *lighting_mode = LightingMode::from(self.bk_config.lighting_mode);
         }
@@ -352,9 +430,36 @@ impl Background {
     pub fn tick(
         &mut self,
         state: &mut SharedGameState,
+        stage: &Stage,
         frame: &Frame,
     ) -> GameResult<()> {
         self.tick = self.tick.wrapping_add(1);
+
+
+
+        //we need the map size so we can account for the letterboxing/pillarboxing
+        let tile_size = match state.tile_size {
+            TileSize::Tile16x16 => 16,
+            TileSize::Tile8x8 => 8,
+        };
+        //size of the loaded stage in pixels
+        let map_pxl_width = stage.map.width * tile_size;
+        let map_pxl_height = stage.map.height * tile_size;
+        //actual size of a single letterbox (left or right)/(top or bottom)
+        let pilrbox_width = if state.canvas_size.0 > map_pxl_width as f32 {(state.canvas_size.0 - map_pxl_width as f32) / 2.0} else {0.0};
+        let ltrbox_height = if state.canvas_size.1 > map_pxl_height as f32 {(state.canvas_size.1 - map_pxl_height as f32) / 2.0} else {0.0};
+
+        //the new offsets that should be used 
+        let pb_canvas_width = if state.canvas_size.0 > map_pxl_width as f32 {pilrbox_width + map_pxl_width as f32} else {state.canvas_size.0};
+        let lb_canvas_height = if state.canvas_size.1 > map_pxl_width as f32 {ltrbox_height + map_pxl_height as f32} else {state.canvas_size.1};
+
+        //map edges if letterboxes are taken into account
+        let boxed_lim = Rect::new(pilrbox_width, ltrbox_height, pb_canvas_width, lb_canvas_height);
+        //map edges relative to actual window size
+        let windowed_lim = Rect::new(0.0, 0.0, state.canvas_size.0, state.canvas_size.1);
+
+
+
 
         for layer in self.bk_config.layers.as_mut_slice() {
             if !layer.layer_enabled {continue;}
@@ -374,7 +479,7 @@ impl Background {
             }
             //could also possibly do this without needing mutable vars, but cannot specify start frame, and will not halt when bkg is inactive
             //let equivalent_tick = (self.tick as u32 / layer.animation_style.animation_speed) % layer.animation_style.frame_count;
-
+            
 
             ////advance location offsets
 
@@ -384,14 +489,31 @@ impl Background {
             //reset frame offsets so background location resets with no-flag conditions
             let (frame_x, frame_y) = frame.xy_interpolated(state.frame_time);
 
-            layer.frame_x_offset = 0.0;
-            layer.frame_y_offset = 0.0;
+            //handle edge relativity
+            if scroll_flags.relative_to_pillarbox {
+                (layer.edge_coords.left, layer.edge_coords.right) = (boxed_lim.left, boxed_lim.right);
+            } else {
+                (layer.edge_coords.left, layer.edge_coords.right) = (windowed_lim.left, windowed_lim.right);
+            }
+
+            if scroll_flags.relative_to_letterbox {
+                (layer.edge_coords.top, layer.edge_coords.bottom) = (boxed_lim.top, boxed_lim.bottom);
+            } else {
+                (layer.edge_coords.top, layer.edge_coords.bottom) = (windowed_lim.top, windowed_lim.bottom);
+            }
+
+
+            layer.frame_x_offset = layer.edge_coords.left;
+            layer.frame_y_offset = layer.edge_coords.top;
 
             if scroll_flags.follow_pc_x {
                 layer.frame_x_offset -= frame_x as f32 * layer.animation_style.follow_speed_x;
             }
             if scroll_flags.lock_to_y_axis {
                 layer.frame_x_offset -= frame_x as f32;
+            }
+            if scroll_flags.add_screen_width {
+                layer.frame_x_offset += layer.edge_coords.width();
             }
 
             if scroll_flags.align_with_water_lvl {
@@ -402,6 +524,9 @@ impl Background {
             }
             if scroll_flags.lock_to_x_axis {
                 layer.frame_y_offset -= frame_y as f32;
+            }
+            if scroll_flags.add_screen_height {
+                layer.frame_y_offset += layer.edge_coords.height()
             }
 
 
@@ -434,10 +559,10 @@ impl Background {
             //looping for infinite-width tilesets: (note: it takes several cycles to get this within range if corner offsets are massve: that's what the code above tried to solve, but it introduces other problems I don't want to deal with)
             if layer.draw_repeat_x == 0 {
                 //offset just behind left wall, and shift in
-                if layer.layer_x_value + layer.frame_x_offset + layer.draw_corner_offset_x >  0.0 {                    
+                if layer.layer_x_value + layer.frame_x_offset + layer.draw_corner_offset_x > layer.edge_coords.left { //0.0 {                    
                     layer.layer_x_value -= full_width;
                 }
-                else if layer.layer_x_value + layer.frame_x_offset + layer.draw_corner_offset_x < 0.0  - full_width {
+                else if layer.layer_x_value + layer.frame_x_offset + layer.draw_corner_offset_x < layer.edge_coords.left - full_width {
                     layer.layer_x_value += full_width;
                 }
             }
@@ -448,10 +573,10 @@ impl Background {
                 //if layer's right corner offset by the times it should be draw is less than 0, shift it over by one bitmap width and window width
                 if layer.layer_x_value + layer.draw_corner_offset_x +
                 (full_width * layer.draw_repeat_x as f32) +
-                layer.frame_x_offset < 0.0 {
+                layer.frame_x_offset < layer.edge_coords.left {
 
                     //move whole layerset to the right side of the viewspace
-                    layer.layer_x_value += (full_width * layer.draw_repeat_x as f32) + state.canvas_size.0;
+                    layer.layer_x_value += (full_width * layer.draw_repeat_x as f32) + layer.edge_coords.width();
 
                     //if y movement is randomized, add a random value +- animation speed to the y position
                     if scroll_flags.random_offset_y {
@@ -460,10 +585,11 @@ impl Background {
                 }
 
                 //if layer's left corner is beyond the window width
-                else if layer.layer_x_value + layer.draw_corner_offset_x + layer.frame_x_offset > state.canvas_size.0{
+                else if layer.layer_x_value + layer.draw_corner_offset_x +
+                layer.frame_x_offset > layer.edge_coords.right {
 
                     //move whole layer set to the left side of the viewspace
-                    layer.layer_x_value -= (full_width * layer.draw_repeat_x as f32) + state.canvas_size.0;
+                    layer.layer_x_value -= (full_width * layer.draw_repeat_x as f32) + layer.edge_coords.width();
 
                     if scroll_flags.random_offset_y {
                         layer.layer_y_value += self.rng.range(-(layer.animation_style.animation_speed as i32)..(layer.animation_style.animation_speed as i32)) as f32;
@@ -476,37 +602,39 @@ impl Background {
             //same as above but for y
             if layer.draw_repeat_y == 0 {
                 //offset just behind left wall, and shift in
-                if layer.layer_y_value + layer.frame_y_offset + layer.draw_corner_offset_y >  0.0 {
+                if layer.layer_y_value + layer.frame_y_offset + layer.draw_corner_offset_y >  layer.edge_coords.top { //0.0 {
                     layer.layer_y_value -= full_height;
                 }
-                else if layer.layer_y_value + layer.frame_y_offset + layer.draw_corner_offset_y < 0.0  - full_height {
+                else if layer.layer_y_value + layer.frame_y_offset + layer.draw_corner_offset_y < layer.edge_coords.top - full_height {
                     layer.layer_y_value += full_height;
                 }
             }
             else if scroll_flags.autoscroll_y {
                 //layer.layer_y_value -= layer.animation_style.scroll_speed_y;
 
-                //if layer's right corner offset by the times it should be draw is less than 0, shift it over by one bitmap width and window width
+                //if layer's top corner offset by the times it should be draw is less than 0, shift it down by one bitmap height and window height
                 if layer.layer_y_value + layer.draw_corner_offset_y +
-                (full_height * layer.draw_repeat_y as f32) + layer.frame_y_offset < 0.0{
+                (full_height * layer.draw_repeat_y as f32) +
+                layer.frame_y_offset < layer.edge_coords.top {
 
                     //move whole layerset to the bottom of the viewspace
-                    layer.layer_y_value += (full_height * layer.draw_repeat_y as f32) + state.canvas_size.1;
+                    layer.layer_y_value += (full_height * layer.draw_repeat_y as f32) + layer.edge_coords.height();
 
                     //if y movement is randomized, add a random value +- animation speed to the x position
                     if scroll_flags.random_offset_x {
-                        layer.layer_y_value += self.rng.range(-(layer.animation_style.animation_speed as i32)..(layer.animation_style.animation_speed as i32)) as f32;
+                        layer.layer_x_value += self.rng.range(-(layer.animation_style.animation_speed as i32)..(layer.animation_style.animation_speed as i32)) as f32;
                     }
                 }
 
-                //if layer's left corner is beyond the window width
-                else if layer.layer_y_value + layer.draw_corner_offset_y + layer.frame_y_offset > state.canvas_size.1{
+                //if layer's bottom corner is beyond the window height
+                else if layer.layer_y_value + layer.draw_corner_offset_y +
+                layer.frame_y_offset > layer.edge_coords.bottom {
 
                     //move whole layer set to the bottom of the viewspace
-                    layer.layer_y_value -= (full_height * layer.draw_repeat_y as f32) + state.canvas_size.1;
+                    layer.layer_y_value -= (full_height * layer.draw_repeat_y as f32) + layer.edge_coords.height();
 
                     if scroll_flags.random_offset_x {
-                        layer.layer_y_value += self.rng.range(-(layer.animation_style.animation_speed as i32)..(layer.animation_style.animation_speed as i32)) as f32;
+                        layer.layer_x_value += self.rng.range(-(layer.animation_style.animation_speed as i32)..(layer.animation_style.animation_speed as i32)) as f32;
                     }
 
                 }
@@ -682,7 +810,8 @@ impl Background {
                 for layer in self.bk_config.layers.as_slice() {
                     if !layer.layer_enabled ||
                     (is_front && !layer.animation_style.scroll_flags.draw_above_foreground) || //layer is not flagged to draw above the foreground
-                    (!is_front && layer.animation_style.scroll_flags.draw_above_foreground)
+                    (!is_front && layer.animation_style.scroll_flags.draw_above_foreground) ||
+                    (layer.bmp_height == 0 || layer.bmp_width == 0) //skip 0-width rects
                     {continue;}
 
 
@@ -708,7 +837,7 @@ impl Background {
                     y_off += layer.draw_corner_offset_y;
 
                     let mut y = 0;
-                    while (y < rep_y || rep_y == 0) && y_off < (state.canvas_size.1 as f32) * 16.0 {
+                    while (y < rep_y || rep_y == 0) && y_off < layer.edge_coords.bottom { //(state.canvas_size.1 as f32) * 16.0 {
                         
                         //need this to reset for each layer
                         let mut x_off = layer.layer_x_value as f32;
@@ -722,7 +851,7 @@ impl Background {
 
                         //while loop (x-axis)
                         let mut x = 0;
-                        while (x < rep_x || rep_x == 0) && x_off < (state.canvas_size.0 as f32) * 16.0 {
+                        while (x < rep_x || rep_x == 0) && x_off < layer.edge_coords.right { //(state.canvas_size.0 as f32) * 16.0 {
 
                             //condition taken care of earler in the draw process
                             //if scroll_flags.draw_above_foreground {}
@@ -746,14 +875,6 @@ impl Background {
                 }
 
 
-                // let (bg_width, bg_height) = (batch.width() as i32, batch.height() as i32);
-                // let count_x = state.canvas_size.0 as i32 / bg_width + 1;
-                // let count_y = state.canvas_size.1 as i32 / bg_height + 1;
-                // for y in -1..count_y {
-                //     for x in -1..count_x {
-                //         batch.add((x * bg_width) as f32, (y * bg_height) as f32);
-                //     }
-                // }
             }
         }
 
