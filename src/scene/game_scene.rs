@@ -1343,7 +1343,7 @@ impl GameScene {
 
 
         self.nikumaru.tick(state, &self.player1)?;
-        self.background.tick(state, &self.frame)?;
+        self.background.tick(state, &self.stage, &self.frame)?;
         self.hud_player1.visible = self.player1.cond.alive();
         self.hud_player2.visible = self.player2.cond.alive();
         self.hud_player1.has_player2 = self.player2.cond.alive() && !self.player2.cond.hidden();
