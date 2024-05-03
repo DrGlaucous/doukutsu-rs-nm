@@ -1339,7 +1339,7 @@ impl GameScene {
         }
     }
 
-    fn tick_world(&mut self, state: &mut SharedGameState, ctx: &mut Context) -> GameResult {
+    fn tick_world(&mut self, state: &mut SharedGameState) -> GameResult {
 
 
         self.nikumaru.tick(state, &self.player1)?;
@@ -1878,7 +1878,7 @@ impl Scene for GameScene {
                     TextScriptExecutionState::MapSystem => (),
                     _ => {
                         if state.control_flags.tick_world() {
-                            self.tick_world(state, ctx)?;
+                            self.tick_world(state)?;
                         }
                     }
                 }

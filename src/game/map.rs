@@ -26,17 +26,17 @@ static SUPPORTED_PXE_VERSIONS: [u8; 2] = [0, 0x10];
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct TileAnimConfig {
     pub tile_id: u16,
-    pub frame_count: u32,
-    pub frame_start: u32,
     pub animation_speed: u32, //ticks between frame change
+    pub frame_start: u32,
+    pub frame: Vec<u16>,
 }
 impl Default for TileAnimConfig {
     fn default() -> Self {
         Self {
             tile_id: 0,
             animation_speed: 0,
-            frame_count: 0,
             frame_start: 0,
+            frame: vec![0,1]
         }
     }
 }
