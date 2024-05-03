@@ -258,9 +258,9 @@ Here are the fields for the animated tile config file:
 - `tiles` - a list of each tile to have an animation.
 - `tile_id` - which tile from the bitmap should recieve this animation. The tile is indexed from `0` at the top left corner from left to right. For `.pxa` files, it is indexed by `16` pixels. For `.pxpack` *(kero-blaster)* files, it is indexed by `8`. This behaves similar to how the stock `<CMP` command works.
 *Note: if multiple entries share the same `tile_id`, it will only use the configuration from the last one in the list.*
-- `frame_count` - how many frames of animation the layer should have, 0 and 1 both do the same thing
-- `frame_start` - what animation number to start on, [0 thru frame_count-1]
 - `animation_speed` - how many ingame ticks it takes to advance the frame by 1
+- `frame_start` - what animation number to start on, values larger than the number of frames will be wrapped
+- `frame` - list of tile RECTs to render in sequence, selected in the same manner as the `tile_id`. *(Note: this affects what the tile **looks like** only. It does not affect collision, which is still that of `tile_id`.)*
  
 Here's an example of a file:
 ```
@@ -269,15 +269,29 @@ Here's an example of a file:
   "tiles": [
     {
       "tile_id": 60,
-      "frame_count": 6,
+      "animation_speed": 8,
       "frame_start": 0,
-      "animation_speed": 8
+      "frame": [
+        60,
+        61,
+        62,
+        63,
+        64,
+        65
+      ]
     },
-    {
-      "tile_id": 61,
-      "frame_count": 6,
-      "frame_start": 0,
-      "animation_speed": 8
+	{
+      "tile_id": 65,
+      "animation_speed": 8,
+      "frame_start": 5,
+      "frame": [
+        60,
+        61,
+        62,
+        63,
+        64,
+        65
+      ]
     }
   ]
 }

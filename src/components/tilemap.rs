@@ -183,9 +183,9 @@ impl Tilemap {
                 //offset tile by its current animation frame if it is currently in our index
                 if let Some(anim_config) = stage.map.animation_config.borrow() {
                     for t_config in anim_config.tiles.as_slice() {
-                        if t_config.tile_id == tile && t_config.frame_count > 1 {
-                            let offset_count = (self.tick/t_config.animation_speed + t_config.frame_start) % t_config.frame_count;
-                            let offset_tile = tile + offset_count as u16;
+                        if t_config.tile_id == tile && t_config.frame.len() > 0 {
+                            let frame_index = (self.tick/t_config.animation_speed + t_config.frame_start) as usize % t_config.frame.len();
+                            let offset_tile = t_config.frame[frame_index];
                             let tile_size = tile_size as u16;
                             rect.left = (offset_tile as u16 % 16) * tile_size;
                             rect.top = (offset_tile as u16 / 16) * tile_size;
