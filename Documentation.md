@@ -224,7 +224,7 @@ Here's an example of a file:
   ]
 }
 ```
-(to try this out ingame, name it something like `background_name.json` and place it in the `/data/bkg` directory), then load it in with `<BKGbackground_name$`
+*(to try this out ingame, name it something like `background_name.json` and place it in the `/data/bkg` directory, then load it in with `<BKGbackground_name$`)*
 
 
 
@@ -248,10 +248,41 @@ In addition to support for layers, the following commands have been added to int
 
 
 
+## Animated tiles
 
+The animated tiles option allows tiles to change their color on a predefined tick interval, just like the `animation_speed` parameter of `<BKG`. The tile animations are configured with a `.json` file placed in the `./data/Stage` directory. This `.json` must have the same name as the tileset it will be loaded with. For example, a `.json` with name `Cave.json` will be loaded with the tileset `PrtCave.bmp` +  `Cave.pxa`. If the `.json` is not correctly formatted or not present, it will simply be ignored and the tileset will be loaded as normal.
 
+Here are the fields for the animated tile config file:
 
-
+- `version` - config version number, this should not be edited by the user, since it tells the engine how to deal with the config file. Files that are out of date will automatically be updated and re-saved by the engine when it tries to load them.
+- `tiles` - a list of each tile to have an animation.
+- `tile_id` - which tile from the bitmap should recieve this animation. The tile is indexed from `0` at the top left corner from left to right. For `.pxa` files, it is indexed by `16` pixels. For `.pxpack` *(kero-blaster)* files, it is indexed by `8`. This behaves similar to how the stock `<CMP` command works.
+*Note: if multiple entries share the same `tile_id`, it will only use the configuration from the last one in the list.*
+- `frame_count` - how many frames of animation the layer should have, 0 and 1 both do the same thing
+- `frame_start` - what animation number to start on, [0 thru frame_count-1]
+- `animation_speed` - how many ingame ticks it takes to advance the frame by 1
+ 
+Here's an example of a file:
+```
+{
+  "version": 1,
+  "tiles": [
+    {
+      "tile_id": 60,
+      "frame_count": 6,
+      "frame_start": 0,
+      "animation_speed": 8
+    },
+    {
+      "tile_id": 61,
+      "frame_count": 6,
+      "frame_start": 0,
+      "animation_speed": 8
+    }
+  ]
+}
+```
+*(to try this out ingame, name it something like `Cave.json` and place it in the `/data/Stage` directory, then load any map that uses the `Cave` tileset and this will be loaded along side it)*
 
 
 

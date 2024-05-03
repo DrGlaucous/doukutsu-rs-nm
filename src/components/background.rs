@@ -1,5 +1,5 @@
 use std::borrow::BorrowMut;
-use std::env;
+use std::path::PathBuf;
 
 use crate::common::{Color, Rect};
 use crate::framework::context::Context;
@@ -9,9 +9,9 @@ use crate::game::frame::Frame;
 use crate::game::shared_game_state::{SharedGameState, TileSize};
 use crate::game::stage::{BackgroundType, Stage, StageTexturePaths};
 use crate::scene::game_scene::LightingMode;
-use crate::framework::error::GameError::ParseError;
 use crate::framework::error::GameError;
 use crate::util::rng::{Xoroshiro32PlusPlus, RNG};
+
 
 //this could (and probably should) be a bitfield, but I don't know how I'd serialize/deserialize that (inexperience shows)
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -184,7 +184,7 @@ impl BkgConfig {
         match filesystem::open(ctx, String::from("/bkg/") + path + ".json") {
             Ok(file) => {
                 match serde_json::from_reader::<_, BkgConfig>(file) {
-                    Ok(bkg_config) => return Ok(bkg_config),
+                    Ok(bkg_config) => return Ok(bkg_config.upgrade(path)),
                     Err(err) => {
                         log::warn!("Failed to deserialize bkg file: {}", err);
                         return Err(GameError::from(err));
@@ -290,52 +290,15 @@ impl BkgConfig {
     //write self to ./data/bkg/path.json (filesystem only allows writing to the user directory)
     fn write_out(&self, path: &String) -> GameResult {
         
-        //get path of current executable (one layer above ./data) (lifted from vanilla.rs)
-        #[cfg(not(any(target_os = "android", target_os = "horizon")))]
-        let mut data_root_path = env::current_dir().unwrap();
 
-        #[cfg(target_os = "android")]
-        let mut data_root_path = PathBuf::from(ndk_glue::native_activity().internal_data_path().to_string_lossy().to_string());
+        //path format: DiscoVision
+        //needed format: bkg/DiscoVision.json (use PathBuf to do this)
 
-        #[cfg(target_os = "horizon")]
-        let mut data_root_path = PathBuf::from("sdmc:/switch/doukutsu-rs/");
-
-        //other environment checks (if other path is incorrect, get the path of self and remove the "self" part)
-        #[cfg(not(any(target_os = "android", target_os = "horizon")))]
-        if !data_root_path.is_file() {
-            data_root_path = env::current_exe().unwrap();
-            data_root_path.pop();
-        }
+        let mut path_buf = PathBuf::from("bkg");
+        path_buf.push(path.clone() + ".json");
 
 
-
-        //get location of ./data (lifted from shared_game_state.rs)
-        let datadir = match option_env!("VANILLA_EXT_OUTDIR") {
-            Some(outdir) => outdir,
-            None => "data",
-        };
-
-        data_root_path.push(datadir);
-        data_root_path.push("bkg");
-
-        //try to create folders if they do not already exsist (clone of deep_create_dir_if_not_exists)
-        if !data_root_path.is_dir() {
-            let result = std::fs::create_dir_all(data_root_path.clone());
-            if result.is_err() {
-                return Err(ParseError(format!("Failed to create directory structure: {}", result.unwrap_err())));
-            }
-        }
-
-        //push filename
-        data_root_path.push(path.clone() + ".json");
-
-        //make file object from path
-        let bkg_file = match std::fs::File::create(data_root_path) {
-            Ok(file) => file,
-            Err(_) => {
-                return Err(ParseError("Failed to create BKG file.".to_string()));
-            }
-        };
+        let bkg_file = filesystem::get_writable_file(path_buf)?;
 
         //write out
         serde_json::to_writer_pretty(bkg_file, self)?;
@@ -407,7 +370,7 @@ impl Background {
         //if the config file is valid, load it in
         if let Ok(config) = BkgConfig::load(ctx, path) {
             textures.background = config.bmp_filename.clone(); //we need to check the validity of the filename here to stop the program from crashing, but this not essential for function
-            self.bk_config = config.upgrade(path);
+            self.bk_config = config;
             stage.data.background_type = BackgroundType::Custom;
             *lighting_mode = LightingMode::from(self.bk_config.lighting_mode);
         }

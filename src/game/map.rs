@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::io;
 use std::io::{BufRead, BufReader, Read};
 use std::sync::Arc;
+use std::path::PathBuf;
 
 use byteorder::{ReadBytesExt, LE};
 
@@ -18,6 +19,105 @@ static SUPPORTED_PXM_VERSIONS: [u8; 2] = [0x10, 0x21];
 // Entity files
 static SUPPORTED_PXE_VERSIONS: [u8; 2] = [0, 0x10];
 
+
+////////////////// Tileset animation data
+
+//for a single tile
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+pub struct TileAnimConfig {
+    pub tile_id: u16,
+    pub frame_count: u32,
+    pub frame_start: u32,
+    pub animation_speed: u32, //ticks between frame change
+}
+impl Default for TileAnimConfig {
+    fn default() -> Self {
+        Self {
+            tile_id: 0,
+            animation_speed: 0,
+            frame_count: 0,
+            frame_start: 0,
+        }
+    }
+}
+
+//for all the tiles
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+pub struct TilesetAnimConfig {
+    #[serde(default = "current_version")]
+    pub version: u32,
+    pub tiles : Vec<TileAnimConfig>,
+}
+impl Default for TilesetAnimConfig {
+    fn default() -> Self {
+        Self {
+            version: 0,
+            tiles: vec![TileAnimConfig::default()],
+        }
+    }
+}
+impl TilesetAnimConfig {
+    pub fn load(ctx: &Context, path: &String) -> GameResult<TilesetAnimConfig> {
+        //open from ./data/Stage/ folder
+        match filesystem::open(ctx, String::from("/Stage/") + path + ".json") {
+            Ok(file) => {
+                match serde_json::from_reader::<_, TilesetAnimConfig>(file) {
+                    Ok(bkg_config) => return Ok(bkg_config.upgrade(path)),
+                    Err(err) => {
+                        log::warn!("Failed to deserialize tile animation file: {}", err);
+                        return Err(GameError::from(err));
+                    },
+                } 
+            }
+            Err(err) =>{
+                //log::warn!("Failed to open tile animation file: {}", err); //no warning since this is default behavior
+                //used to create the initial json from the struct
+                //TilesetAnimConfig::default().write_out(path)?;
+
+                return Err(GameError::from(err));
+            }
+        }
+    }
+
+    pub fn upgrade(mut self, path: &String) -> Self {
+
+        let initial_version = self.version;
+
+        //if self.version == 1 {
+        //    self.version = 2;
+        //}
+
+        if self.version != initial_version {
+            log::info!("Upgraded animation file \"{}\" from version {} to {}.", path, initial_version, self.version);
+
+            if let Err(r) = self.write_out(path) {
+                log::error!("Failed to save updated tile animation file: {}", r);
+            }
+        }
+
+        self
+    }
+    
+    fn write_out(&self, path: &String) -> GameResult {
+        let mut path_buf = PathBuf::from("Stage");
+        path_buf.push(path.clone() + ".json");
+
+        let bkg_file = filesystem::get_writable_file(path_buf)?;
+
+        //write out
+        serde_json::to_writer_pretty(bkg_file, self)?;
+
+        Ok(())
+    }
+
+}
+#[inline(always)]
+fn current_version() -> u32 {
+    1
+}
+//////////////////
+
+
 #[derive(Clone)]
 pub struct Map {
     pub width: u16,
@@ -28,6 +128,8 @@ pub struct Map {
     pub attrib: Vec<u8>,
 
     pub tile_size: TileSize,
+
+    pub animation_config: Option<TilesetAnimConfig>, //optional animation data
 }
 
 static SOLID_TILES: [u8; 8] = [0x05, 0x41, 0x43, 0x46, 0x54, 0x55, 0x56, 0x57];
@@ -170,7 +272,7 @@ impl Map {
             log::warn!("Map attribute data is shorter than 256 bytes!");
         }
 
-        Ok(Map { width, height, tiles: tiles_u16, attrib, tile_size: TileSize::Tile16x16 })
+        Ok(Map { width, height, tiles: tiles_u16, attrib, tile_size: TileSize::Tile16x16, animation_config: None})
     }
 
 
@@ -393,7 +495,7 @@ impl Map {
         //copy the attributes to a u8 vector
         let attrib = Vec::from(attrib);
 
-        Ok(Map { width: width_fg, height: height_fg, tiles: tiles_u16, attrib, tile_size: TileSize::Tile8x8 })
+        Ok(Map { width: width_fg, height: height_fg, tiles: tiles_u16, attrib, tile_size: TileSize::Tile8x8, animation_config: None })
     }
 
     pub fn get_attribute(&self, x: usize, y: usize) -> u8 {

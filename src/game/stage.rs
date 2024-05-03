@@ -11,8 +11,9 @@ use crate::framework::context::Context;
 use crate::framework::error::GameError::ResourceLoadError;
 use crate::framework::error::{GameError, GameResult};
 use crate::framework::filesystem;
-use crate::game::map::{Map, NPCData};
-use crate::game::scripting::tsc::text_script::{TextScript, TextScriptEncoding};
+use crate::game::map::{Map, NPCData, TilesetAnimConfig};
+use crate::game::scripting::tsc::text_script::TextScript;
+use crate::util::encoding::read_cur_shift_jis;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct NpcType {
@@ -523,14 +524,24 @@ impl Stage {
         let mut data = data.clone();
 
         if let Ok(pxpack_file) = filesystem::open_find(ctx, roots, ["Stage/", &data.map, ".pxpack"].join("")) {
-            let map = Map::load_pxpack(pxpack_file, roots, &mut data, ctx)?;
+            let mut map = Map::load_pxpack(pxpack_file, roots, &mut data, ctx)?;
+            map.animation_config = match TilesetAnimConfig::load(ctx, &data.tileset.name) {
+                Ok(config) => Some(config),
+                _ => None
+            };           
+            
             let stage = Self { map, data };
 
             return Ok(stage);
         } else if let Ok(map_file) = filesystem::open_find(ctx, roots, ["Stage/", &data.map, ".pxm"].join("")) {
             let attrib_file = filesystem::open_find(ctx, roots, ["Stage/", &data.tileset.name, ".pxa"].join(""))?;
 
-            let map = Map::load_pxm(map_file, attrib_file)?;
+            let mut map = Map::load_pxm(map_file, attrib_file)?;
+            //attempt to load tile animation data
+            map.animation_config = match TilesetAnimConfig::load(ctx, &data.tileset.name) {
+                Ok(config) => Some(config),
+                _ => None
+            };
 
             let stage = Self { map, data };
 

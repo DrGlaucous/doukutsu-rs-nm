@@ -401,3 +401,62 @@ pub fn unmount_vfs(ctx: &mut Context, root: &PathBuf) {
 pub fn unmount_user_vfs(ctx: &mut Context, root: &PathBuf) {
     ctx.filesystem.unmount_user_vfs(root)
 }
+
+/// Returns a "std::fs::File" handle to the path specified by 'path' in the ./data directory. (part of mod-features)
+pub fn get_writable_file(path_buf: PathBuf) -> GameResult<std::fs::File> {
+        
+    //get path of current executable (one layer above ./data) (lifted from vanilla.rs)
+    #[cfg(not(any(target_os = "android", target_os = "horizon")))]
+    let mut data_root_path = std::env::current_dir().unwrap();
+
+    #[cfg(target_os = "android")]
+    let mut data_root_path = PathBuf::from(ndk_glue::native_activity().internal_data_path().to_string_lossy().to_string());
+
+    #[cfg(target_os = "horizon")]
+    let mut data_root_path = PathBuf::from("sdmc:/switch/doukutsu-rs/");
+
+    //other environment checks (if other path is incorrect, get the path of self and remove the "self" part)
+    #[cfg(not(any(target_os = "android", target_os = "horizon")))]
+    if !data_root_path.is_file() {
+        data_root_path = std::env::current_exe().unwrap();
+        data_root_path.pop();
+    }
+
+    //get location of ./data (lifted from shared_game_state.rs)
+    let datadir = match option_env!("VANILLA_EXT_OUTDIR") {
+        Some(outdir) => outdir,
+        None => "data",
+    };
+
+    data_root_path.push(datadir);
+    // data_root_path now contains c:/Users..../data
+    // we now add our path to it
+
+    //add the non-file part of the path to this
+    let mut subdir = path_buf.clone();
+    subdir.pop(); //strip off filename
+    data_root_path.push(subdir);
+
+    //try to create folders if they do not already exsist (clone of deep_create_dir_if_not_exists)
+    if !data_root_path.is_dir() {
+        let result = std::fs::create_dir_all(data_root_path.clone());
+        if result.is_err() {
+            return Err(GameError::ParseError(format!("Failed to create directory structure: {}", result.unwrap_err())));
+        }
+    }
+
+    //push filename
+    data_root_path.push(path_buf.file_name().unwrap());
+
+    //make file object from path
+    let file_handle = match std::fs::File::create(data_root_path) {
+        Ok(file) => file,
+        Err(_) => {
+            return Err(GameError::ParseError(format!("Failed to create file at {}", path_buf.to_str().unwrap())));
+        }
+    };
+
+
+    Ok(file_handle)
+
+}

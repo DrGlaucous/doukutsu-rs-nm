@@ -66,7 +66,7 @@ pub struct JukeboxScene {
 impl JukeboxScene {
     pub fn new() -> JukeboxScene {
         let fake_stage = Stage {
-            map: Map { width: 0, height: 0, tiles: vec![], attrib: vec![], tile_size: TileSize::Tile16x16 },
+            map: Map { width: 0, height: 0, tiles: vec![], attrib: vec![], tile_size: TileSize::Tile16x16, animation_config: None },
             data: StageData {
                 name: String::new(),
                 name_jp: String::new(),
