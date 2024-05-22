@@ -23,7 +23,7 @@ impl Context {
     pub fn new() -> Context {
         Context {
             headless: false,
-            size_hint: (640, 480),
+            size_hint: (320, 240),//(640, 480),
             filesystem: Filesystem::new(),
             renderer: None,
             gamepad_context: GamepadContext::new(),
