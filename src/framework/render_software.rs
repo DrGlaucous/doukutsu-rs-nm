@@ -224,56 +224,56 @@ pub fn draw_to_canvas_rect(
                     //[Rs]*[As]/0xFF+[Rd]*0xFF/[As]
 
                     // //FLOATING POINT OPERATIONS (known to work)
-                    let mut f_src_a = ((src_val >> (8 * 3)) & 0xFF) as f32 / 255.0; 
-                    let mut f_src_r = ((src_val >> (8 * 2)) & 0xFF) as f32 / 255.0; 
-                    let mut f_src_g = ((src_val >> (8 * 1)) & 0xFF) as f32 / 255.0; 
-                    let mut f_src_b = ((src_val >> (8 * 0)) & 0xFF) as f32 / 255.0; 
+                    // let mut f_src_a = ((src_val >> (8 * 3)) & 0xFF) as f32 / 255.0; 
+                    // let mut f_src_r = ((src_val >> (8 * 2)) & 0xFF) as f32 / 255.0; 
+                    // let mut f_src_g = ((src_val >> (8 * 1)) & 0xFF) as f32 / 255.0; 
+                    // let mut f_src_b = ((src_val >> (8 * 0)) & 0xFF) as f32 / 255.0; 
 
-                    let mut f_dst_a = ((des_val >> (8 * 3)) & 0xFF) as f32 / 255.0; 
-                    let mut f_dst_r = ((des_val >> (8 * 2)) & 0xFF) as f32 / 255.0; 
-                    let mut f_dst_g = ((des_val >> (8 * 1)) & 0xFF) as f32 / 255.0; 
-                    let mut f_dst_b = ((des_val >> (8 * 0)) & 0xFF) as f32 / 255.0; 
+                    // let mut f_dst_a = ((des_val >> (8 * 3)) & 0xFF) as f32 / 255.0; 
+                    // let mut f_dst_r = ((des_val >> (8 * 2)) & 0xFF) as f32 / 255.0; 
+                    // let mut f_dst_g = ((des_val >> (8 * 1)) & 0xFF) as f32 / 255.0; 
+                    // let mut f_dst_b = ((des_val >> (8 * 0)) & 0xFF) as f32 / 255.0; 
 
-                    let mut val4f = f_src_a + (f_dst_a * (1.0 - f_src_a));
-                    let mut val3f = (f_src_r * f_src_a) + (f_dst_r * (1.0 - f_src_a));
-                    let mut val2f = (f_src_g * f_src_a) + (f_dst_g * (1.0 - f_src_a));
-                    let mut val1f = (f_src_b * f_src_a) + (f_dst_b * (1.0 - f_src_a));
+                    // let mut val4f = f_src_a + (f_dst_a * (1.0 - f_src_a));
+                    // let mut val3f = (f_src_r * f_src_a) + (f_dst_r * (1.0 - f_src_a));
+                    // let mut val2f = (f_src_g * f_src_a) + (f_dst_g * (1.0 - f_src_a));
+                    // let mut val1f = (f_src_b * f_src_a) + (f_dst_b * (1.0 - f_src_a));
 
-                    let mut val4 = ((val4f * 255.0) * color_mod.a) as u32;
-                    let mut val3 = ((val3f * 255.0) * color_mod.r) as u32;
-                    let mut val2 = ((val2f * 255.0) * color_mod.g) as u32;
-                    let mut val1 = ((val1f * 255.0) * color_mod.b) as u32;
+                    // let mut val4 = ((val4f * 255.0) * color_mod.a) as u32;
+                    // let mut val3 = ((val3f * 255.0) * color_mod.r * color_mod.a) as u32;
+                    // let mut val2 = ((val2f * 255.0) * color_mod.g * color_mod.a) as u32;
+                    // let mut val1 = ((val1f * 255.0) * color_mod.b * color_mod.a) as u32;
 
-                    let mut val42 = val4 as f32;
-                    let mut val32 = val3 as f32;
-                    let mut val22 = val2 as f32;
-                    let mut val12 = val1 as f32;
+                    // let mut val42 = val4 as f32;
+                    // let mut val32 = val3 as f32;
+                    // let mut val22 = val2 as f32;
+                    // let mut val12 = val1 as f32;
                     // //END
 
 
                     //try the same thing with only integer math
-                    // let mut src_a = ((src_val >> (8 * 3)) & 0xFF); 
-                    // let mut src_r = ((src_val >> (8 * 2)) & 0xFF); 
-                    // let mut src_g = ((src_val >> (8 * 1)) & 0xFF); 
-                    // let mut src_b = ((src_val >> (8 * 0)) & 0xFF); 
+                    let src_a = ((src_val >> (8 * 3)) & 0xFF); 
+                    let src_r = ((src_val >> (8 * 2)) & 0xFF); 
+                    let src_g = ((src_val >> (8 * 1)) & 0xFF); 
+                    let src_b = ((src_val >> (8 * 0)) & 0xFF); 
 
-                    // let mut dst_a = ((des_val >> (8 * 3)) & 0xFF); 
-                    // let mut dst_r = ((des_val >> (8 * 2)) & 0xFF); 
-                    // let mut dst_g = ((des_val >> (8 * 1)) & 0xFF); 
-                    // let mut dst_b = ((des_val >> (8 * 0)) & 0xFF); 
+                    let dst_a = ((des_val >> (8 * 3)) & 0xFF); 
+                    let dst_r = ((des_val >> (8 * 2)) & 0xFF); 
+                    let dst_g = ((des_val >> (8 * 1)) & 0xFF); 
+                    let dst_b = ((des_val >> (8 * 0)) & 0xFF); 
 
 
-                    // let mut val4u = (src_a + (dst_a * (0xFF - src_a) / 0xFF )) * cma as u32 / 0xFF;
-                    // let mut val3u = ((src_r * src_a / 0xFF) + (dst_r * (0xFF - src_a) / 0xFF)) * cmr as u32 / 0xFF;
-                    // let mut val2u = ((src_g * src_a / 0xFF) + (dst_g * (0xFF - src_a) / 0xFF)) * cmg as u32 / 0xFF;
-                    // let mut val1u = ((src_b * src_a / 0xFF) + (dst_b * (0xFF - src_a) / 0xFF)) * cmb as u32 / 0xFF;
+                    let val4u = (src_a + (dst_a * (0xFF - src_a) / 0xFF )) * cma as u32 / 0xFF;
+                    let val3u = ((src_r * src_a / 0xFF) + (dst_r * (0xFF - src_a) / 0xFF)) * cmr as u32 * cma as u32 / 0xFE01;
+                    let val2u = ((src_g * src_a / 0xFF) + (dst_g * (0xFF - src_a) / 0xFF)) * cmg as u32 * cma as u32 / 0xFE01;
+                    let val1u = ((src_b * src_a / 0xFF) + (dst_b * (0xFF - src_a) / 0xFF)) * cmb as u32 * cma as u32 / 0xFE01;
 
 
                     // if val3u != val3 {
                     //     let mut detsrc = val1 + val2;
                     // }
 
-                    canv_dst.buffer_mut()[d_idx] = (val4 << 8*3) | (val3 << 8*2) | (val2 << 8*1) | (val1 << 8*0);
+                    canv_dst.buffer_mut()[d_idx] = (val4u << 8*3) | (val3u << 8*2) | (val2u << 8*1) | (val1u << 8*0);
 
 
                 },
@@ -315,6 +315,33 @@ pub fn draw_to_canvas_rect(
 
 
 
+pub fn draw_to_canvas_fill(
+    canv_dst: &mut Canvas,
+    rect_src: &Rect<isize>,
+    x: isize,
+    y: isize,
+    mode: BlendMode,
+    color_mod: Color,
+    color: Color,
+) {
+
+    //see: drawing::rect::fill_rect
+
+    // Split buffer into chunks of "width", skip until the top of the rectangle and iterate over
+    // all rows (y2 - y1) to get each scanline.  Then, set pixels in the scanline in the interval
+    // [x1,x2].
+    // c.buffer_mut()
+    // .as_mut_slice()
+    // .chunks_mut(w)
+    // .skip(y1)
+    // .take(y2 - y1 + 1)
+    // .for_each(|scanline|
+    //     scanline.iter_mut()
+    //         .skip(x1)
+    //         .take(x2 - x1 + 1)
+    //         .for_each(|x| *x = col)
+}
+
 
 
 
@@ -322,12 +349,15 @@ pub struct SoftwareTexture {
     width: u16,
     height: u16,
     commands: Vec<SpriteBatchCommand>,
-    texture: Option<Canvas>, //the texture's pseronal canvas
-    canvas: Rc<RefCell<Canvas>>, //refrence to the renderer's main canvas
+
+    texture: Rc<RefCell<Canvas>>, //the texture's pseronal canvas
+    //texture: Option<Canvas>,
+
+    target_canvas: Rc<RefCell<Rc<RefCell<Canvas>>>>, //refrence to the renderer's main canvas (or the target canvas)
 
     color_mod: Color,
     alpha_mod: u8,
-    blend_mode: BlendMode,
+    blend_mode: Rc<RefCell<BlendMode>>,
 
 }
 impl SoftwareTexture {
@@ -362,105 +392,92 @@ impl BackendTexture for SoftwareTexture {
 
     // put stuff from this texture onto the renderer's framebuffer
     fn draw(&mut self) -> GameResult<()> {
-        match &mut self.texture {
-            None => Ok(()),
-            Some(texture) => {
 
-                //todo: texture setup (things like blend mode, etc.)
-                for command in &self.commands {
-                    match command{
-                        SpriteBatchCommand::DrawRect(src, dst) => {
+        let self_texture = self.texture.borrow_mut();
+
+        //todo: texture setup (things like blend mode, etc.)
+        for command in &self.commands {
+            match command{
+                SpriteBatchCommand::DrawRect(src, dst) => {
 
 
-                            //let src = Rect::new(src.left as f64 - 0.5, src.top as f64 - 0.5, src.right as f64 - 0.5, src.bottom as f64 - 0.5);
-                            //let dst: Rect<isize> = Rect::new((dst.left - 0.5) as isize, (dst.top - 0.5) as isize, (dst.right - 0.5) as isize, (dst.bottom - 0.5) as isize);
-                            
-                            
-                            let src = Rect::new(src.left as f64, src.top as f64, src.right as f64, src.bottom as f64);
-                            let dst: Rect<isize> = Rect::new((dst.left) as isize, (dst.top) as isize, (dst.right) as isize, (dst.bottom) as isize);
+                    //let src = Rect::new(src.left as f64 - 0.5, src.top as f64 - 0.5, src.right as f64 - 0.5, src.bottom as f64 - 0.5);
+                    //let dst: Rect<isize> = Rect::new((dst.left - 0.5) as isize, (dst.top - 0.5) as isize, (dst.right - 0.5) as isize, (dst.bottom - 0.5) as isize);
+                    
+                    
+                    let src = Rect::new(src.left as f64, src.top as f64, src.right as f64, src.bottom as f64);
+                    let dst: Rect<isize> = Rect::new((dst.left) as isize, (dst.top) as isize, (dst.right) as isize, (dst.bottom) as isize);
 
-                            //draw it out of triangles, the openGL way.
+                    //draw it out of triangles, the openGL way.
 
-                            if let Some(mut self_texture) = self.texture.as_mut()
-                            {
-                                // let (tex_scale_x, tex_scale_y) = (1.0 / self.width as f64, 1.0 / self.height as f64);
+                    //if let Some(mut self_texture) = self.texture.as_mut()
+                    {
+                        let layer_1 = self.target_canvas.borrow_mut();
+                        let mut upstream_canvas = layer_1.borrow_mut();
+                        {
+                            //drawing::shape::textured_triangle(upstream_canvas.deref_mut(), &mut self_texture,
+                            //    &vertices[0], &vertices[1], &vertices[2], UVWrapMode::Clamp);
+                            //drawing::shape::textured_triangle(upstream_canvas.deref_mut(), &mut self_texture,
+                            //    &vertices[3], &vertices[4], &vertices[5], UVWrapMode::Clamp);
 
-                                // let vertices = [
-                                //     UVVertex::new(dst.left, dst.bottom, src.left * tex_scale_x, src.bottom * tex_scale_y),
-                                //     UVVertex::new(dst.left, dst.top, src.left * tex_scale_x, src.top * tex_scale_y),
-                                //     UVVertex::new(dst.right, dst.top, src.right * tex_scale_x, src.top * tex_scale_y),
-
-                                //     UVVertex::new(dst.left, dst.bottom, src.left * tex_scale_x, src.bottom * tex_scale_y),
-                                //     UVVertex::new(dst.right, dst.top, src.right * tex_scale_x, src.top * tex_scale_y),
-                                //     UVVertex::new(dst.right, dst.bottom, src.right * tex_scale_x, src.bottom * tex_scale_y),
-                                // ];
-
-                                let mut upstream_canvas = self.canvas.borrow_mut();
-                                {
-                                    //drawing::shape::textured_triangle(upstream_canvas.deref_mut(), &mut self_texture,
-                                    //    &vertices[0], &vertices[1], &vertices[2], UVWrapMode::Clamp);
-                                    //drawing::shape::textured_triangle(upstream_canvas.deref_mut(), &mut self_texture,
-                                    //    &vertices[3], &vertices[4], &vertices[5], UVWrapMode::Clamp);
-
-                                    if src.left as u32 == 32 && src.top as u32 == 16 && src.right as u32 == 48 && src.bottom as u32 == 32 {
-                                        let mut stopper = src.left;
-                                    }
-
-                                    let src = Rect::new(src.left as isize, src.top as isize, src.right as isize, src.bottom as isize);
-                                    draw_to_canvas_rect(&mut upstream_canvas,
-                                        &self_texture,
-                                        &src, dst.left, dst.top,
-                                        BlendMode::Alpha,
-                                        Color::from_rgba(0xFF, 0xFF, 0xFF, 0x00),
-                                    );
-                                }
-                            }
-                            
-
-                        }
-
-                        SpriteBatchCommand::DrawRectTinted(src, dst, color) => {
-
-                            let src = Rect::new(src.left as f64, src.top as f64, src.right as f64, src.bottom as f64);
-                            let dst: Rect<isize> = Rect::new((dst.left) as isize, (dst.top) as isize, (dst.right) as isize, (dst.bottom) as isize);
-
-                            if let Some(mut self_texture) = self.texture.as_mut()
-                            {
-
-                                let mut upstream_canvas = self.canvas.borrow_mut();
-                                {
-                                    
-
-                                    if src.left as u32 == 32 && src.top as u32 == 16 && src.right as u32 == 48 && src.bottom as u32 == 32 {
-                                        let mut stopper = src.left;
-                                    }
-
-                                    let src = Rect::new(src.left as isize, src.top as isize, src.right as isize, src.bottom as isize);
-                                    draw_to_canvas_rect(&mut upstream_canvas,
-                                        &self_texture,
-                                        &src, dst.left, dst.top,
-                                        BlendMode::Alpha,
-                                        color.clone(),
-                                    );
-                                }
+                            let mut stopper = 0.0;
+                            if src.left as u32 == 32 && src.top as u32 == 16 && src.right as u32 == 48 && src.bottom as u32 == 32 {
+                                let mut stopper = src.left;
                             }
 
-                        }
-
-                        _ =>{
-
-                            let mut command_op = command;
-                            if 2 > 3 {
-                                let mut cc = command_op.clone();
-                            }
-
+                            let src = Rect::new(src.left as isize, src.top as isize, src.right as isize, src.bottom as isize);
+                            draw_to_canvas_rect(&mut upstream_canvas,
+                                &self_texture,
+                                &src, dst.left, dst.top,
+                                self.blend_mode.borrow().to_owned(),
+                                Color::from_rgba(0xFF, 0xFF, 0xFF, 0xFF),
+                            );
                         }
                     }
+                    
+
                 }
 
-                Ok(())
+                SpriteBatchCommand::DrawRectTinted(src, dst, color) => {
+
+                    let src = Rect::new(src.left as f64, src.top as f64, src.right as f64, src.bottom as f64);
+                    let dst: Rect<isize> = Rect::new((dst.left) as isize, (dst.top) as isize, (dst.right) as isize, (dst.bottom) as isize);
+
+                    //if let Some(mut self_texture) = self.texture.as_mut()
+                    {
+                        let layer_1 = self.target_canvas.borrow_mut();
+                        let mut upstream_canvas = layer_1.borrow_mut();
+                        {
+                            
+
+                            if src.left as u32 == 32 && src.top as u32 == 16 && src.right as u32 == 48 && src.bottom as u32 == 32 {
+                                let mut stopper = src.left;
+                            }
+
+                            let src = Rect::new(src.left as isize, src.top as isize, src.right as isize, src.bottom as isize);
+                            draw_to_canvas_rect(&mut upstream_canvas,
+                                &self_texture,
+                                &src, dst.left, dst.top,
+                                self.blend_mode.borrow().to_owned(),
+                                color.clone(),
+                            );
+                        }
+                    }
+
+                }
+
+                _ =>{
+
+                    let mut command_op = command;
+                    if 2 > 3 {
+                        let mut cc = command_op.clone();
+                    }
+
+                }
             }
         }
+
+        Ok(())
     }
 
     //return sub-type
@@ -745,14 +762,16 @@ pub struct SoftwareRenderer{
 
     imgui: RefCell<imgui::Context>,
 
-    //main screen buffer
-    //buff: ImageBuffer<image::Rgba<u8>, Vec<u8>>, //Vec<u8>, //Vec<RgbaImage>,
+
 
     //main screen buffer
     canvas: Rc<RefCell<Canvas>>,
 
-    //target texture
-    //target: &mut Canvas,
+    //target buffer (will often be the same as "canvas", but will change depending on what the target is)
+    target_canvas: Rc<RefCell<Rc<RefCell<Canvas>>>>,
+
+    //shared blend mode
+    blend_mode: Rc<RefCell<BlendMode>>,
 
     //test: changing parameters
     timer: u32,
@@ -773,12 +792,16 @@ impl SoftwareRenderer {
         //todo: take other types of refs (implement things like BalGl)
         let presenter = BalSdl::new(refs_sdl.unwrap(), event_pump)?;
 
+        let canvas = Rc::new(RefCell::new(Canvas::new(size_hint.0 as usize, size_hint.1 as usize)));
+        let target_canvas =  Rc::new(RefCell::new(canvas.clone()));
         Ok(Box::new(SoftwareRenderer{
             presenter: presenter,
             imgui: RefCell::new(imgui),
             //buff: ImageBuffer::new(320, 240),
             timer: 0,
-            canvas: Rc::new(RefCell::new(Canvas::new(size_hint.0 as usize, size_hint.1 as usize)))
+            canvas,
+            target_canvas,
+            blend_mode: Rc::new(RefCell::new(BlendMode::Alpha)),
         }))
 
     }
@@ -854,6 +877,7 @@ impl BackendRenderer for SoftwareRenderer {
         Ok(())
     }
 
+    //canvas: Rc::new(RefCell::new(Canvas::new(size_hint.0 as usize, size_hint.1 as usize)))
     //produce a BackendTexture that can be altered
     fn create_texture_mutable(&mut self, width: u16, height: u16) -> GameResult<Box<dyn BackendTexture>> {
         Ok(Box::new(
@@ -861,11 +885,11 @@ impl BackendRenderer for SoftwareRenderer {
                 width,
                 height,
                 commands: vec![],
-                texture: Some(Canvas::new(width as usize, height as usize)),
-                canvas: Rc::new(RefCell::new(Canvas::new(width as usize, height as usize))),
+                texture: Rc::new(RefCell::new(Canvas::new(width as usize, height as usize))), //Some(Canvas::new(width as usize, height as usize)),
+                target_canvas: self.target_canvas.clone(), //Rc::new(RefCell::new(Canvas::new(width as usize, height as usize))),
                 color_mod: Color::from_rgba(0xFF, 0xFF, 0xFF, 0xFF),
                 alpha_mod: 0xFF,
-                blend_mode: BlendMode::None,
+                blend_mode: self.blend_mode.clone(),
             }
         ))
     }
@@ -915,22 +939,48 @@ impl BackendRenderer for SoftwareRenderer {
                 width,
                 height,
                 commands: vec![],
-                texture: Some(canvas_buf),
-                canvas: self.canvas.clone(),
+                texture: Rc::new(RefCell::new(canvas_buf)),
+                target_canvas: self.target_canvas.clone(),
                 color_mod: Color::from_rgba(0xFF, 0xFF, 0xFF, 0xFF),
                 alpha_mod: 0xFF,
-                blend_mode: BlendMode::None,
+                blend_mode: self.blend_mode.clone(),
             }
         ))
     }
 
     //when a backend texture is copied from one to another, how the pixels are blended together
-    fn set_blend_mode(&mut self, _blend: BlendMode) -> GameResult {
+    //or is this when the final is copied onscreen...
+    fn set_blend_mode(&mut self, blend: BlendMode) -> GameResult {
+        self.blend_mode.replace(blend);
         Ok(())
     }
 
     //tell the renderer where to draw to (texture, whose format is determined by BackendTexture), or with none default back to the canvas
-    fn set_render_target(&mut self, _texture: Option<&Box<dyn BackendTexture>>) -> GameResult {
+    fn set_render_target(&mut self, texture: Option<&Box<dyn BackendTexture>>) -> GameResult {
+
+        match texture {
+            Some(texture) => {
+                let software_texture = texture
+                    .as_any()
+                    .downcast_ref::<SoftwareTexture>()
+                    .ok_or(GameError::RenderError("This texture was not created by Software backend.".to_string()))?;
+                
+                //let yy = self.target_canvas.swap(other)
+                //let yy = self.target_canvas.as_ptr();
+                self.target_canvas.replace(software_texture.texture.clone());
+                //*yy = software_texture.texture.clone();
+
+
+
+                //let yy = self.target_canvas.;
+
+                //self.target_canvas.as_ref() = software_texture.texture.as_ref();
+            
+            }
+            None => {
+                self.target_canvas.replace(self.canvas.clone());
+            }
+        }
         Ok(())
     }
 
@@ -940,7 +990,8 @@ impl BackendRenderer for SoftwareRenderer {
         let color = color.to_rgba();
         let color = ARGBColour::new(color.3, color.0, color.1, color.2);
         
-        drawing::rect::fill_rect(self.canvas.borrow_mut().deref_mut(), &color, rect.left, rect.top, rect.right, rect.bottom);
+        //todo: replace this with function that does blending
+        //drawing::rect::fill_rect(self.canvas.borrow_mut().deref_mut(), &color, rect.left, rect.top, rect.right, rect.bottom);
 
         //let mut image = RgbaImage::new(200, 200);
         //draw_filled_rect_mut(&mut self.buff, ImRect::at(130, 10).of_size(20, 20), color);
