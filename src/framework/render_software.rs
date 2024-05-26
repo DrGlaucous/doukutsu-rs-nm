@@ -51,11 +51,13 @@ use std::any::Any;
 use std::cell::{RefCell, UnsafeCell};
 use std::ffi::c_void;
 use std::io::Read;
-use std::ops::{Deref, DerefMut};
+use std::ops::{Deref, DerefMut, Add, Sub, Mul, Div};
 use std::ptr::{null, null_mut};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 use std::vec::Vec;
+use num_traits::Num;
+
 
 use imageproc::drawing::Blend;
 use imgui::internal::RawWrapper;
@@ -103,7 +105,7 @@ use crate::framework::backend_sdl2::SDL2Context;
 ///////////////////////////////////////////////////////////////////
 
 //using these instead of the Canvas library's built-in blit functions because we don't need the extra features and we need different blend modes
-pub fn trim_oob_rects(
+fn trim_oob_rects(
     rect_src: &Rect<isize>,
     dest_width: isize,
     dest_height: isize,
@@ -154,6 +156,113 @@ pub fn trim_oob_rects(
 
 }
 
+
+fn blend_pixel (src_val: u32, des_val: u32, blend_mode: BlendMode, color: (u8, u8, u8, u8)) -> u32 {
+
+    //color format: RGBA
+    //u32 color format: ARGB
+
+    match blend_mode {
+        BlendMode::None => {
+            return src_val;
+        },
+        BlendMode::Add => {
+
+            let val4 = ((des_val >> (8 * 3)) & 0xFF) * color.3 as u32 / 0xFF;
+            
+            let val3 = (((des_val >> (8 * 2)) as u8).saturating_add(((src_val >> (8 * 2)) as u8)) as u32) * color.0 as u32 * 0xFF as u32 / 0xFE01;
+            let val2 = (((des_val >> (8 * 1)) as u8).saturating_add(((src_val >> (8 * 1)) as u8)) as u32) * color.1 as u32 * 0xFF as u32 / 0xFE01;
+            let val1 = (((des_val >> (8 * 0)) as u8).saturating_add(((src_val >> (8 * 0)) as u8)) as u32) * color.2 as u32 * 0xFF as u32 / 0xFE01;
+
+            return (val4 << 8*3) | (val3 << 8*2) | (val2 << 8*1) | (val1 << 8*0);
+        },
+        BlendMode::Alpha => {
+            //sdl blend
+            //let mut des_val = canv_dst.buffer_mut()[d_idx];
+            //let mut src_val = sour_buffer[s_idx];
+
+
+            //[3][2][1][0]
+            //[A][R][G][B]
+
+            //[Rs]*[As]/0xFF+[Rd]*0xFF/[As]
+
+            // //FLOATING POINT OPERATIONS (known to work)
+            // let mut f_src_a = ((src_val >> (8 * 3)) & 0xFF) as f32 / 255.0; 
+            // let mut f_src_r = ((src_val >> (8 * 2)) & 0xFF) as f32 / 255.0; 
+            // let mut f_src_g = ((src_val >> (8 * 1)) & 0xFF) as f32 / 255.0; 
+            // let mut f_src_b = ((src_val >> (8 * 0)) & 0xFF) as f32 / 255.0; 
+
+            // let mut f_dst_a = ((des_val >> (8 * 3)) & 0xFF) as f32 / 255.0; 
+            // let mut f_dst_r = ((des_val >> (8 * 2)) & 0xFF) as f32 / 255.0; 
+            // let mut f_dst_g = ((des_val >> (8 * 1)) & 0xFF) as f32 / 255.0; 
+            // let mut f_dst_b = ((des_val >> (8 * 0)) & 0xFF) as f32 / 255.0; 
+
+            // let mut val4f = f_src_a + (f_dst_a * (1.0 - f_src_a));
+            // let mut val3f = (f_src_r * f_src_a) + (f_dst_r * (1.0 - f_src_a));
+            // let mut val2f = (f_src_g * f_src_a) + (f_dst_g * (1.0 - f_src_a));
+            // let mut val1f = (f_src_b * f_src_a) + (f_dst_b * (1.0 - f_src_a));
+
+            // let mut val4 = ((val4f * 255.0) * color.a) as u32;
+            // let mut val3 = ((val3f * 255.0) * color.r * color.a) as u32;
+            // let mut val2 = ((val2f * 255.0) * color.g * color.a) as u32;
+            // let mut val1 = ((val1f * 255.0) * color.b * color.a) as u32;
+
+            // let mut val42 = val4 as f32;
+            // let mut val32 = val3 as f32;
+            // let mut val22 = val2 as f32;
+            // let mut val12 = val1 as f32;
+
+            // return (val4 << 8*3) | (val3 << 8*2) | (val2 << 8*1) | (val1 << 8*0);
+            // //END
+
+
+            // //try the same thing with only integer math
+            let src_a = ((src_val >> (8 * 3)) & 0xFF); 
+            let src_r = ((src_val >> (8 * 2)) & 0xFF); 
+            let src_g = ((src_val >> (8 * 1)) & 0xFF); 
+            let src_b = ((src_val >> (8 * 0)) & 0xFF); 
+
+            let dst_a = ((des_val >> (8 * 3)) & 0xFF); 
+            let dst_r = ((des_val >> (8 * 2)) & 0xFF); 
+            let dst_g = ((des_val >> (8 * 1)) & 0xFF); 
+            let dst_b = ((des_val >> (8 * 0)) & 0xFF); 
+
+            let val4u = (src_a + (dst_a * (0xFF - src_a) / 0xFF )) * color.3 as u32 / 0xFF;
+            let val3u = ((src_r * src_a / 0xFF) + (dst_r * (0xFF - src_a) / 0xFF)) * color.0 as u32 * color.3 as u32 / 0xFE01;
+            let val2u = ((src_g * src_a / 0xFF) + (dst_g * (0xFF - src_a) / 0xFF)) * color.1 as u32 * color.3 as u32 / 0xFE01;
+            let val1u = ((src_b * src_a / 0xFF) + (dst_b * (0xFF - src_a) / 0xFF)) * color.2 as u32 * color.3 as u32 / 0xFE01;
+
+            return (val4u << 8*3) | (val3u << 8*2) | (val2u << 8*1) | (val1u << 8*0);
+
+        },
+        BlendMode::Multiply => {
+            //d-rs maps this to sdl's mod function, but sdl also has an actual multiply function
+            //let des_val = canv_dst.buffer_mut()[d_idx];
+            //let src_val = sour_buffer[s_idx];
+
+            // //debug halting function
+            // if (des_val & 0xFF00) != 0 && (src_val & 0xFF00) != 0 {
+            //     let mut detsrc = ((des_val >> (8 * 1)) & 0xFF);
+            //     let mut detsrc2 = ((src_val >> (8 * 1)) & 0xFF);
+            //     detsrc *= detsrc2;
+            //     detsrc2 = detsrc / 0xFF;
+            // }
+
+            let val4 = ((des_val >> (8 * 3)) & 0xFF) * color.3 as u32 / 0xFF;
+            
+            let val3 = (((des_val >> (8 * 2)) & 0xFF) * ((src_val >> (8 * 2)) & 0xFF) / 0xFF) * color.0 as u32 * color.3 as u32 / 0xFE01;
+            let val2 = (((des_val >> (8 * 1)) & 0xFF) * ((src_val >> (8 * 1)) & 0xFF) / 0xFF) * color.1 as u32 * color.3 as u32 / 0xFE01;
+            let val1 = (((des_val >> (8 * 0)) & 0xFF) * ((src_val >> (8 * 0)) & 0xFF) / 0xFF) * color.2 as u32 * color.3 as u32 / 0xFE01;
+
+            return (val4 << 8*3) | (val3 << 8*2) | (val2 << 8*1) | (val1 << 8*0);
+
+        },
+    }
+    
+}
+
+
 //see if this is ligher weight than the triangle functions (most likely: yes)
 pub fn draw_to_canvas_rect(
     canv_dst: &mut Canvas,
@@ -174,7 +283,9 @@ pub fn draw_to_canvas_rect(
     //let dest_buffer = canv_dst.buffer_mut();
     let sour_buffer = canv_src.buffer();
 
+    //we break color out like this so we don't have to calculate u8 from float values every time
     let (cmr, cmg, cmb, cma) = color_mod.to_rgba();
+
 
     for iy in 0..(rect_src.height() as usize) {
         for ix in 0..(rect_src.width() as usize) {
@@ -188,118 +299,12 @@ pub fn draw_to_canvas_rect(
             let d_idx = canv_dst.buffer_index(dx, dy);
             let s_idx = canv_src.buffer_index(sx, sy);
 
-
-
-            match mode {
-                BlendMode::None => {
-                    canv_dst.buffer_mut()[d_idx] = sour_buffer[s_idx];
-                },
-                BlendMode::Add => {
-
-                    let des_val = canv_dst.buffer_mut()[d_idx];
-                    let src_val = sour_buffer[s_idx];
-
-                    // //debug
-                    // if (des_val & 0xFF00) != 0 && (src_val & 0xFF00) != 0 {
-                    //     let mut detsrc = des_val.saturating_add(src_val);
-                    // }
-
-                    let val4 = ((des_val >> (8 * 3)) & 0xFF); //((des_val >> (8 * 3)) as u8).saturating_add(((src_val >> (8 * 3)) as u8)) as u32;
-                    
-                    let val3 = ((des_val >> (8 * 2)) as u8).saturating_add(((src_val >> (8 * 2)) as u8)) as u32;
-                    let val2 = ((des_val >> (8 * 1)) as u8).saturating_add(((src_val >> (8 * 1)) as u8)) as u32;
-                    let val1 = ((des_val >> (8 * 0)) as u8).saturating_add(((src_val >> (8 * 0)) as u8)) as u32;
-
-                    canv_dst.buffer_mut()[d_idx] = (val4 << 8*3) | (val3 << 8*2) | (val2 << 8*1) | (val1 << 8*0);
-                },
-                BlendMode::Alpha => {
-                    //sdl blend
-                    let mut des_val = canv_dst.buffer_mut()[d_idx];
-                    let mut src_val = sour_buffer[s_idx];
-
-
-                    //[3][2][1][0]
-                    //[A][R][G][B]
-
-                    //[Rs]*[As]/0xFF+[Rd]*0xFF/[As]
-
-                    // //FLOATING POINT OPERATIONS (known to work)
-                    // let mut f_src_a = ((src_val >> (8 * 3)) & 0xFF) as f32 / 255.0; 
-                    // let mut f_src_r = ((src_val >> (8 * 2)) & 0xFF) as f32 / 255.0; 
-                    // let mut f_src_g = ((src_val >> (8 * 1)) & 0xFF) as f32 / 255.0; 
-                    // let mut f_src_b = ((src_val >> (8 * 0)) & 0xFF) as f32 / 255.0; 
-
-                    // let mut f_dst_a = ((des_val >> (8 * 3)) & 0xFF) as f32 / 255.0; 
-                    // let mut f_dst_r = ((des_val >> (8 * 2)) & 0xFF) as f32 / 255.0; 
-                    // let mut f_dst_g = ((des_val >> (8 * 1)) & 0xFF) as f32 / 255.0; 
-                    // let mut f_dst_b = ((des_val >> (8 * 0)) & 0xFF) as f32 / 255.0; 
-
-                    // let mut val4f = f_src_a + (f_dst_a * (1.0 - f_src_a));
-                    // let mut val3f = (f_src_r * f_src_a) + (f_dst_r * (1.0 - f_src_a));
-                    // let mut val2f = (f_src_g * f_src_a) + (f_dst_g * (1.0 - f_src_a));
-                    // let mut val1f = (f_src_b * f_src_a) + (f_dst_b * (1.0 - f_src_a));
-
-                    // let mut val4 = ((val4f * 255.0) * color_mod.a) as u32;
-                    // let mut val3 = ((val3f * 255.0) * color_mod.r * color_mod.a) as u32;
-                    // let mut val2 = ((val2f * 255.0) * color_mod.g * color_mod.a) as u32;
-                    // let mut val1 = ((val1f * 255.0) * color_mod.b * color_mod.a) as u32;
-
-                    // let mut val42 = val4 as f32;
-                    // let mut val32 = val3 as f32;
-                    // let mut val22 = val2 as f32;
-                    // let mut val12 = val1 as f32;
-                    // //END
-
-
-                    //try the same thing with only integer math
-                    let src_a = ((src_val >> (8 * 3)) & 0xFF); 
-                    let src_r = ((src_val >> (8 * 2)) & 0xFF); 
-                    let src_g = ((src_val >> (8 * 1)) & 0xFF); 
-                    let src_b = ((src_val >> (8 * 0)) & 0xFF); 
-
-                    let dst_a = ((des_val >> (8 * 3)) & 0xFF); 
-                    let dst_r = ((des_val >> (8 * 2)) & 0xFF); 
-                    let dst_g = ((des_val >> (8 * 1)) & 0xFF); 
-                    let dst_b = ((des_val >> (8 * 0)) & 0xFF); 
-
-
-                    let val4u = (src_a + (dst_a * (0xFF - src_a) / 0xFF )) * cma as u32 / 0xFF;
-                    let val3u = ((src_r * src_a / 0xFF) + (dst_r * (0xFF - src_a) / 0xFF)) * cmr as u32 * cma as u32 / 0xFE01;
-                    let val2u = ((src_g * src_a / 0xFF) + (dst_g * (0xFF - src_a) / 0xFF)) * cmg as u32 * cma as u32 / 0xFE01;
-                    let val1u = ((src_b * src_a / 0xFF) + (dst_b * (0xFF - src_a) / 0xFF)) * cmb as u32 * cma as u32 / 0xFE01;
-
-
-                    // if val3u != val3 {
-                    //     let mut detsrc = val1 + val2;
-                    // }
-
-                    canv_dst.buffer_mut()[d_idx] = (val4u << 8*3) | (val3u << 8*2) | (val2u << 8*1) | (val1u << 8*0);
-
-
-                },
-                BlendMode::Multiply => {
-                    //d-rs maps this to sdl's mod function, but sdl also has an actual multiply function
-                    let des_val = canv_dst.buffer_mut()[d_idx];
-                    let src_val = sour_buffer[s_idx];
-
-                    // //debug halting function
-                    // if (des_val & 0xFF00) != 0 && (src_val & 0xFF00) != 0 {
-                    //     let mut detsrc = ((des_val >> (8 * 1)) & 0xFF);
-                    //     let mut detsrc2 = ((src_val >> (8 * 1)) & 0xFF);
-                    //     detsrc *= detsrc2;
-                    //     detsrc2 = detsrc / 0xFF;
-                    // }
-
-                    let val4 = ((des_val >> (8 * 3)) & 0xFF); //((des_val >> (8 * 3)) & 0xFF) * ((src_val >> (8 * 3)) & 0xFF) / 0xFF;
-                    
-                    let val3 = ((des_val >> (8 * 2)) & 0xFF) * ((src_val >> (8 * 2)) & 0xFF) / 0xFF;
-                    let val2 = ((des_val >> (8 * 1)) & 0xFF) * ((src_val >> (8 * 1)) & 0xFF) / 0xFF;
-                    let val1 = ((des_val >> (8 * 0)) & 0xFF) * ((src_val >> (8 * 0)) & 0xFF) / 0xFF;
-
-                    canv_dst.buffer_mut()[d_idx] = (val4 << 8*3) | (val3 << 8*2) | (val2 << 8*1) | (val1 << 8*0);
-
-                },
-            }
+            canv_dst.buffer_mut()[d_idx] = blend_pixel(
+                sour_buffer[s_idx],
+                canv_dst.buffer_mut()[d_idx],
+                mode,
+                (cmr, cmg, cmb, cma));
+            
         }
     }
 
@@ -313,18 +318,90 @@ pub fn draw_to_canvas_rect(
 
 }
 
+// long map(long x, long in_min, long in_max, long out_min, long out_max) {
+//     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+//   }
+
+#[inline]
+fn map<T: Num + PartialOrd + Copy>(x: T, in_min: T, in_max: T, out_min: T, out_max: T) -> T {
+    (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+}
+
+#[inline]
+fn buffer_index<T: Num + PartialOrd + Copy>(x: T, y: T, width: T) -> T {
+    (y * width) + x
+}
+
+pub fn draw_to_canvas_scaled(
+    canv_dst: &mut Canvas,
+    canv_src: &Canvas,
+    rect_dst: &Rect<isize>,
+    rect_src: &Rect<isize>,
+    flip_x: bool,
+    flip_y: bool,   
+    mode: BlendMode,
+    color_mod: Color, 
+) {
+
+    //trim rect or break out if the rect is OOB (function returns "none")
+    let (trimmed_rect_dst, x, y) = if let Some(rcc) = trim_oob_rects(
+        rect_dst,
+        canv_dst.width() as isize,
+        canv_dst.height() as isize,
+        rect_dst.left, rect_dst.top) {rcc}
+    else {return};
+
+
+
+
+
+    //let dest_buffer = canv_dst.buffer_mut();
+    let sour_buffer = canv_src.buffer();
+
+    let (cmr, cmg, cmb, cma) = color_mod.to_rgba();
+
+
+
+    for iy in 0..(trimmed_rect_dst.height() as usize) {
+        for ix in 0..(trimmed_rect_dst.width() as usize) {
+
+            //destination coordinates
+            let dy = iy + y as usize;
+            let dx =  ix + x as usize;
+
+            //source coordinates (scale these)
+            //let sy = iy + rect_src.top as usize;
+            //let sx =  ix + rect_src.left as usize;
+
+            let sy = map((iy as isize) + trimmed_rect_dst.top - rect_dst.top, 0, rect_dst.height(), 0, rect_src.height()) as usize + rect_src.top as usize;;
+            let sx = map((ix as isize) + trimmed_rect_dst.left - rect_dst.left, 0, rect_dst.width(), 0, rect_src.width()) as usize + rect_src.left as usize;
+
+            //(y * self.width) + x
+            let d_idx = canv_dst.buffer_index(dx, dy);
+            let s_idx = canv_src.buffer_index(sx, sy);
+
+            canv_dst.buffer_mut()[d_idx] = blend_pixel(
+                sour_buffer[s_idx],
+                canv_dst.buffer_mut()[d_idx],
+                mode,
+                (cmr, cmg, cmb, cma));
+            
+        }
+    }
+
+
+}
 
 
 pub fn draw_to_canvas_fill(
     canv_dst: &mut Canvas,
     rect_src: &Rect<isize>,
-    x: isize,
-    y: isize,
-    mode: BlendMode,
+    blend_mode: BlendMode,
     color_mod: Color,
     color: Color,
 ) {
 
+    //drawing::rect::fill_rect(c, col, x1, y1, x2, y2)
     //see: drawing::rect::fill_rect
 
     // Split buffer into chunks of "width", skip until the top of the rectangle and iterate over
@@ -340,6 +417,32 @@ pub fn draw_to_canvas_fill(
     //         .skip(x1)
     //         .take(x2 - x1 + 1)
     //         .for_each(|x| *x = col)
+
+
+    //source color (with ARGB format)
+    let (cmr, cmg, cmb, cma) = color.to_rgba();
+    let clr = u32::from_be_bytes([cma, cmr, cmg, cmb]);
+
+    //dest color (with tuple format)
+    let blend_color= color_mod.to_rgba();
+
+    let rect_src = trim_oob_rects(rect_src, canv_dst.width() as isize, canv_dst.height() as isize, rect_src.left, rect_src.top);
+
+    if let Some((rect_src, _, _)) = rect_src {
+        let width = canv_dst.width();
+
+        canv_dst.buffer_mut()
+            .as_mut_slice()
+            .chunks_mut(width)
+            .skip(rect_src.top as usize)
+            .take((rect_src.bottom - rect_src.top + 1) as usize)
+            .for_each(|scanline|
+                scanline.iter_mut()
+                    .skip(rect_src.left as usize)
+                    .take((rect_src.right - rect_src.left + 1) as  usize)
+                    .for_each(|x| *x = blend_pixel(clr, *x, blend_mode, blend_color)));
+    }
+
 }
 
 
@@ -426,12 +529,25 @@ impl BackendTexture for SoftwareTexture {
                             }
 
                             let src = Rect::new(src.left as isize, src.top as isize, src.right as isize, src.bottom as isize);
-                            draw_to_canvas_rect(&mut upstream_canvas,
+                            // draw_to_canvas_rect(&mut upstream_canvas,
+                            //     &self_texture,
+                            //     &src, dst.left, dst.top,
+                            //     self.blend_mode.borrow().to_owned(),
+                            //     Color::from_rgba(0xFF, 0xFF, 0xFF, 0xFF),
+                            // );
+
+                            draw_to_canvas_scaled(&mut upstream_canvas,
                                 &self_texture,
-                                &src, dst.left, dst.top,
+                                &dst,
+                                &src,
+                                false,
+                                false,
                                 self.blend_mode.borrow().to_owned(),
                                 Color::from_rgba(0xFF, 0xFF, 0xFF, 0xFF),
                             );
+
+
+
                         }
                     }
                     
@@ -455,12 +571,23 @@ impl BackendTexture for SoftwareTexture {
                             }
 
                             let src = Rect::new(src.left as isize, src.top as isize, src.right as isize, src.bottom as isize);
-                            draw_to_canvas_rect(&mut upstream_canvas,
-                                &self_texture,
-                                &src, dst.left, dst.top,
-                                self.blend_mode.borrow().to_owned(),
-                                color.clone(),
+                            // draw_to_canvas_rect(&mut upstream_canvas,
+                            //     &self_texture,
+                            //     &src, dst.left, dst.top,
+                            //     self.blend_mode.borrow().to_owned(),
+                            //     color.clone(),
+                            // );
+
+                            draw_to_canvas_scaled(&mut upstream_canvas,
+                                     &self_texture,
+                                     &dst,
+                                     &src,
+                                     false,
+                                     false,
+                                     self.blend_mode.borrow().to_owned(),
+                                     color.clone(),
                             );
+
                         }
                     }
 
@@ -816,9 +943,18 @@ impl BackendRenderer for SoftwareRenderer {
 
     //puts nothing but a single color on the window
     fn clear(&mut self, color: Color) {
-        let color = color.to_rgba();
-        let color = ARGBColour::new(color.3, color.0, color.1, color.2);
-        self.canvas.borrow_mut().clear(&color);
+
+        // let color = color.to_rgba();
+        // let color = ARGBColour::new(color.3, color.0, color.1, color.2);
+        // self.canvas.borrow_mut().clear(&color);
+
+        let canvas = self.target_canvas.borrow_mut();
+        let rect = Rect::new(0,0, canvas.borrow().width() as isize, canvas.borrow().height() as isize);
+        draw_to_canvas_fill(
+            canvas.borrow_mut().deref_mut(),
+            &rect, self.blend_mode.as_ref().borrow().deref().clone(),
+            Color::from_rgba_u32(0xFFFFFFFF), color);
+        
     }
 
     //puts canvas on the window, called on every frame we want drawn
@@ -965,15 +1101,14 @@ impl BackendRenderer for SoftwareRenderer {
                     .downcast_ref::<SoftwareTexture>()
                     .ok_or(GameError::RenderError("This texture was not created by Software backend.".to_string()))?;
                 
+                self.target_canvas.replace(software_texture.texture.clone());
+
+
+                //tests
                 //let yy = self.target_canvas.swap(other)
                 //let yy = self.target_canvas.as_ptr();
-                self.target_canvas.replace(software_texture.texture.clone());
                 //*yy = software_texture.texture.clone();
-
-
-
                 //let yy = self.target_canvas.;
-
                 //self.target_canvas.as_ref() = software_texture.texture.as_ref();
             
             }
@@ -987,15 +1122,23 @@ impl BackendRenderer for SoftwareRenderer {
     //fill the window buffer directly with a colored rectangle
     fn draw_rect(&mut self, rect: Rect<isize>, color: Color) -> GameResult {
 
-        let color = color.to_rgba();
-        let color = ARGBColour::new(color.3, color.0, color.1, color.2);
-        
         //todo: replace this with function that does blending
+        //let color = color.to_rgba();
+        //let color = ARGBColour::new(color.3, color.0, color.1, color.2);
         //drawing::rect::fill_rect(self.canvas.borrow_mut().deref_mut(), &color, rect.left, rect.top, rect.right, rect.bottom);
 
         //let mut image = RgbaImage::new(200, 200);
         //draw_filled_rect_mut(&mut self.buff, ImRect::at(130, 10).of_size(20, 20), color);
 
+        let stage1 = self.target_canvas.borrow_mut();
+        draw_to_canvas_fill(
+            stage1.borrow_mut().deref_mut(),
+            &rect, self.blend_mode.as_ref().borrow().deref().clone(),
+            Color::from_rgba_u32(0xFFFFFFFF), color);
+
+
+        //drawing::rect::fill_rect(stage1.borrow_mut().deref_mut(), &color, rect.left, rect.top, rect.right, rect.bottom);
+            
         Ok(())
         
 
