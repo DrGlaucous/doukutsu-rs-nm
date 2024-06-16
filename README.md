@@ -22,6 +22,28 @@ The rest of this readme is unchanged.
 D-RS
 ---
 
+What is this *branch?*
+---
+
+This branch adds several Quality-Of-Life improvements to the game's backend to make it easier to mod. If you're reading this and you're not a modder, this stuff probably doesn't interest you, since it changes nothing flashy about the game itself.
+
+Additions:
+- `<BKG` and its sub-commands, which allow for the creation of modular and dynamic backgrounds.
+- NOXID-type layer support, (where NOXID is the first user to implement this type of layering system), allowing for multiple tile layers to be drawn on top of each other
+- That's all she wrote! *(for now)*
+
+To see how to use these features for modifying the game, please take a look at the the [Documentation](Documentation.md) page.
+
+Also, for more info for modding Cave Story in general, please see the [Community Wiki page](https://wiki.doukutsu.club/).
+
+
+
+
+The rest of this readme is unchanged.
+
+D-RS
+---
+
 A fully playable re-implementation of the Cave Story (Doukutsu Monogatari) engine written
 in [Rust](https://www.rust-lang.org/).
 
