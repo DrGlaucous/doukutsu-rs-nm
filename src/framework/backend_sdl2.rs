@@ -37,7 +37,7 @@ use crate::framework::gamepad::{Axis, Button, GamepadType};
 use crate::framework::graphics::BlendMode;
 use crate::framework::keyboard::ScanCode;
 #[cfg(feature = "render-opengl")]
-use crate::framework::render_opengl::{GLContext, OpenGLRenderer};
+use crate::framework::render_opengl::{GLContext, OpenGLRenderer, GlVersionInfo};
 use crate::framework::ui::init_imgui;
 use crate::game::shared_game_state::WindowMode;
 use crate::game::Game;
@@ -481,8 +481,15 @@ impl BackendEventLoop for SDL2EventLoop {
                 *user_data = Rc::into_raw(refs) as *mut c_void;
             }
 
+            unsafe fn get_current_buffer(user_data: &mut *mut c_void) -> usize {
+                let refs = Rc::from_raw(*user_data as *mut RefCell<SDL2Context>);
+                *user_data = Rc::into_raw(refs) as *mut c_void;
+                0
+            }
+
+            let gl_version = GlVersionInfo::OpenGL(2, 1);
             let gl_context =
-                GLContext { gles2_mode: false, is_sdl: true, get_proc_address, swap_buffers, user_data, ctx };
+                GLContext { gl_version, is_sdl: true, get_proc_address, swap_buffers, get_current_buffer, user_data, ctx };
 
             return Ok(Box::new(OpenGLRenderer::new(gl_context, UnsafeCell::new(imgui))));
         } else {

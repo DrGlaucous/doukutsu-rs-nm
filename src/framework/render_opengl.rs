@@ -21,12 +21,19 @@ use crate::framework::graphics::{BlendMode, VSyncMode};
 use crate::framework::util::{field_offset, return_param};
 use crate::game::GAME_SUSPENDED;
 
+#[derive(PartialEq, Clone, Copy)]
+pub enum GlVersionInfo {
+    OpenGL(u32, u32),
+    OpenGLES,
+}
+
 pub struct GLContext {
-    pub gles2_mode: bool,
+    pub gl_version: GlVersionInfo,
     pub is_sdl: bool,
-    pub get_proc_address: unsafe fn(user_data: &mut *mut c_void, name: &str) -> *const c_void,
-    pub swap_buffers: unsafe fn(user_data: &mut *mut c_void),
-    pub user_data: *mut c_void,
+    pub get_proc_address: unsafe fn(user_data: &mut *mut c_void, name: &str) -> *const c_void,  // Gets the address of the running opengl env
+    pub swap_buffers: unsafe fn(user_data: &mut *mut c_void), // Swaps hardware buffers for rendering (only for double-buffered systems)
+    pub get_current_buffer: unsafe fn(user_data: &mut *mut c_void) -> usize, // Get number of the current frambebuffer for the screen (only for single-buffered systems)
+    pub user_data: *mut c_void, // Void pointer to opengl user data
     pub ctx: *mut Context,
 }
 
@@ -37,6 +44,7 @@ pub struct OpenGLTexture {
     framebuffer_id: u32,
     shader: RenderShader,
     vbo: GLuint,
+    vao: GLuint,
     vertices: Vec<VertexData>,
     context_active: Arc<RefCell<bool>>,
 }
@@ -231,7 +239,7 @@ impl BackendTexture for OpenGLTexture {
                 gl.gl.Enable(gl::BLEND);
                 gl.gl.Disable(gl::DEPTH_TEST);
 
-                self.shader.bind_attrib_pointer(gl, self.vbo);
+                self.shader.bind_attrib_pointer(gl, self.vbo, self.vao);
 
                 gl.gl.BindTexture(gl::TEXTURE_2D, self.texture_id);
                 gl.gl.BufferData(
@@ -301,14 +309,29 @@ fn check_shader_compile_status(shader: u32, gl: &Gl) -> GameResult {
     Ok(())
 }
 
+// opengl 2.1 shaders with header "#version 110"
 const VERTEX_SHADER_BASIC: &str = include_str!("shaders/opengl/vertex_basic_110.glsl");
 const FRAGMENT_SHADER_TEXTURED: &str = include_str!("shaders/opengl/fragment_textured_110.glsl");
 const FRAGMENT_SHADER_COLOR: &str = include_str!("shaders/opengl/fragment_color_110.glsl");
 const FRAGMENT_SHADER_WATER: &str = include_str!("shaders/opengl/fragment_water_110.glsl");
 
+// openglES shaders
 const VERTEX_SHADER_BASIC_GLES: &str = include_str!("shaders/opengles/vertex_basic_100.glsl");
 const FRAGMENT_SHADER_TEXTURED_GLES: &str = include_str!("shaders/opengles/fragment_textured_100.glsl");
 const FRAGMENT_SHADER_COLOR_GLES: &str = include_str!("shaders/opengles/fragment_color_100.glsl");
+
+// opengl 3.3 shaders with header "#version 330 core" (mainly for retroarch macOS)
+const VERTEX_SHADER3_BASIC: &str = include_str!("shaders/opengl3/vertex_basic_330.glsl");
+const FRAGMENT_SHADER3_TEXTURED: &str = include_str!("shaders/opengl3/fragment_textured_330.glsl");
+const FRAGMENT_SHADER3_COLOR: &str = include_str!("shaders/opengl3/fragment_color_330.glsl");
+const FRAGMENT_SHADER3_WATER: &str = include_str!("shaders/opengl3/fragment_water_330.glsl");
+
+// same as stock 2.1 shaders but without version headers (mainly for retroarch, but also works on desktop)
+const VERTEX_SHADERM_BASIC: &str = include_str!("shaders/openglm/vertex_basic_m.glsl");
+const FRAGMENT_SHADERM_TEXTURED: &str = include_str!("shaders/openglm/fragment_textured_m.glsl");
+const FRAGMENT_SHADERM_COLOR: &str = include_str!("shaders/openglm/fragment_color_m.glsl");
+const FRAGMENT_SHADERM_WATER: &str = include_str!("shaders/openglm/fragment_water_m.glsl");
+
 
 #[derive(Copy, Clone)]
 struct RenderShader {
@@ -403,7 +426,7 @@ impl RenderShader {
         Ok(shader)
     }
 
-    unsafe fn bind_attrib_pointer(&self, gl: &Gl, vbo: GLuint) -> GameResult {
+    unsafe fn bind_attrib_pointer(&self, gl: &Gl, vbo: GLuint, vao: GLuint) -> GameResult {
         gl.gl.UseProgram(self.program_id);
         gl.gl.BindBuffer(gl::ARRAY_BUFFER, vbo);
         gl.gl.EnableVertexAttribArray(self.position);
@@ -446,6 +469,7 @@ struct RenderData {
     tex_shader: RenderShader,
     fill_shader: RenderShader,
     fill_water_shader: RenderShader,
+    vao: GLuint,
     vbo: GLuint,
     ebo: GLuint,
     font_texture: GLuint,
@@ -462,6 +486,7 @@ impl RenderData {
             tex_shader: RenderShader::default(),
             fill_shader: RenderShader::default(),
             fill_water_shader: RenderShader::default(),
+            vao: 0,
             vbo: 0,
             ebo: 0,
             font_texture: 0,
@@ -472,13 +497,56 @@ impl RenderData {
         }
     }
 
-    fn init(&mut self, gles2_mode: bool, imgui: &mut imgui::Context, gl: &Gl) {
+    fn init(&mut self, gl_version: GlVersionInfo, imgui: &mut imgui::Context, gl: &Gl) {
         self.initialized = true;
 
-        let vshdr_basic = if gles2_mode { VERTEX_SHADER_BASIC_GLES } else { VERTEX_SHADER_BASIC };
-        let fshdr_tex = if gles2_mode { FRAGMENT_SHADER_TEXTURED_GLES } else { FRAGMENT_SHADER_TEXTURED };
-        let fshdr_fill = if gles2_mode { FRAGMENT_SHADER_COLOR_GLES } else { FRAGMENT_SHADER_COLOR };
-        let fshdr_fill_water = if gles2_mode { FRAGMENT_SHADER_COLOR_GLES } else { FRAGMENT_SHADER_WATER };
+        // Decide what shader files to use
+        let (
+            vshdr_basic,
+            fshdr_tex,
+            fshdr_fill,
+            fshdr_fill_water,
+        ) = match gl_version {
+            GlVersionInfo::OpenGL(maj, min) => {
+                if maj == 3 {
+                    if min == 0 {
+                        // (desktop gl requests 3.0) (which also includes 2.1 compatability)
+                        (
+                            VERTEX_SHADER_BASIC,
+                            FRAGMENT_SHADER_TEXTURED,
+                            FRAGMENT_SHADER_COLOR,
+                            FRAGMENT_SHADER_WATER
+                        )
+                    } else {
+                        // (retroarch mac requests strict 3.3)
+                        (
+                            VERTEX_SHADER3_BASIC,
+                            FRAGMENT_SHADER3_TEXTURED,
+                            FRAGMENT_SHADER3_COLOR,
+                            FRAGMENT_SHADER3_WATER
+                        )
+                    }
+                } else {
+                    // (retroarch requests 2.1)
+                    (
+                        VERTEX_SHADERM_BASIC,
+                        FRAGMENT_SHADERM_TEXTURED,
+                        FRAGMENT_SHADERM_COLOR,
+                        FRAGMENT_SHADERM_WATER
+                    )
+                }
+
+            },
+            GlVersionInfo::OpenGLES => {
+                // mobile uses openGLES 2 regardless of port
+                (
+                    VERTEX_SHADER_BASIC_GLES,
+                    FRAGMENT_SHADER_TEXTURED_GLES,
+                    FRAGMENT_SHADER_COLOR_GLES,
+                    FRAGMENT_SHADER_COLOR_GLES
+                )
+            },
+        };
 
         unsafe {
             self.tex_shader =
@@ -488,6 +556,7 @@ impl RenderData {
             self.fill_water_shader =
                 RenderShader::compile(gl, vshdr_basic, fshdr_fill_water).unwrap_or_else(|_| RenderShader::default());
 
+            self.vao = return_param(|x| gl.gl.GenVertexArrays(1, x));
             self.vbo = return_param(|x| gl.gl.GenBuffers(1, x));
             self.ebo = return_param(|x| gl.gl.GenBuffers(1, x));
 
@@ -608,11 +677,11 @@ impl OpenGLRenderer {
     fn get_context(&mut self) -> Option<(&mut GLContext, &'static Gl)> {
         let imgui = unsafe { &mut *self.imgui.get() };
 
-        let gles2 = self.refs.gles2_mode;
+        let gl_version = self.refs.gl_version;
         let gl = load_gl(&mut self.refs);
 
         if !self.render_data.initialized {
-            self.render_data.init(gles2, imgui, gl);
+            self.render_data.init(gl_version, imgui, gl);
         }
 
         Some((&mut self.refs, gl))
@@ -621,10 +690,13 @@ impl OpenGLRenderer {
 
 impl BackendRenderer for OpenGLRenderer {
     fn renderer_name(&self) -> String {
-        if self.refs.gles2_mode {
-            "OpenGL ES 2.0".to_string()
-        } else {
-            "OpenGL 2.1".to_string()
+        match self.refs.gl_version {
+            GlVersionInfo::OpenGL(maj, min) => {
+                format!("OpenGL {}.{}", maj, min).to_string()
+            },
+            GlVersionInfo::OpenGLES => {
+                "OpenGL ES 2.0".to_string()
+            }
         }
     }
 
@@ -647,14 +719,23 @@ impl BackendRenderer for OpenGLRenderer {
 
         unsafe {
             if let Some((_, gl)) = self.get_context() {
-                gl.gl.BindFramebuffer(gl::FRAMEBUFFER, 0);
+
+                //Bind the output framebuffer provided by the frontend
+                let fbo = if let Some((context, _)) = self.get_context() {
+                    ((context.get_current_buffer))(&mut context.user_data)
+                } else {0} as GLuint;
+
+                gl.gl.BindFramebuffer(gl::FRAMEBUFFER, fbo);
+
+                gl.gl.Viewport(0, 0, (self.render_data.last_size.0) as GLsizei, (self.render_data.last_size.1) as GLsizei);
+
                 gl.gl.ClearColor(0.0, 0.0, 0.0, 1.0);
                 gl.gl.Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
 
                 let matrix =
                     [[2.0f32, 0.0, 0.0, 0.0], [0.0, -2.0, 0.0, 0.0], [0.0, 0.0, -1.0, 0.0], [-1.0, 1.0, 0.0, 1.0]];
 
-                self.render_data.tex_shader.bind_attrib_pointer(gl, self.render_data.vbo);
+                self.render_data.tex_shader.bind_attrib_pointer(gl, self.render_data.vbo, self.render_data.vao);
                 gl.gl.UniformMatrix4fv(self.render_data.tex_shader.proj_mtx, 1, gl::FALSE, matrix.as_ptr() as _);
 
                 let color = (255, 255, 255, 255);
@@ -834,6 +915,7 @@ impl BackendRenderer for OpenGLRenderer {
                     vertices: Vec::new(),
                     shader: self.render_data.tex_shader,
                     vbo: self.render_data.vbo,
+                    vao: self.render_data.vao,
                     context_active: self.context_active.clone(),
                 }))
             }
@@ -873,6 +955,7 @@ impl BackendRenderer for OpenGLRenderer {
                     vertices: Vec::new(),
                     shader: self.render_data.tex_shader,
                     vbo: self.render_data.vbo,
+                    vao: self.render_data.vao,
                     context_active: self.context_active.clone(),
                 }))
             }
@@ -1004,7 +1087,7 @@ impl BackendRenderer for OpenGLRenderer {
                     VertexData { position: (rect.right as _, rect.bottom as _), uv, color },
                 ];
 
-                self.render_data.fill_shader.bind_attrib_pointer(gl, self.render_data.vbo);
+                self.render_data.fill_shader.bind_attrib_pointer(gl, self.render_data.vbo, self.render_data.vao);
 
                 gl.gl.BindTexture(gl::TEXTURE_2D, self.render_data.font_texture);
                 gl.gl.BindBuffer(gl::ARRAY_BUFFER, self.render_data.vbo);
@@ -1249,13 +1332,13 @@ impl OpenGLRenderer {
         if let Some(gl) = &GL_PROC {
             match shader {
                 BackendShader::Fill => {
-                    self.render_data.fill_shader.bind_attrib_pointer(gl, self.render_data.vbo)?;
+                    self.render_data.fill_shader.bind_attrib_pointer(gl, self.render_data.vbo, self.render_data.vao)?;
                 }
                 BackendShader::Texture => {
-                    self.render_data.tex_shader.bind_attrib_pointer(gl, self.render_data.vbo)?;
+                    self.render_data.tex_shader.bind_attrib_pointer(gl, self.render_data.vbo, self.render_data.vao)?;
                 }
                 BackendShader::WaterFill(scale, t, frame_pos) => {
-                    self.render_data.fill_water_shader.bind_attrib_pointer(gl, self.render_data.vbo)?;
+                    self.render_data.fill_water_shader.bind_attrib_pointer(gl, self.render_data.vbo, self.render_data.vao)?;
                     gl.gl.Uniform1f(self.render_data.fill_water_shader.scale, scale);
                     gl.gl.Uniform1f(self.render_data.fill_water_shader.time, t);
                     gl.gl.Uniform2f(self.render_data.fill_water_shader.frame_offset, frame_pos.0, frame_pos.1);
