@@ -65,7 +65,8 @@ impl VanillaExtractor {
 
         log::info!("Found vanilla game executable, attempting to extract resources.");
 
-        if filesystem::exists(ctx, format!("{}/stage.sect", data_base_dir.clone())) {
+        // The only physicalFS currently loaded uses ./data/ already as its root, so format!("{}/stage.sect", data_base_dir.clone()) would check for /data/data/stage.sect, which is wrong
+        if filesystem::exists(ctx, "/stage.sect") {
             log::info!("Vanilla resources are already extracted, not proceeding.");
             return None;
         }
