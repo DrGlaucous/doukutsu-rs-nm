@@ -4,7 +4,7 @@ use std::mem::MaybeUninit;
 
 use crate::sound::fir::FIR;
 use crate::sound::fir::FIR_STEP;
-use crate::sound::InterpolationMode;
+use crate::sound::backend::InterpolationMode;
 use crate::sound::organya::{Song as Organya, Version};
 use crate::sound::stuff::*;
 use crate::sound::wav::*;

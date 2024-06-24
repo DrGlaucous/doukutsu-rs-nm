@@ -11,7 +11,7 @@ use crate::input::gamepad_player_controller::GamepadController;
 use crate::input::keyboard_player_controller::KeyboardController;
 use crate::input::player_controller::PlayerController;
 use crate::input::touch_player_controller::TouchPlayerController;
-use crate::sound::InterpolationMode;
+use crate::sound::backend::InterpolationMode;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Settings {

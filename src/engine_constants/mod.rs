@@ -18,7 +18,7 @@ use crate::game::settings::Settings;
 use crate::game::shared_game_state::{FontData, Season};
 use crate::i18n::Locale;
 use crate::sound::pixtone::{Channel, Envelope, PixToneParameters, Waveform};
-use crate::sound::SoundManager;
+use crate::sound::backend::SoundManager;
 
 mod npcs;
 
@@ -1616,7 +1616,7 @@ impl EngineConstants {
         }
     }
 
-    pub fn apply_csplus_patches(&mut self, sound_manager: &mut SoundManager) {
+    pub fn apply_csplus_patches(&mut self, sound_manager: &mut Box<dyn SoundManager>) {
         log::info!("Applying Cave Story+ constants patches...");
 
         self.is_cs_plus = true;
