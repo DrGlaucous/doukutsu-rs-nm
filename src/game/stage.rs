@@ -12,8 +12,7 @@ use crate::framework::error::GameError::ResourceLoadError;
 use crate::framework::error::{GameError, GameResult};
 use crate::framework::filesystem;
 use crate::game::map::{Map, NPCData, TilesetAnimConfig};
-use crate::game::scripting::tsc::text_script::TextScript;
-use crate::util::encoding::read_cur_shift_jis;
+use crate::game::scripting::tsc::text_script::{TextScript, TextScriptEncoding};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct NpcType {
