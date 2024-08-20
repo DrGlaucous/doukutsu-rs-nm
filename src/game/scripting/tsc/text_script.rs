@@ -20,7 +20,7 @@ use crate::framework::error::GameResult;
 use crate::game::frame::UpdateTarget;
 use crate::game::npc::NPC;
 use crate::game::player::{ControlMode, TargetPlayer};
-use crate::game::scripting::tsc::bytecode_utils::{read_cur_varint, read_string};
+use crate::game::scripting::tsc::bytecode_utils::{read_cur_varint, read_string_tsc};
 use crate::game::scripting::tsc::encryption::decrypt_tsc;
 use crate::game::scripting::tsc::opcodes::TSCOpCode;
 use crate::game::shared_game_state::ReplayState;
@@ -2039,7 +2039,7 @@ impl TextScriptVM {
                 let textures = &mut*game_scene.stage_textures.deref().borrow_mut();
                 //get path
                 let len = read_cur_varint(&mut cursor)? as usize;
-                let filepath = read_string(&mut cursor, len).unwrap();
+                let filepath = read_string_tsc(&mut cursor, len).unwrap();
                 game_scene.background.load_bkg_custom(ctx, textures, &mut game_scene.stage, &mut game_scene.lighting_mode, &mut &filepath)?;
                 exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
             }

@@ -6,7 +6,7 @@ use itertools::Itertools;
 
 use crate::framework::error::GameError::ParseError;
 use crate::framework::error::GameResult;
-use crate::game::scripting::tsc::bytecode_utils::{put_string, put_varint};
+use crate::game::scripting::tsc::bytecode_utils::{put_string, put_varint, put_string_tsc};
 use crate::game::scripting::tsc::credit_script::CreditScript;
 use crate::game::scripting::tsc::opcodes::{CreditOpCode, TSCOpCode};
 use crate::game::scripting::tsc::parse_utils::{expect_char, read_number, skip_until};
@@ -323,39 +323,9 @@ impl TextScript {
             //parses string delimited by $, no additional arguments
             TSCOpCode::BKG =>
             {
-
                 //stow opcode
                 put_varint(instr as i32, out);
-
-                //terminates with < or end of file
-
-                //holds directory string
-                let mut char_buf = Vec::with_capacity(64);
-                while let Some(&chr) = iter.peek() {
-                    match chr
-                    {
-                        //i give up on terminating with <CRF. Nasty iterators. just end at any command.
-                        b'<' | b'$' => {
-                            break;
-                        }
-                        //move reader forward
-                        b'\r' => {
-                            iter.next();
-                        }
-                        //add char to holding tank
-                        _ => {
-                            char_buf.push(chr);
-                            iter.next();
-                        }
-                    }
-                }                
-                //stow the filepath string (starting with string count)
-                //put_string(&mut char_buf, out, TextScriptEncoding::UTF8);
-
-                //don't use fancy encoding for now: the string goes directly into the compiled code
-                put_varint(char_buf.len() as  i32, out);
-                out.append(&mut char_buf);
-
+                put_string_tsc(iter, out);
             }
         }
 
