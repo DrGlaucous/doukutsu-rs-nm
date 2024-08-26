@@ -136,6 +136,18 @@ pub fn set_clip_rect(ctx: &mut Context, rect: Option<Rect>) -> GameResult {
 }
 
 
+pub fn draw_light(ctx: &mut Context, 
+    collision_surface: Option<&Box<dyn BackendTexture>>,
+    target_surface: Option<&Box<dyn BackendTexture>>,
+) -> GameResult {
+    if let Some(renderer) = &mut ctx.renderer {
+        return renderer.draw_light(collision_surface, target_surface);
+    }
+
+    Err(GameError::RenderError("Rendering backend hasn't been initialized yet.".to_string()))
+}
+
+
 pub fn imgui_context(ctx: &Context) -> GameResult<&mut imgui::Context> {
     if let Some(renderer) = ctx.renderer.as_ref() {
         return renderer.imgui();

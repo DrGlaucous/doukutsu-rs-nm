@@ -1,8 +1,8 @@
 #version 110
 
 uniform sampler2D Texture;
-varying vec2 Frag_UV;
-varying vec4 Frag_Color;
+varying vec2 Frag_UV; //uv corrdinate of current pixel
+varying vec4 Frag_Color; //tint color
 
 void main()
 {

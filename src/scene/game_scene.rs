@@ -54,6 +54,9 @@ use crate::scene::title_scene::TitleScene;
 use crate::scene::Scene;
 use crate::util::rng::RNG;
 
+//TEMP DEBUG
+use crate::framework::graphics::{create_texture_mutable, set_render_target};
+
 pub struct GameScene {
     pub tick: u32,
     pub stage: Stage,
@@ -513,6 +516,8 @@ impl GameScene {
     }
 
     fn draw_light_map(&self, state: &mut SharedGameState, ctx: &mut Context) -> GameResult {
+
+        //set target to lightmap canvas
         {
             let maybe_canvas = state.lightmap_canvas.as_ref();
 
@@ -527,6 +532,7 @@ impl GameScene {
 
         graphics::clear(ctx, Color::from_rgb(100, 100, 110));
 
+        //draw glow
         for npc in self.npc_list.iter_alive() {
             if npc.x < (self.frame.x - 128 * 0x200 - npc.display_bounds.width() as i32 * 0x200)
                 || npc.x
@@ -545,6 +551,7 @@ impl GameScene {
             npc.draw_lightmap(state, ctx, &self.frame)?;
         }
 
+        //draw hardcoded lights
         {
             let batch = state.texture_set.get_or_load_batch(ctx, &state.constants, "builtin/lightmap/spot")?;
 
@@ -1090,6 +1097,7 @@ impl GameScene {
         graphics::set_blend_mode(ctx, BlendMode::Multiply)?;
         graphics::set_render_target(ctx, None)?;
 
+        //put on main screen
         {
             let canvas = state.lightmap_canvas.as_mut().unwrap();
             let rect = Rect { left: 0.0, top: 0.0, right: state.screen_size.0, bottom: state.screen_size.1 };
@@ -1998,6 +2006,49 @@ impl Scene for GameScene {
 
     fn draw(&self, state: &mut SharedGameState, ctx: &mut Context) -> GameResult {
         //graphics::set_canvas(ctx, Some(&state.game_canvas));
+
+
+        //temp. hardcoded light for testing purposes
+        {
+
+            let (width, height) = (ctx.screen_size.0 as u16, ctx.screen_size.1 as u16);
+
+            // ensure no texture is bound before destroying them.
+            set_render_target(ctx, None)?;
+            let collision_map = create_texture_mutable(ctx, width, height)?;
+
+            //set target to collision map canvas
+            graphics::set_render_target(ctx, Some(&collision_map))?;
+
+            graphics::set_blend_mode(ctx, BlendMode::Add)?;
+            graphics::clear(ctx, Color::from_rgba(0, 0, 0, 0));
+            //draw an "opaque" box on the collision surface
+            // let rect = Rect::new((width/6) as isize,(height/6) as isize,(width/2 - 4) as isize, (height/2 - 4) as isize);
+
+            // let rect = Rect::new(
+            //     0 as isize,
+            //     0 as isize,
+            //     (width/2) as isize, 
+            //     (height/2 - 4) as isize
+            // );
+            // graphics::draw_rect(ctx, rect, Color::from_rgba(255, 0, 0, 255))?;
+
+            let rect = Rect::new(
+                0 as isize,
+                (height/2 + 4) as isize,
+                (width/2) as isize, 
+                (height) as isize
+            );
+            graphics::draw_rect(ctx, rect, Color::from_rgba(0, 0, 255, 255))?;
+
+
+            graphics::draw_light(ctx, Some(&collision_map), state.lightmap_canvas.as_ref())?;
+
+
+
+        }
+
+
 
         if self.player1.control_mode == ControlMode::IronHead {
             self.set_ironhead_clip(state, ctx)?;

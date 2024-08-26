@@ -23,6 +23,11 @@ pub enum BackendShader {
     WaterFill(f32, f32, (f32, f32)),
     Fill,
     Texture,
+
+    //uniforms are passed into this
+    //x and y relative to rendered frame
+    //((x,y,radius), color_center, color_edge)
+    //RayTrace((f32, f32, f32), f32, f32),
 }
 
 pub trait Backend {
@@ -67,6 +72,15 @@ pub trait BackendRenderer {
     fn draw_outline_rect(&mut self, rect: Rect, line_width: usize, color: Color) -> GameResult;
 
     fn set_clip_rect(&mut self, rect: Option<Rect>) -> GameResult;
+
+
+    fn draw_light(
+        &mut self,
+        collision_surface: Option<&Box<dyn BackendTexture>>,
+        target_surface: Option<&Box<dyn BackendTexture>>,
+    ) -> GameResult {
+        Ok(())
+    }
 
     fn imgui(&self) -> GameResult<&mut imgui::Context>;
 
