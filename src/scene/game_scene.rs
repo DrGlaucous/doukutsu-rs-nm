@@ -2011,6 +2011,7 @@ impl Scene for GameScene {
         //temp. hardcoded light for testing purposes
         {
 
+
             let (width, height) = (ctx.screen_size.0 as u16, ctx.screen_size.1 as u16);
 
             // ensure no texture is bound before destroying them.
@@ -2023,23 +2024,34 @@ impl Scene for GameScene {
             graphics::set_blend_mode(ctx, BlendMode::Add)?;
             graphics::clear(ctx, Color::from_rgba(0, 0, 0, 0));
             //draw an "opaque" box on the collision surface
-            // let rect = Rect::new((width/6) as isize,(height/6) as isize,(width/2 - 4) as isize, (height/2 - 4) as isize);
-
-            // let rect = Rect::new(
-            //     0 as isize,
-            //     0 as isize,
-            //     (width/2) as isize, 
-            //     (height/2 - 4) as isize
+            
+            // let batch = state.texture_set.get_or_load_batch(ctx, &state.constants, "JScreen")?;
+            // batch.add_rect(
+            //     0.0,
+            //     0.0,
+            //     &Rect::new(0,0,640,480),
             // );
-            // graphics::draw_rect(ctx, rect, Color::from_rgba(255, 0, 0, 255))?;
+            // batch.draw(ctx)?;
+
+            
+            //let rect = Rect::new((width/6) as isize,(height/6) as isize,(width/2 - 4) as isize, (height/2 - 4) as isize);
 
             let rect = Rect::new(
                 0 as isize,
+                0 as isize,
+                (width/2 - 2) as isize, 
+                (height/2 - 24) as isize
+            );
+            graphics::draw_rect(ctx, rect, Color::from_rgba(255, 0, 0, 255))?;
+
+            let rect = Rect::new(
+                (width/2 - 8) as isize,
                 (height/2 + 4) as isize,
-                (width/2) as isize, 
-                (height) as isize
+                (width/2 - 4) as isize, 
+                (height/2 - 4) as isize
             );
             graphics::draw_rect(ctx, rect, Color::from_rgba(0, 0, 255, 255))?;
+
 
 
             graphics::draw_light(ctx, Some(&collision_map), state.lightmap_canvas.as_ref())?;

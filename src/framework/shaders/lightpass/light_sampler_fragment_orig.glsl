@@ -9,10 +9,10 @@ uniform sampler2D Texture, RayTexture;
 //in_ColorD: color at edge
 uniform vec3 in_Light, in_ColorS, in_ColorD;
 
-//size (w+h) of the texture collision texture
-//and the location of the light (relative to destination?)
+//in_World: size (w+h) of the texture collision texture (1/size)
+//in_LightCenter: The location of the light (relative to destination?)
 //in_LightTexSize_WH: size of the destination texture (any width+height)
-uniform vec2 in_WorldTexSize, in_LightCenter, in_LightTexSize_WH;
+uniform vec2 in_World, in_LightCenter, in_LightTexSize_WH;
 
 //in_RayTexSize: the size of the raycast refrence texture
 //in_LightTexSize: size of the destination texture (square?)
@@ -51,7 +51,7 @@ void main() {
 		// Reads out the length fo the ray itself.
 		RayLength = clamp(TexRay.r + (TexRay.g / 255.0), 0.0, 1.0) * in_Light.z,
 		// Returns a bool whether or not this pixel is within the ray.
-		RayVisible = sign(RayLength - Distance) * (1. - texture2D(Texture, (in_Light.xy + Delta) * in_WorldTexSize).a),
+		RayVisible = sign(RayLength - Distance) * (1. - texture2D(Texture, (in_Light.xy + Delta) * in_World).a),
 		// Gets the gradient/tone map based on distance from the pixel to the light.
 		ToneMap = ToneMapFunc(Distance, in_Light.z);
 	

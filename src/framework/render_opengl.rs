@@ -716,8 +716,8 @@ impl RenderData {
 
                 //set this one active + add settings for it
                 gl.gl.BindTexture(gl::TEXTURE_2D, texture_id);
-                gl.gl.TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as _);
-                gl.gl.TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as _);
+                gl.gl.TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as _);
+                gl.gl.TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as _);
                 gl.gl.TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE as _);
                 gl.gl.TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::CLAMP_TO_EDGE as _);
 
@@ -1443,10 +1443,10 @@ impl BackendRenderer for OpenGLRenderer {
 
                         //update projection matrix (y inverted, as seen in def_matrix)
                         self.curr_matrix = [
-                            [2.0 / -(RAY_TRACER_TEXTURE_WH as f32), 0.0, 0.0, 0.0],
+                            [2.0 / (RAY_TRACER_TEXTURE_WH as f32), 0.0, 0.0, 0.0],
                             [0.0, 2.0 / -(RAY_TRACER_TEXTURE_WH as f32), 0.0, 0.0],
                             [0.0, 0.0, -1.0, 0.0],
-                            [1.0, 1.0, 0.0, 1.0],
+                            [-1.0, 1.0, 0.0, 1.0],
                         ];
 
                         //set attributes for this program
