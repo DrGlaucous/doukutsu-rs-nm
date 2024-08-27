@@ -326,6 +326,7 @@ pub struct SharedGameState {
     pub textscript_vm: TextScriptVM,
     pub creditscript_vm: CreditScriptVM,
     pub lightmap_canvas: Option<Box<dyn BackendTexture>>,
+    pub light_collision_canvas: Option<Box<dyn BackendTexture>>,
     pub season: Season,
     pub menu_character: MenuCharacter,
     pub fs_container: Option<FilesystemContainer>,
@@ -483,6 +484,7 @@ impl SharedGameState {
             textscript_vm: TextScriptVM::new(),
             creditscript_vm: CreditScriptVM::new(),
             lightmap_canvas: None,
+            light_collision_canvas: None,
             season,
             menu_character: MenuCharacter::Quote,
             fs_container: None,
@@ -729,6 +731,7 @@ impl SharedGameState {
         // ensure no texture is bound before destroying them.
         set_render_target(ctx, None)?;
         self.lightmap_canvas = Some(create_texture_mutable(ctx, width, height)?);
+        self.light_collision_canvas = Some(create_texture_mutable(ctx, width, height)?);
 
         Ok(())
     }

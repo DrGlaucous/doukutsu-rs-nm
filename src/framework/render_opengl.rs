@@ -1401,7 +1401,7 @@ impl BackendRenderer for OpenGLRenderer {
         }
     }
 
-    //todo: make it use the current rendering target instead of having to specify one
+    //todo: make it use the current rendering target instead of having to specify one (this may hurt performance though...)
     fn draw_light(
         &mut self,
         collision_surface: Option<&Box<dyn BackendTexture>>,
@@ -1433,7 +1433,6 @@ impl BackendRenderer for OpenGLRenderer {
                     let dest_width = gl_target_texture.width; //(2.0 / self.curr_matrix[0][0]).round();
                     let dest_height = gl_target_texture.height; //(2.0 / self.curr_matrix[1][1]).round();
 
-                    //temp hard-coded light info
                     //where the light is located realtive to the collision data(place in "middle")
                     let x_collision = light.x;
                     let y_collision = light.y;
@@ -1667,8 +1666,8 @@ impl BackendRenderer for OpenGLRenderer {
                         gl.gl.BindFramebuffer(gl::FRAMEBUFFER, gl_target_texture.framebuffer_id);
                         gl.gl.Viewport(0, 0, dest_width as _, dest_height as _);
 
-                        gl.gl.ClearColor(0.0, 0.0, 0.0, 1.0);
-                        gl.gl.Clear(gl::COLOR_BUFFER_BIT);
+                        //gl.gl.ClearColor(0.0, 0.0, 0.0, 1.0);
+                        //gl.gl.Clear(gl::COLOR_BUFFER_BIT);
 
                         //draw to ray tracer texture
                         let color = (255, 255, 255, 255);
@@ -1694,8 +1693,8 @@ impl BackendRenderer for OpenGLRenderer {
                         handle_err(gl, 0);
 
                         //unbind 
-                        gl.gl.BindTexture(gl::TEXTURE_2D, 0);
-                        gl.gl.BindBuffer(gl::ARRAY_BUFFER, 0);
+                        //gl.gl.BindTexture(gl::TEXTURE_2D, 0);
+                        //gl.gl.BindBuffer(gl::ARRAY_BUFFER, 0);
 
                         //bitmaps are written out in BGR format...
                         //red(seen blue) is the first byte of the 2 byte ray length MSB
@@ -1705,7 +1704,7 @@ impl BackendRenderer for OpenGLRenderer {
 
 
 
-
+                        // Test texture dump
                         let mut bob = 1;
                         if bob == 1 {
                             bob += 1;
@@ -1717,7 +1716,6 @@ impl BackendRenderer for OpenGLRenderer {
                                 "./JScreen.bmp",
                                 gl
                             );
-
                             dump_texture(
                                 self.render_data.ray_data_texture,
                                 Some(self.render_data.ray_data_framebuffer),
@@ -1725,7 +1723,6 @@ impl BackendRenderer for OpenGLRenderer {
                                 ray_texture_size as _,
                                 "./JScreen0.bmp",
                                 gl);
-
                             dump_texture(
                                 gl_collision_texture.texture_id,
                                 Some(gl_collision_texture.framebuffer_id),
@@ -1733,9 +1730,7 @@ impl BackendRenderer for OpenGLRenderer {
                                 gl_collision_texture.height as _,
                                 "./JScreen2.bmp",
                                 gl
-                            );
-
-                            
+                            );    
                         }
 
                         handle_err(gl, 0);

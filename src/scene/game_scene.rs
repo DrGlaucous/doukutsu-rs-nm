@@ -24,7 +24,7 @@ use crate::components::tilemap::{TileLayer, Tilemap};
 use crate::components::water_renderer::{WaterLayer, WaterRenderer};
 use crate::components::whimsical_star::WhimsicalStar;
 use crate::entity::GameEntity;
-use crate::framework::backend::{SpriteBatchCommand, BackendRaytraceLight};
+use crate::framework::backend::{SpriteBatchCommand, BackendRaytraceLight, BackendTexture};
 use crate::framework::context::Context;
 use crate::framework::error::GameResult;
 use crate::framework::graphics::{draw_rect, BlendMode, FilterMode};
@@ -398,6 +398,45 @@ impl GameScene {
         )
     }
 
+    fn draw_light_raycast_hardware(
+        &self,
+        //state: &mut SharedGameState,
+        ctx: &mut Context,
+        collision_surface: Option<&Box<dyn BackendTexture>>,
+        target_surface: Option<&Box<dyn BackendTexture>>,
+        world_point_x: i32,
+        world_point_y: i32,
+        color_center: Color,
+        color_edge: Color,
+        radius: u16,
+        angle: Range<f32>,
+    ) -> GameResult {
+
+        let (width, height) = (ctx.screen_size.0 as u16, ctx.screen_size.1 as u16);
+
+        let px = world_point_x as f32 / 512.0;
+        let py = world_point_y as f32 / 512.0;
+
+        let fx2 = self.frame.x as f32 / 512.0;
+        let fy2 = self.frame.y as f32 / 512.0;
+
+        //light parameters
+        let light = BackendRaytraceLight{
+            x: px - fx2,
+            y: py - fy2,
+            x_dest: px,
+            y_dest: py,
+            angle,
+            radius,
+            color_center,
+            color_edge,
+        };
+
+        graphics::draw_light(ctx, collision_surface, target_surface, light)?;
+        
+        Ok(())
+    }
+
     fn draw_light_raycast(
         &self,
         tile_size: TileSize,
@@ -426,7 +465,7 @@ impl GameScene {
             let dx = d.cos() * -5.0;
             let dy = d.sin() * -5.0;
             let m = 1.0 - ((ahalf - i as f32).abs() / ahalf);
-            let mut x = px;
+            let mut x: f32 = px;
             let mut y = py;
             let mut r = br;
             let mut g = bg;
@@ -516,6 +555,7 @@ impl GameScene {
         }
     }
 
+    //draws all lights
     fn draw_light_map(&self, state: &mut SharedGameState, ctx: &mut Context) -> GameResult {
 
         //set target to lightmap canvas
@@ -533,7 +573,7 @@ impl GameScene {
 
         graphics::clear(ctx, Color::from_rgb(100, 100, 110));
 
-        //draw glow
+        //draw glow (unimplemented)
         for npc in self.npc_list.iter_alive() {
             if npc.x < (self.frame.x - 128 * 0x200 - npc.display_bounds.width() as i32 * 0x200)
                 || npc.x
@@ -560,7 +600,8 @@ impl GameScene {
                 [(&self.player1, &self.inventory_player1), (&self.player2, &self.inventory_player2)].iter()
             {
                 if player.cond.alive() && !player.cond.hidden() && inv.get_current_weapon().is_some() {
-                    if state.settings.light_cone {
+                    let lc = state.settings.light_cone;
+                    if lc {
                         let range = match () {
                             _ if player.up => 60..120,
                             _ if player.down => 240..300,
@@ -579,15 +620,29 @@ impl GameScene {
 
                         let (_, gun_off_y) = player.skin.get_gun_offset();
 
-                        self.draw_light_raycast(
-                            state.tile_size,
-                            player.x + player.direction.vector_x() * 0x800,
-                            player.y + gun_off_y * 0x200 + 0x400,
-                            color,
-                            att,
-                            range,
-                            batch,
-                        );
+                        // self.draw_light_raycast(
+                        //     state.tile_size,
+                        //     player.x + player.direction.vector_x() * 0x800,
+                        //     player.y + gun_off_y * 0x200 + 0x400,
+                        //     color,
+                        //     att,
+                        //     range,
+                        //     batch,
+                        // );
+
+                        // self.draw_light_raycast_hardware(
+                        //     ctx,
+                        //     state.light_collision_canvas.as_ref(),
+                        //     state.lightmap_canvas.as_ref(),
+                        //     player.x + player.direction.vector_x() * 0x800,
+                        //     player.y + gun_off_y * 0x200 + 0x400,
+                        //     Color::from_rgb(255, 255, 255),
+                        //     Color::from_rgb(255, 255, 0),
+                        //     (att * 128.0) as u16,
+                        //     0.0..3.14159*2.0,
+                        // )?;
+
+
                     } else {
                         self.draw_light(
                             interpolate_fix9_scale(
@@ -1095,6 +1150,20 @@ impl GameScene {
             batch.draw_filtered(FilterMode::Linear, ctx)?;
         }
 
+
+        // graphics::set_blend_mode(ctx, BlendMode::Alpha)?;
+        // self.draw_light_raycast_hardware(
+        //     ctx,
+        //     state.light_collision_canvas.as_ref(),
+        //     state.lightmap_canvas.as_ref(),
+        //     self.player1.x + self.player1.direction.vector_x() * 0x800,
+        //     self.player1.y * 0x200,
+        //     Color::from_rgba(255, 255, 255, 255),
+        //     Color::from_rgba(255, 255, 0, 255),
+        //     128,
+        //     0.0..3.14159*2.0,
+        // )?;
+
         graphics::set_blend_mode(ctx, BlendMode::Multiply)?;
         graphics::set_render_target(ctx, None)?;
 
@@ -1107,6 +1176,7 @@ impl GameScene {
             canvas.add(SpriteBatchCommand::DrawRect(rect, rect));
             canvas.draw()?;
 
+            //darken screen
             graphics::set_render_target(ctx, Some(canvas))?;
             graphics::draw_rect(
                 ctx,
@@ -2010,62 +2080,71 @@ impl Scene for GameScene {
 
 
         //temp. hardcoded light for testing purposes
-        {
-
+        let mut apples_pears = 0;
+        if apples_pears > 0 {
 
             let (width, height) = (ctx.screen_size.0 as u16, ctx.screen_size.1 as u16);
 
-            // ensure no texture is bound before destroying them.
-            set_render_target(ctx, None)?;
-            let collision_map = create_texture_mutable(ctx, width, height)?;
+            apples_pears = width;
 
-            //set target to collision map canvas
-            graphics::set_render_target(ctx, Some(&collision_map))?;
+            // // ensure no texture is bound before destroying them.
+            // set_render_target(ctx, None)?;
+            // let collision_map = create_texture_mutable(ctx, width, height)?;
 
-            graphics::set_blend_mode(ctx, BlendMode::Add)?;
-            graphics::clear(ctx, Color::from_rgba(0, 0, 0, 0));
-            //draw an "opaque" box on the collision surface
+            // //set target to collision map canvas
+            // graphics::set_render_target(ctx, Some(&collision_map))?;
+
+            // graphics::set_blend_mode(ctx, BlendMode::Add)?;
+            // graphics::clear(ctx, Color::from_rgba(0, 0, 0, 0));
+            // //draw an "opaque" box on the collision surface
             
-            // let batch = state.texture_set.get_or_load_batch(ctx, &state.constants, "JScreen")?;
-            // batch.add_rect(
-            //     0.0,
-            //     0.0,
-            //     &Rect::new(0,0,640,480),
+            // // let batch = state.texture_set.get_or_load_batch(ctx, &state.constants, "JScreen")?;
+            // // batch.add_rect(
+            // //     0.0,
+            // //     0.0,
+            // //     &Rect::new(0,0,640,480),
+            // // );
+            // // batch.draw(ctx)?;
+
+            
+            // //let rect = Rect::new((width/6) as isize,(height/6) as isize,(width/2 - 4) as isize, (height/2 - 4) as isize);
+
+            // let rect = Rect::new(
+            //     0 as isize,
+            //     0 as isize,
+            //     (width/2 - 2) as isize, 
+            //     (height/2 - 24) as isize
             // );
-            // batch.draw(ctx)?;
+            // graphics::draw_rect(ctx, rect, Color::from_rgba(255, 0, 0, 255))?;
 
-            
-            //let rect = Rect::new((width/6) as isize,(height/6) as isize,(width/2 - 4) as isize, (height/2 - 4) as isize);
-
-            let rect = Rect::new(
-                0 as isize,
-                0 as isize,
-                (width/2 - 2) as isize, 
-                (height/2 - 24) as isize
-            );
-            graphics::draw_rect(ctx, rect, Color::from_rgba(255, 0, 0, 255))?;
-
-            let rect = Rect::new(
-                (width/2 - 8) as isize,
-                (height/2 + 4) as isize,
-                (width/2 - 4) as isize, 
-                (height/2 - 4) as isize
-            );
-            graphics::draw_rect(ctx, rect, Color::from_rgba(0, 0, 255, 255))?;
+            // let rect = Rect::new(
+            //     (width/2 - 8) as isize,
+            //     (height/2 + 4) as isize,
+            //     (width/2 - 4) as isize, 
+            //     (height/2 - 4) as isize
+            // );
+            // graphics::draw_rect(ctx, rect, Color::from_rgba(0, 0, 255, 255))?;
 
             let light = BackendRaytraceLight{
                 x: (width / 2) as f32,
                 y: (height / 2) as f32,
                 x_dest: (width / 2) as f32,
                 y_dest: (height / 2) as f32,
-                angle: 0.6..(1.8 * PI),
-                radius: 128,
+                angle: 0.0..(2.0 * PI),
+                radius: (128 * state.scale as u16),
                 color_center: Color::from_rgb(255, 255, 255),
                 color_edge: Color::from_rgb(0, 0, 255),
-
             };
 
-            graphics::draw_light(ctx, Some(&collision_map), state.lightmap_canvas.as_ref(), light)?;
+            
+
+            //clear target surface
+            graphics::set_render_target(ctx, state.lightmap_canvas.as_ref())?;
+            graphics::set_blend_mode(ctx, BlendMode::Add)?;
+            graphics::clear(ctx, Color::from_rgba(0, 0, 0, 0));
+
+
+            graphics::draw_light(ctx, state.light_collision_canvas.as_ref(), state.lightmap_canvas.as_ref(), light)?;
 
 
 
@@ -2100,8 +2179,36 @@ impl Scene for GameScene {
         }
 
         self.water_renderer.draw(state, ctx, &self.frame, WaterLayer::Back)?;
+
+        //set target to collision buffer
+        {
+            graphics::set_render_target(ctx, state.light_collision_canvas.as_ref())?;
+            //erase contents
+            graphics::clear(ctx, Color::from_rgba(0, 0, 0, 0));
+            graphics::set_blend_mode(ctx, BlendMode::Alpha)?;
+        }
+
+        //these will be stored on the collision mask for later
         self.tilemap.draw(state, ctx, &self.frame, TileLayer::Foreground, stage_textures_ref, &self.stage)?;
         self.tilemap.draw(state, ctx, &self.frame, TileLayer::Snack, stage_textures_ref, &self.stage)?;
+        //return to normal target + draw collision buffer to main window
+        {
+            graphics::set_render_target(ctx, None)?;
+            //blendmode did not change: no need to set it again here
+            //graphics::set_blend_mode(ctx, BlendMode::Alpha)?;
+
+            //get the collision mask
+            let canvas = state.light_collision_canvas.as_mut().unwrap();
+            let rect = Rect { left: 0.0, top: 0.0, right: state.screen_size.0, bottom: state.screen_size.1 };
+
+            //clear queue and draw contents to screen
+            canvas.clear();
+            canvas.add(SpriteBatchCommand::DrawRect(rect, rect));
+            canvas.draw()?;
+
+        }
+        
+
         self.draw_npc_layer(state, ctx, NPCLayer::Foreground)?;
         self.tilemap.draw(state, ctx, &self.frame, TileLayer::FarForeground, stage_textures_ref, &self.stage)?;
         self.water_renderer.draw(state, ctx, &self.frame, WaterLayer::Front)?;

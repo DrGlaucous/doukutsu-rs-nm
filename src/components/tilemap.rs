@@ -3,6 +3,7 @@ use std::borrow::Borrow;
 use crate::common::Rect;
 use crate::framework::context::Context;
 use crate::framework::error::GameResult;
+use crate::framework::backend::BackendTexture;
 use crate::game::frame::Frame;
 use crate::game::shared_game_state::{SharedGameState, TileSize};
 use crate::game::stage::{BackgroundType, Stage, StageTexturePaths};
@@ -46,10 +47,17 @@ impl Tilemap {
         layer: TileLayer,
         textures: &StageTexturePaths,
         stage: &Stage,
+        //target_canvas: Option<&Box<dyn BackendTexture>>,
     ) -> GameResult {
         if stage.map.tile_size == TileSize::Tile8x8 && layer == TileLayer::Snack {
             return Ok(());
         }
+
+        //not sure if I should leave this in here or have it in the main game_scene function
+        // //if we have a special target specified, 
+        // if let Some(canvas) = target_canvas {
+
+        // }
 
         let tex = match layer {
             TileLayer::Snack => "Npc/NpcSym",
