@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::ops::{Deref, Range};
 use std::rc::Rc;
+use std::f32::consts::PI;
 
 use log::info;
 
@@ -23,7 +24,7 @@ use crate::components::tilemap::{TileLayer, Tilemap};
 use crate::components::water_renderer::{WaterLayer, WaterRenderer};
 use crate::components::whimsical_star::WhimsicalStar;
 use crate::entity::GameEntity;
-use crate::framework::backend::SpriteBatchCommand;
+use crate::framework::backend::{SpriteBatchCommand, BackendRaytraceLight};
 use crate::framework::context::Context;
 use crate::framework::error::GameResult;
 use crate::framework::graphics::{draw_rect, BlendMode, FilterMode};
@@ -2052,9 +2053,19 @@ impl Scene for GameScene {
             );
             graphics::draw_rect(ctx, rect, Color::from_rgba(0, 0, 255, 255))?;
 
+            let light = BackendRaytraceLight{
+                x: (width / 2) as f32,
+                y: (height / 2) as f32,
+                x_dest: (width / 2) as f32,
+                y_dest: (height / 2) as f32,
+                angle: 0.6..(1.8 * PI),
+                radius: 128,
+                color_center: Color::from_rgb(255, 255, 255),
+                color_edge: Color::from_rgb(0, 0, 255),
 
+            };
 
-            graphics::draw_light(ctx, Some(&collision_map), state.lightmap_canvas.as_ref())?;
+            graphics::draw_light(ctx, Some(&collision_map), state.lightmap_canvas.as_ref(), light)?;
 
 
 

@@ -1,5 +1,6 @@
 use std::any::Any;
 use std::rc::Rc;
+use std::ops::{Range, RangeInclusive, RangeBounds};
 
 use imgui::DrawData;
 
@@ -16,6 +17,24 @@ pub struct VertexData {
     pub color: (u8, u8, u8, u8),
     pub uv: (f32, f32),
 }
+
+#[derive(Clone)]
+pub struct BackendRaytraceLight {
+    /// location realtive to collision zone (in pixels, prescaled)
+    pub x: f32,
+    pub y: f32,
+    /// location realtive to target texture (in pixels, prescaled)
+    pub x_dest: f32,
+    pub y_dest: f32,
+    /// in radians, 0-2pi (values larger or smaller don't affect anything)
+    pub angle: Range<f32>,
+    /// in pixels
+    pub radius: u16,
+    pub color_center: Color,
+    pub color_edge: Color,
+
+}
+
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum BackendShader {
@@ -73,11 +92,12 @@ pub trait BackendRenderer {
 
     fn set_clip_rect(&mut self, rect: Option<Rect>) -> GameResult;
 
-
+    //do I want this to be in this trait, or part of `BackendTexture`?
     fn draw_light(
         &mut self,
         collision_surface: Option<&Box<dyn BackendTexture>>,
         target_surface: Option<&Box<dyn BackendTexture>>,
+        light: BackendRaytraceLight,
     ) -> GameResult {
         Ok(())
     }

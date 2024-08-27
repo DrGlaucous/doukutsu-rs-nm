@@ -1,5 +1,5 @@
 use crate::common::{Color, Rect};
-use crate::framework::backend::{BackendShader, BackendTexture, VertexData};
+use crate::framework::backend::{BackendShader, BackendTexture, VertexData, BackendRaytraceLight};
 use crate::framework::context::Context;
 use crate::framework::error::{GameError, GameResult};
 
@@ -139,9 +139,10 @@ pub fn set_clip_rect(ctx: &mut Context, rect: Option<Rect>) -> GameResult {
 pub fn draw_light(ctx: &mut Context, 
     collision_surface: Option<&Box<dyn BackendTexture>>,
     target_surface: Option<&Box<dyn BackendTexture>>,
+    light: BackendRaytraceLight,
 ) -> GameResult {
     if let Some(renderer) = &mut ctx.renderer {
-        return renderer.draw_light(collision_surface, target_surface);
+        return renderer.draw_light(collision_surface, target_surface, light);
     }
 
     Err(GameError::RenderError("Rendering backend hasn't been initialized yet.".to_string()))

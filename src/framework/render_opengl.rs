@@ -6,11 +6,12 @@ use std::mem;
 use std::mem::MaybeUninit;
 use std::ptr::null;
 use std::sync::Arc;
+use std::ops::{Range, RangeInclusive, RangeBounds};
 
 use imgui::{DrawCmd, DrawCmdParams, DrawData, DrawIdx, DrawVert, TextureId, Ui};
 
 use crate::common::{Color, Rect};
-use crate::framework::backend::{BackendRenderer, BackendShader, BackendTexture, SpriteBatchCommand, VertexData};
+use crate::framework::backend::{BackendRenderer, BackendShader, BackendTexture, SpriteBatchCommand, VertexData, BackendRaytraceLight};
 use crate::framework::context::Context;
 use crate::framework::error::GameError;
 use crate::framework::error::GameError::RenderError;
@@ -478,7 +479,7 @@ struct RenderShader {
     light_coord: GLint, //[x,y,z(radius)] of light center rel. to collision texture
     world_map_size_recip: GLint, //[x,y] width and height of the world(collision) map
     ray_texture_size: GLint,//[x,y] width and height of the texture map
-
+    ray_angle_range: GLint,//[x,y] min and max angle to draw the raycast light between
     ////////////
     //light sampler specific variables
 
@@ -513,6 +514,7 @@ impl Default for RenderShader {
             light_coord: 0,
             world_map_size_recip: 0,
             ray_texture_size: 0,
+            ray_angle_range: 0,
             ray_texture: 0,
             color_s: 0,
             color_d: 0,
@@ -590,10 +592,13 @@ impl RenderShader {
             shader.world_map_size_recip = gl.gl.GetUniformLocation(shader.program_id, b"in_World\0".as_ptr() as _) as _;
             shader.ray_texture_size = gl.gl.GetUniformLocation(shader.program_id, b"in_RayTexSize\0".as_ptr() as _) as _;
             shader.ray_texture = gl.gl.GetUniformLocation(shader.program_id, b"RayTexture\0".as_ptr() as _) as _;
+            shader.ray_angle_range = gl.gl.GetUniformLocation(shader.program_id, b"in_Angle\0".as_ptr() as _) as _;
             shader.color_s = gl.gl.GetUniformLocation(shader.program_id, b"in_ColorS\0".as_ptr() as _) as _;
             shader.color_d = gl.gl.GetUniformLocation(shader.program_id, b"in_ColorD\0".as_ptr() as _) as _;
             shader.light_coord_dest = gl.gl.GetUniformLocation(shader.program_id, b"in_LightCenter\0".as_ptr() as _) as _;
             shader.texture_size = gl.gl.GetUniformLocation(shader.program_id, b"in_LightTexSize_WH\0".as_ptr() as _) as _;
+        
+            handle_err(gl, 0);
         }
 
         Ok(shader)
@@ -750,6 +755,8 @@ impl RenderData {
                 gl.gl.DrawBuffers(1, draw_buffers.as_ptr() as _);
                 //save made framebuffer
                 self.ray_data_framebuffer = framebuffer_id;
+
+                handle_err(gl, 0);
 
             
             }
@@ -1394,10 +1401,12 @@ impl BackendRenderer for OpenGLRenderer {
         }
     }
 
+    //todo: make it use the current rendering target instead of having to specify one
     fn draw_light(
         &mut self,
         collision_surface: Option<&Box<dyn BackendTexture>>,
         target_surface: Option<&Box<dyn BackendTexture>>,
+        light: BackendRaytraceLight,
     ) -> GameResult {
                                 
         if let Some((_, gl)) = self.get_context() {
@@ -1426,15 +1435,29 @@ impl BackendRenderer for OpenGLRenderer {
 
                     //temp hard-coded light info
                     //where the light is located realtive to the collision data(place in "middle")
-                    let x_collision = col_width / 2;
-                    let y_collision = col_height / 2;
+                    let x_collision = light.x;
+                    let y_collision = light.y;
                     //where the light will be drawn on the target texture
-                    let x_target = dest_width as f32 / 2.0;
-                    let y_target = dest_height as f32 / 2.0;
-                    let radius = 128;
+                    let x_target = light.x_dest;
+                    let y_target = light.y_dest;
+                    let radius = light.radius;
                     //RGB
-                    let color_center = (1.0f32, 1.0f32, 1.0f32);
-                    let color_edge = (0.0f32, 1.0f32, 1.0f32);
+                    let color_center = (
+                        light.color_center.r,
+                        light.color_center.g,
+                        light.color_center.b,
+                    );
+                    let color_edge = (
+                        light.color_edge.r,
+                        light.color_edge.g,
+                        light.color_edge.b,
+                    );
+                    // let color_center = (1.0f32, 1.0f32, 1.0f32);
+                    // let color_edge = (0.0f32, 1.0f32, 1.0f32);
+
+
+                    let angle_min = light.angle.start;
+                    let angle_max = light.angle.end;
 
                     let ray_texture_size = (RAY_TRACER_TEXTURE_WH as f32);//.powi(2);
 
@@ -1492,6 +1515,11 @@ impl BackendRenderer for OpenGLRenderer {
                             self.render_data.ray_tracer_shader.world_map_size_recip,
                             1.0 / (col_width as GLfloat),
                             1.0 / (col_height as GLfloat),
+                        );
+                        gl.gl.Uniform2f(
+                            self.render_data.ray_tracer_shader.ray_angle_range,
+                            angle_min,
+                            angle_max,
                         );
                         handle_err(gl, 0);
                         gl.gl.Uniform1f(
