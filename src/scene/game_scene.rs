@@ -404,8 +404,8 @@ impl GameScene {
         ctx: &mut Context,
         collision_surface: Option<&Box<dyn BackendTexture>>,
         target_surface: Option<&Box<dyn BackendTexture>>,
-        world_point_x: i32,
-        world_point_y: i32,
+        x: f32,
+        y: f32,
         screen_scale: f32,
         color_center: Color,
         color_edge: Color,
@@ -415,14 +415,8 @@ impl GameScene {
 
         let (width, height) = (ctx.screen_size.0 as u16, ctx.screen_size.1 as u16);
 
-        let px = world_point_x as f32 / 512.0;
-        let py = world_point_y as f32 / 512.0;
-
-        let fx2 = self.frame.x as f32 / 512.0;
-        let fy2 = self.frame.y as f32 / 512.0;
-
-        let x = (px - fx2) * screen_scale;
-        let y = (py - fy2) * screen_scale;
+        let x = /*(px - fx2)*/ x * screen_scale;
+        let y = y * screen_scale;
 
         //light parameters
         let light = BackendRaytraceLight{
@@ -632,15 +626,16 @@ impl GameScene {
 
 
                         let (color, power) = match inv.get_current_weapon() {
-                            Some(Weapon { wtype: WeaponType::Fireball, .. }) => (Color::from_rgb(170u8, 80u8, 0u8), 128),
-                            Some(Weapon { wtype: WeaponType::PolarStar, .. }) => (Color::from_rgb(150u8, 150u8, 160u8), 128),
-                            Some(Weapon { wtype: WeaponType::Spur, .. }) => (Color::from_rgb(170u8, 170u8, 200u8), 128),
+                            Some(Weapon { wtype: WeaponType::Fireball, .. }) => (Color::from_rgb(170u8, 80u8, 0u8), 160),
+                            Some(Weapon { wtype: WeaponType::PolarStar, .. }) => (Color::from_rgb(150u8, 150u8, 160u8), 160),
+                            Some(Weapon { wtype: WeaponType::Spur, .. }) => (Color::from_rgb(170u8, 170u8, 200u8), 160),
                             Some(Weapon { wtype: WeaponType::Blade, .. }) => continue 'cc,
-                            _ => (Color::from_rgb(150u8, 150u8, 150u8), 128),
+                            _ => (Color::from_rgb(150u8, 150u8, 150u8), 160),
                         };
 
                         let (_, gun_off_y) = player.skin.get_gun_offset();
 
+                        //old raycast method
                         // self.draw_light_raycast(
                         //     state.tile_size,
                         //     player.x + player.direction.vector_x() * 0x800,
@@ -652,15 +647,25 @@ impl GameScene {
                         // );
 
 
-                        //let x = interpolate_fix9_scale(player.prev_x as i32, player.x as i32, state.frame_time);
-                        //let y = interpolate_fix9_scale(player.prev_y as i32, player.y as i32, state.frame_time);
 
+                        let offset_x = player.direction.vector_x() * 0x800;
+                        let offset_y = gun_off_y * 0x200 + 0x400;
+                        let x = interpolate_fix9_scale(
+                            player.prev_x - self.frame.prev_x,
+                            player.x - self.frame.x,
+                            state.frame_time,
+                        );
+                        let y = interpolate_fix9_scale(
+                            player.prev_y - self.frame.prev_y,
+                            player.y - self.frame.y,
+                            state.frame_time,
+                        );
                         self.draw_light_raycast_hardware(
                             ctx,
                             state.light_collision_canvas.as_ref(),
                             state.lightmap_canvas.as_ref(),
-                            player.x + player.direction.vector_x() * 0x800,
-                            player.y + gun_off_y * 0x200 + 0x400,
+                            x + (offset_x / 0x200) as f32,
+                            y + (offset_y / 0x200) as f32,
                             state.scale,
                             Color::from_rgba( 255, 255, 255, 255),
                             color,
