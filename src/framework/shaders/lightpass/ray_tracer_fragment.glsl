@@ -35,10 +35,10 @@ void main() {
 	
 	//cut unused indicies short (index >= ray count)
 	//optimized out using "step" in the for loop (see below), but is in for now for clarification
-	if (ray_count.x >= ray_count.y) {
-		gl_FragColor = vec4(0,0,0,1);
-		return;
-	}
+	// if (ray_count.x >= ray_count.y) {
+	// 	gl_FragColor = vec4(0,0,0,1);
+	// 	return;
+	// }
 	
 	// Takes the index/ray_count and converts it to an angle in range of: 0 to 2pi = 0 to ray_count.
 	float Theta = TAU * (ray_count.x / ray_count.y);
@@ -48,11 +48,26 @@ void main() {
 	vec2 xyRay = vec2(0.0);
 
 
-	//step will be either 0 or 1, depending on if y is larger than x
-	//step is also used for min and max angle
-	//step(in_Angle.x, Theta) //1 if theta is larger= than min_angle
-	//step(Theta, in_Angle.y) //1 if theta is smaller than max_angle
-	float in_valid_angle = step(ray_count.x,ray_count.y) * step(in_Angle.x, Theta) * step(Theta, in_Angle.y);
+	//will be 1 if the min_angle is bigger than the max_angle
+	float min_angle_smaller = step(in_Angle.x, in_Angle.y);
+
+	//step(x,y):
+	//y>=x
+
+	//1 if:
+	//step(in_Angle.x, Theta) //1 if theta is larger= than min_angle AND
+	//step(Theta, in_Angle.y) //1 if theta is smaller than max_angle AND
+	//(1.0 - min_angle_bigger) //1 if we're looking at a normal range
+	float is_within_normal_angle_range = step(in_Angle.x, Theta) * step(Theta, in_Angle.y) * min_angle_smaller;
+
+	//1 if:
+	//step(in_Angle.y, Theta) //1 if theta is larger= than max_angle AND
+	//step(Theta, in_Angle.x) //1 if theta is smaller than min_angle AND
+	//min_angle_bigger //1 if we're looking at an inverted range (pointing to the right)
+	float is_within_inverted_range = (step(in_Angle.x, Theta) + step(Theta, in_Angle.y)) * (1.0 - min_angle_smaller);
+
+	//is index less than ray count and are we within angle range?
+	float in_valid_angle = step(ray_count.x,ray_count.y) * (is_within_normal_angle_range + is_within_inverted_range);
 
 	// Ensures we are within the angle range prescribed. If not, the ray is not traced (for-loop breaks).
 	// in_valid_angle is 1 if yes. If not, MAXRADIUS is multiplied by 0 and we end early)
@@ -93,6 +108,7 @@ void main() {
 	// } else {
 	// 	rayLength = 0.9;
 	// }
+	
 
 
 	//red is MSB, blue is LSB

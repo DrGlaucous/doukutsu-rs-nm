@@ -406,6 +406,7 @@ impl GameScene {
         target_surface: Option<&Box<dyn BackendTexture>>,
         world_point_x: i32,
         world_point_y: i32,
+        screen_scale: f32,
         color_center: Color,
         color_edge: Color,
         radius: u16,
@@ -420,14 +421,17 @@ impl GameScene {
         let fx2 = self.frame.x as f32 / 512.0;
         let fy2 = self.frame.y as f32 / 512.0;
 
+        let x = (px - fx2) * screen_scale;
+        let y = (py - fy2) * screen_scale;
+
         //light parameters
         let light = BackendRaytraceLight{
-            x: px - fx2,
-            y: py - fy2,
-            x_dest: px,
-            y_dest: py,
+            x,
+            y,
+            x_dest: x,
+            y_dest: y,
             angle,
-            radius,
+            radius: radius * screen_scale as u16,
             color_center,
             color_edge,
         };
@@ -602,20 +606,37 @@ impl GameScene {
                 if player.cond.alive() && !player.cond.hidden() && inv.get_current_weapon().is_some() {
                     let lc = state.settings.light_cone;
                     if lc {
+                        // let range = match () {
+                        //     _ if player.up => 60..120,
+                        //     _ if player.down => 240..300,
+                        //     _ if player.direction == Direction::Left => -30..30,
+                        //     _ if player.direction == Direction::Right => 150..210,
+                        //     _ => continue 'cc,
+                        // };
+
+                        // let (color, att) = match inv.get_current_weapon() {
+                        //     Some(Weapon { wtype: WeaponType::Fireball, .. }) => ((170u8, 80u8, 0u8), 0.92),
+                        //     Some(Weapon { wtype: WeaponType::PolarStar, .. }) => ((150u8, 150u8, 160u8), 0.92),
+                        //     Some(Weapon { wtype: WeaponType::Spur, .. }) => ((170u8, 170u8, 200u8), 0.92),
+                        //     Some(Weapon { wtype: WeaponType::Blade, .. }) => continue 'cc,
+                        //     _ => ((150u8, 150u8, 150u8), 0.92),
+                        // };
+
                         let range = match () {
-                            _ if player.up => 60..120,
-                            _ if player.down => 240..300,
-                            _ if player.direction == Direction::Left => -30..30,
-                            _ if player.direction == Direction::Right => 150..210,
+                            _ if player.up => (PI/3.0)..(2.0*PI/3.0),
+                            _ if player.down => (4.0*PI/3.0)..(5.0*PI/3.0),
+                            _ if player.direction == Direction::Right => -(PI/6.0)..(PI/6.0),
+                            _ if player.direction == Direction::Left => (5.0*PI/6.0)..(7.0*PI/6.0),
                             _ => continue 'cc,
                         };
 
-                        let (color, att) = match inv.get_current_weapon() {
-                            Some(Weapon { wtype: WeaponType::Fireball, .. }) => ((170u8, 80u8, 0u8), 0.92),
-                            Some(Weapon { wtype: WeaponType::PolarStar, .. }) => ((150u8, 150u8, 160u8), 0.92),
-                            Some(Weapon { wtype: WeaponType::Spur, .. }) => ((170u8, 170u8, 200u8), 0.92),
+
+                        let (color, power) = match inv.get_current_weapon() {
+                            Some(Weapon { wtype: WeaponType::Fireball, .. }) => (Color::from_rgb(170u8, 80u8, 0u8), 128),
+                            Some(Weapon { wtype: WeaponType::PolarStar, .. }) => (Color::from_rgb(150u8, 150u8, 160u8), 128),
+                            Some(Weapon { wtype: WeaponType::Spur, .. }) => (Color::from_rgb(170u8, 170u8, 200u8), 128),
                             Some(Weapon { wtype: WeaponType::Blade, .. }) => continue 'cc,
-                            _ => ((150u8, 150u8, 150u8), 0.92),
+                            _ => (Color::from_rgb(150u8, 150u8, 150u8), 128),
                         };
 
                         let (_, gun_off_y) = player.skin.get_gun_offset();
@@ -630,17 +651,22 @@ impl GameScene {
                         //     batch,
                         // );
 
-                        // self.draw_light_raycast_hardware(
-                        //     ctx,
-                        //     state.light_collision_canvas.as_ref(),
-                        //     state.lightmap_canvas.as_ref(),
-                        //     player.x + player.direction.vector_x() * 0x800,
-                        //     player.y + gun_off_y * 0x200 + 0x400,
-                        //     Color::from_rgb(255, 255, 255),
-                        //     Color::from_rgb(255, 255, 0),
-                        //     (att * 128.0) as u16,
-                        //     0.0..3.14159*2.0,
-                        // )?;
+
+                        //let x = interpolate_fix9_scale(player.prev_x as i32, player.x as i32, state.frame_time);
+                        //let y = interpolate_fix9_scale(player.prev_y as i32, player.y as i32, state.frame_time);
+
+                        self.draw_light_raycast_hardware(
+                            ctx,
+                            state.light_collision_canvas.as_ref(),
+                            state.lightmap_canvas.as_ref(),
+                            player.x + player.direction.vector_x() * 0x800,
+                            player.y + gun_off_y * 0x200 + 0x400,
+                            state.scale,
+                            Color::from_rgba( 255, 255, 255, 255),
+                            color,
+                            power, //(att * 128.0) as u16,
+                            range,
+                        )?;
 
 
                     } else {
@@ -655,7 +681,7 @@ impl GameScene {
                                 player.y - self.frame.y,
                                 state.frame_time,
                             ),
-                            5.0,
+                            1.0, //5
                             (150, 150, 150),
                             batch,
                         );
@@ -1150,19 +1176,6 @@ impl GameScene {
             batch.draw_filtered(FilterMode::Linear, ctx)?;
         }
 
-
-        // graphics::set_blend_mode(ctx, BlendMode::Alpha)?;
-        // self.draw_light_raycast_hardware(
-        //     ctx,
-        //     state.light_collision_canvas.as_ref(),
-        //     state.lightmap_canvas.as_ref(),
-        //     self.player1.x + self.player1.direction.vector_x() * 0x800,
-        //     self.player1.y * 0x200,
-        //     Color::from_rgba(255, 255, 255, 255),
-        //     Color::from_rgba(255, 255, 0, 255),
-        //     128,
-        //     0.0..3.14159*2.0,
-        // )?;
 
         graphics::set_blend_mode(ctx, BlendMode::Multiply)?;
         graphics::set_render_target(ctx, None)?;
@@ -2082,7 +2095,7 @@ impl Scene for GameScene {
         //temp. hardcoded light for testing purposes
         let mut apples_pears = 0;
         if apples_pears > 0 {
-
+        //{
             let (width, height) = (ctx.screen_size.0 as u16, ctx.screen_size.1 as u16);
 
             apples_pears = width;
@@ -2146,17 +2159,35 @@ impl Scene for GameScene {
 
             graphics::draw_light(ctx, state.light_collision_canvas.as_ref(), state.lightmap_canvas.as_ref(), light)?;
 
-
+            //graphics::set_render_target(ctx, None)?;
+            //graphics::set_blend_mode(ctx, BlendMode::Alpha)?;
 
         }
-
-
 
         if self.player1.control_mode == ControlMode::IronHead {
             self.set_ironhead_clip(state, ctx)?;
         }
 
         let stage_textures_ref = &*self.stage_textures.deref().borrow();
+        
+        //draw collision mask first (will be put on the screen later)
+        //set target to collision buffer
+        {
+            graphics::set_render_target(ctx, state.light_collision_canvas.as_ref())?;
+            //erase contents
+            graphics::clear(ctx, Color::from_rgba(0, 0, 0, 0));
+            graphics::set_blend_mode(ctx, BlendMode::Alpha)?;
+        }
+        //these will be stored on the collision mask for later
+        self.tilemap.draw(state, ctx, &self.frame, TileLayer::Foreground, stage_textures_ref, &self.stage)?;
+        self.tilemap.draw(state, ctx, &self.frame, TileLayer::Snack, stage_textures_ref, &self.stage)?;
+        //return to normal target
+        {
+            graphics::set_render_target(ctx, None)?;
+            //blendmode did not change: no need to set it again here
+            //graphics::set_blend_mode(ctx, BlendMode::Alpha)?;
+        }
+        
         self.background.draw(state, ctx, &self.frame, stage_textures_ref, &self.stage, false)?;
         self.tilemap.draw(state, ctx, &self.frame, TileLayer::Background, stage_textures_ref, &self.stage)?;
         self.draw_npc_layer(state, ctx, NPCLayer::Background)?;
@@ -2180,18 +2211,7 @@ impl Scene for GameScene {
 
         self.water_renderer.draw(state, ctx, &self.frame, WaterLayer::Back)?;
 
-        //set target to collision buffer
-        {
-            graphics::set_render_target(ctx, state.light_collision_canvas.as_ref())?;
-            //erase contents
-            graphics::clear(ctx, Color::from_rgba(0, 0, 0, 0));
-            graphics::set_blend_mode(ctx, BlendMode::Alpha)?;
-        }
-
-        //these will be stored on the collision mask for later
-        self.tilemap.draw(state, ctx, &self.frame, TileLayer::Foreground, stage_textures_ref, &self.stage)?;
-        self.tilemap.draw(state, ctx, &self.frame, TileLayer::Snack, stage_textures_ref, &self.stage)?;
-        //return to normal target + draw collision buffer to main window
+        //draw collision buffer to main window
         {
             graphics::set_render_target(ctx, None)?;
             //blendmode did not change: no need to set it again here
@@ -2207,7 +2227,6 @@ impl Scene for GameScene {
             canvas.draw()?;
 
         }
-        
 
         self.draw_npc_layer(state, ctx, NPCLayer::Foreground)?;
         self.tilemap.draw(state, ctx, &self.frame, TileLayer::FarForeground, stage_textures_ref, &self.stage)?;

@@ -7,6 +7,7 @@ use std::mem::MaybeUninit;
 use std::ptr::null;
 use std::sync::Arc;
 use std::ops::{Range, RangeInclusive, RangeBounds};
+use std::f32::consts::TAU;
 
 use imgui::{DrawCmd, DrawCmdParams, DrawData, DrawIdx, DrawVert, TextureId, Ui};
 
@@ -451,7 +452,7 @@ const VERTEX_LIGHT_SAMPLER: &str = include_str!("shaders/lightpass/light_sampler
 const FRAGMENT_RAY_TRACER: &str = include_str!("shaders/lightpass/ray_tracer_fragment.glsl");
 const VERTEX_RAY_TRACER: &str = include_str!("shaders/lightpass/ray_tracer_vertex.glsl");
 
-const RAY_TRACER_TEXTURE_WH: u32 = 64;
+const RAY_TRACER_TEXTURE_WH: u32 = 80;
 
 
 #[derive(Copy, Clone)]
@@ -1454,9 +1455,10 @@ impl BackendRenderer for OpenGLRenderer {
                     // let color_center = (1.0f32, 1.0f32, 1.0f32);
                     // let color_edge = (0.0f32, 1.0f32, 1.0f32);
 
-
-                    let angle_min = light.angle.start;
-                    let angle_max = light.angle.end;
+                    
+                    //clamp(wrapping) between 0-2pi (note: for a full circle, we need to use juuuust slightly less than tau or else it will be snapped to 0)
+                    let angle_min = (light.angle.start % TAU + TAU) % TAU;
+                    let angle_max = (light.angle.end % TAU + TAU) % TAU;
 
                     let ray_texture_size = (RAY_TRACER_TEXTURE_WH as f32);//.powi(2);
 
@@ -1571,7 +1573,7 @@ impl BackendRenderer for OpenGLRenderer {
                         //return Ok(());
 
                     }
-                    
+
                     //draw final out
                     {
 
@@ -1595,13 +1597,15 @@ impl BackendRenderer for OpenGLRenderer {
                         //bind raycast data
 
                         //bind collision sampler
+
+                        gl.gl.ActiveTexture(gl::TEXTURE1);
+                        gl.gl.BindTexture(gl::TEXTURE_2D, self.render_data.ray_data_texture as _);
+                        gl.gl.Uniform1i(self.render_data.light_sampler_shader.ray_texture, 1);
+
                         gl.gl.ActiveTexture(gl::TEXTURE0);
                         gl.gl.BindTexture(gl::TEXTURE_2D, gl_collision_texture.texture_id as _);
                         gl.gl.Uniform1i(self.render_data.light_sampler_shader.texture, 0);
                         
-                        gl.gl.ActiveTexture(gl::TEXTURE1);
-                        gl.gl.BindTexture(gl::TEXTURE_2D, self.render_data.ray_data_texture as _);
-                        gl.gl.Uniform1i(self.render_data.light_sampler_shader.ray_texture, 1);
                     
 
                         handle_err(gl, 0);
@@ -1693,8 +1697,8 @@ impl BackendRenderer for OpenGLRenderer {
                         handle_err(gl, 0);
 
                         //unbind 
-                        //gl.gl.BindTexture(gl::TEXTURE_2D, 0);
-                        //gl.gl.BindBuffer(gl::ARRAY_BUFFER, 0);
+                        gl.gl.BindTexture(gl::TEXTURE_2D, 0);
+                        gl.gl.BindBuffer(gl::ARRAY_BUFFER, 0);
 
                         //bitmaps are written out in BGR format...
                         //red(seen blue) is the first byte of the 2 byte ray length MSB
@@ -1705,33 +1709,33 @@ impl BackendRenderer for OpenGLRenderer {
 
 
                         // Test texture dump
-                        let mut bob = 1;
-                        if bob == 1 {
-                            bob += 1;
-                            dump_texture(
-                                gl_target_texture.texture_id,
-                                Some(gl_target_texture.framebuffer_id),
-                                gl_target_texture.width as _,
-                                gl_target_texture.height as _,
-                                "./JScreen.bmp",
-                                gl
-                            );
-                            dump_texture(
-                                self.render_data.ray_data_texture,
-                                Some(self.render_data.ray_data_framebuffer),
-                                ray_texture_size as _,
-                                ray_texture_size as _,
-                                "./JScreen0.bmp",
-                                gl);
-                            dump_texture(
-                                gl_collision_texture.texture_id,
-                                Some(gl_collision_texture.framebuffer_id),
-                                gl_collision_texture.width as _,
-                                gl_collision_texture.height as _,
-                                "./JScreen2.bmp",
-                                gl
-                            );    
-                        }
+                        // let mut bob = 1;
+                        // if bob == 1 {
+                        //     bob += 1;
+                        //     dump_texture(
+                        //         gl_target_texture.texture_id,
+                        //         Some(gl_target_texture.framebuffer_id),
+                        //         gl_target_texture.width as _,
+                        //         gl_target_texture.height as _,
+                        //         "./JScreen.bmp",
+                        //         gl
+                        //     );
+                        //     dump_texture(
+                        //         self.render_data.ray_data_texture,
+                        //         Some(self.render_data.ray_data_framebuffer),
+                        //         ray_texture_size as _,
+                        //         ray_texture_size as _,
+                        //         "./JScreen0.bmp",
+                        //         gl);
+                        //     dump_texture(
+                        //         gl_collision_texture.texture_id,
+                        //         Some(gl_collision_texture.framebuffer_id),
+                        //         gl_collision_texture.width as _,
+                        //         gl_collision_texture.height as _,
+                        //         "./JScreen2.bmp",
+                        //         gl
+                        //     );    
+                        // }
 
                         handle_err(gl, 0);
                     }
