@@ -451,6 +451,7 @@ impl Background {
 
             //reset frame offsets so background location resets with no-flag conditions
             let (frame_x, frame_y) = frame.xy_interpolated(state.frame_time);
+            let scale = state.scale;
 
             //handle edge relativity
             if scroll_flags.relative_to_pillarbox {
@@ -470,7 +471,7 @@ impl Background {
             layer.frame_y_offset = layer.edge_coords.top;
 
             if scroll_flags.follow_pc_x {
-                layer.frame_x_offset -= frame_x as f32 * layer.animation_style.follow_speed_x;
+                layer.frame_x_offset -= (frame_x as f32 * layer.animation_style.follow_speed_x * scale).floor() / scale;
             }
             if scroll_flags.lock_to_y_axis {
                 layer.frame_x_offset -= frame_x as f32;
@@ -483,7 +484,7 @@ impl Background {
                 layer.frame_y_offset += (state.water_level / 0x200) as f32 - frame_y;
             }
             if scroll_flags.follow_pc_y {
-                layer.frame_y_offset -= frame_y as f32 * layer.animation_style.follow_speed_y;
+                layer.frame_y_offset -= (frame_y as f32 * layer.animation_style.follow_speed_y * scale).floor() / scale;
             }
             if scroll_flags.lock_to_x_axis {
                 layer.frame_y_offset -= frame_y as f32;
