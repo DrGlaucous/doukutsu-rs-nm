@@ -1236,15 +1236,15 @@ impl TextScriptVM {
 
                 exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
             }
-            TSCOpCode::MSG | TSCOpCode::MS2 | TSCOpCode::MS3 => {
+            TSCOpCode::MSG | TSCOpCode::MS2 | TSCOpCode::MS3 | TSCOpCode::MS4 => {
                 state.textscript_vm.current_line = TextScriptLine::Line1;
                 state.textscript_vm.line_1.clear();
                 state.textscript_vm.line_2.clear();
                 state.textscript_vm.line_3.clear();
                 state.textscript_vm.flags.set_render(true);
-                state.textscript_vm.flags.set_background_visible(op != TSCOpCode::MS2);
+                state.textscript_vm.flags.set_background_visible(op != TSCOpCode::MS2 && op != TSCOpCode::MS4);
                 state.textscript_vm.flags.set_fast(state.textscript_vm.flags.perma_fast());
-                state.textscript_vm.flags.set_position_top(op != TSCOpCode::MSG);
+                state.textscript_vm.flags.set_position_top(op != TSCOpCode::MSG && op != TSCOpCode::MS4);
                 if op == TSCOpCode::MS2 {
                     state.textscript_vm.face = 0;
                 }

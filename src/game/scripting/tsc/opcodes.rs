@@ -283,6 +283,9 @@ pub enum TSCOpCode {
     /// <BKR, Restores background to default parameters for the map, simmilar to a TRA command
     BKR,
 
+    /// <MS4, Displays text on the bottom of the screen without background. (like MS2, but where MSG happens)
+    MS4,
+
 
 
 }
