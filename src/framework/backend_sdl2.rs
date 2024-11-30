@@ -1084,6 +1084,39 @@ impl BackendTexture for SDL2Texture {
                                 )
                                 .map_err(|e| GameError::RenderError(e.to_string()))?;
                         }
+                        SpriteBatchCommand::DrawRectFlipTintedRotated(src, dest, flip_x, flip_y, color, rads, point_x, point_y, _mag) => {
+
+                            //do tint blending
+                            let (r, g, b, a) = color.to_rgba();
+                            texture.set_color_mod(r, g, b);
+                            texture.set_alpha_mod(a);
+                            texture.set_blend_mode(blend);
+
+                            //create a point to rotate around, since we do this in terms of the source rect, we need to de-magnify mag
+                            let point = sdl2::rect::Point::new((*point_x )as i32, (*point_y) as i32);
+
+                            canvas
+                                .copy_ex(
+                                    texture,
+                                    Some(sdl2::rect::Rect::new(
+                                        src.left.round() as i32,
+                                        src.top.round() as i32,
+                                        src.width().round() as u32,
+                                        src.height().round() as u32,
+                                    )),
+                                    Some(sdl2::rect::Rect::new(
+                                        dest.left.round() as i32,
+                                        dest.top.round() as i32,
+                                        dest.width().round() as u32,
+                                        dest.height().round() as u32,
+                                    )),
+                                    *rads * 180.0 / core::f64::consts::PI, //SDL2 uses degrees, everything else uses radians
+                                    point,
+                                    *flip_x,
+                                    *flip_y,
+                                )
+                                .map_err(|e| GameError::RenderError(e.to_string()))?;
+                        }
                     }
                 }
 

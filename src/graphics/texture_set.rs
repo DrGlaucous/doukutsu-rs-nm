@@ -74,6 +74,21 @@ pub trait SpriteBatch {
         rect: &common::Rect<u16>,
     );
 
+    fn add_rect_flip_scaled_tinted_rotated(
+        &mut self,
+        x: f32,
+        y: f32,
+        flip_x: bool,
+        flip_y: bool,
+        angle: f64,
+        anchor_x: f32,
+        anchor_y: f32,
+        color: (u8, u8, u8, u8),
+        scale_x: f32,
+        scale_y: f32,
+        rect: &common::Rect<u16>,
+    );
+
     fn draw(&mut self, ctx: &mut Context) -> GameResult;
 
     fn draw_filtered(&mut self, _filter: FilterMode, _ctx: &mut Context) -> GameResult;
@@ -146,6 +161,21 @@ impl SpriteBatch for DummyBatch {
         _scale_x: f32,
         _scale_y: f32,
         _rect: &Rect<u16>,
+    ) {}
+
+    fn add_rect_flip_scaled_tinted_rotated(
+        &mut self,
+        _x: f32,
+        _y: f32,
+        _flip_x: bool,
+        _flip_y: bool,
+        _angle: f64,
+        _anchor_x: f32,
+        _anchor_y: f32,
+        _color: (u8, u8, u8, u8),
+        _scale_x: f32,
+        _scale_y: f32,
+        _rect: &common::Rect<u16>,
     ) {}
 
     fn draw(&mut self, _ctx: &mut Context) -> GameResult {
@@ -360,6 +390,54 @@ impl SpriteBatch for SubBatch {
         ));
     }
 
+    fn add_rect_flip_scaled_tinted_rotated(
+        &mut self,
+        x: f32,
+        y: f32,
+        flip_x: bool,
+        flip_y: bool,
+        angle: f64,
+        anchor_x: f32,
+        anchor_y: f32,
+        color: (u8, u8, u8, u8),
+        scale_x: f32,
+        scale_y: f32,
+        rect: &common::Rect<u16>,
+    ) {
+        //do not draw 0 sized rects
+        if (rect.right.saturating_sub(rect.left)) == 0 || (rect.bottom.saturating_sub(rect.top)) == 0 {
+            return;
+        }
+
+        let mag = unsafe { I_MAG };
+
+        self.batch.add(SpriteBatchCommand::DrawRectFlipTintedRotated(
+            //src
+            Rect {
+                left: rect.left as f32 / self.scale_x,
+                top: rect.top as f32 / self.scale_y,
+                right: rect.right as f32 / self.scale_x,
+                bottom: rect.bottom as f32 / self.scale_y,
+            },
+            //dst
+            Rect {
+                left: x * mag,
+                top: y * mag,
+                right: (x + rect.width() as f32 * scale_x) * mag,
+                bottom: (y + rect.height() as f32 * scale_y) * mag,
+            },
+            flip_x,
+            flip_y,
+            color.into(),
+            angle,
+            anchor_x * mag * self.scale_x, //relative to screen scale, so we need to apply magnification AND rect scaling
+            anchor_y * mag * self.scale_y,
+            mag, //pass this in because some backends use an anchor relative to the source while others use one relative to the destination
+            ));
+
+
+    }
+
     #[inline(always)]
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
         self.draw_filtered(FilterMode::Nearest, ctx)
@@ -460,6 +538,23 @@ impl SpriteBatch for CombinedBatch {
         rect: &Rect<u16>,
     ) {
         self.main_batch.add_rect_scaled_tinted(x, y, color, scale_x, scale_y, rect)
+    }
+
+    fn add_rect_flip_scaled_tinted_rotated(
+        &mut self,
+        x: f32,
+        y: f32,
+        flip_x: bool,
+        flip_y: bool,
+        angle: f64,
+        anchor_x: f32,
+        anchor_y: f32,
+        color: (u8, u8, u8, u8),
+        scale_x: f32,
+        scale_y: f32,
+        rect: &common::Rect<u16>,
+    ) {
+        self.main_batch.add_rect_flip_scaled_tinted_rotated(x, y, flip_x, flip_y, angle, anchor_x, anchor_y, color, scale_x, scale_y, rect);
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {

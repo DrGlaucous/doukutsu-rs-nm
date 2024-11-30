@@ -209,6 +209,76 @@ impl BackendTexture for OpenGLTexture {
                 ];
                 self.vertices.extend_from_slice(&vertices);
             }
+            SpriteBatchCommand::DrawRectFlipTintedRotated(mut src, dest, flip_x, flip_y, color, rads, point_x, point_y, _mag) => {
+
+                //flipping rect locations
+                if flip_x {
+                    std::mem::swap(&mut src.left, &mut src.right);
+                }
+
+                if flip_y {
+                    std::mem::swap(&mut src.top, &mut src.bottom);
+                }
+
+                let mut vertices = [
+                    //first triangle
+                    VertexData {
+                        position: (dest.left, dest.bottom), //where to place
+                        uv: (src.left * tex_scale_x, src.bottom * tex_scale_y), //where to get
+                        color: (255, 255, 255, 255), //what extra color to apply
+                    },
+                    VertexData {
+                        position: (dest.left, dest.top),
+                        uv: (src.left * tex_scale_x, src.top * tex_scale_y),
+                        color: (255, 255, 255, 255),
+                    },
+                    VertexData {
+                        position: (dest.right, dest.top),
+                        uv: (src.right * tex_scale_x, src.top * tex_scale_y),
+                        color: (255, 255, 255, 255),
+                    },
+                    
+                    //second triangle
+                    VertexData {
+                        position: (dest.left, dest.bottom),
+                        uv: (src.left * tex_scale_x, src.bottom * tex_scale_y),
+                        color: (255, 255, 255, 255),
+                    },
+                    VertexData {
+                        position: (dest.right, dest.top),
+                        uv: (src.right * tex_scale_x, src.top * tex_scale_y),
+                        color: (255, 255, 255, 255),
+                    },
+                    VertexData {
+                        position: (dest.right, dest.bottom),
+                        uv: (src.right * tex_scale_x, src.bottom * tex_scale_y),
+                        color: (255, 255, 255, 255),
+                    },
+                ];
+
+
+                //note: offsets are in terms of absolute pixels, it changes with display size.
+                let px = dest.left + point_x as f32;
+                let py = dest.top + point_y as f32;
+
+                //there is probably a more concise way to do this...
+                for vert in vertices.iter_mut()
+                {
+                    //get relative coordinates to the axis of rotation
+                    let rel_x = vert.position.0 - px as f32;
+                    let rel_y = vert.position.1 - py as f32;
+                    //only run these 1x at the cost of extra variable space
+                    let sindeg = rads.sin() as f32;
+                    let cosdeg = rads.cos() as f32;
+
+                    //orient the coordinates and re-position relative to origin
+                    vert.position.0 = (rel_x * cosdeg - rel_y * sindeg) + px as f32;
+                    vert.position.1 = (rel_y * cosdeg + rel_x * sindeg) + py as f32;
+                }
+                
+                //pass them back to the parent
+                self.vertices.extend_from_slice(&vertices);
+            }
         }
     }
 

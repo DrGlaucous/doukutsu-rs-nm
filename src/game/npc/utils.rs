@@ -88,6 +88,9 @@ impl NPC {
             rng: Xoroshiro32PlusPlus::new(0),
             popup: NumberPopup::new(),
             splash: false,
+            anchor_x: 0.0,
+            anchor_y: 0.0,
+            angle: 0.0,
         }
     }
 

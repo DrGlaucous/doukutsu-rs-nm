@@ -138,4 +138,7 @@ pub enum SpriteBatchCommand {
     DrawRectFlip(Rect<f32>, Rect<f32>, bool, bool),
     DrawRectTinted(Rect<f32>, Rect<f32>, Color),
     DrawRectFlipTinted(Rect<f32>, Rect<f32>, bool, bool, Color),
+    DrawRectFlipTintedRotated(Rect<f32>, Rect<f32>, bool, bool, Color, f64, f32, f32, f32),
+    //structure of these enums:
+    //source, destination, flip_x, flip_y, color_key, rotation, xloc, yloc (for rotation axis), mag (also for rotation, some backends use it, some do not)
 }

@@ -1,17 +1,27 @@
 use std::any::Any;
 use std::cell::{RefCell, UnsafeCell};
 use std::ffi::c_void;
-use std::io::Read;
+use std::io::Read; //, Seek, SeekFrom};
 use std::mem;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::vec::Vec;
+
+//for non-android
+use std::time::{Duration, Instant};
+
+//from SDL backend
+//use imgui::internal::RawWrapper;
+//use imgui::sys::{ImGuiKey_Backspace, ImGuiKey_Delete, ImGuiKey_Enter};
+//use imgui::{ConfigFlags, DrawCmd, DrawData, DrawIdx, DrawVert, Key, MouseCursor, TextureId, Ui};
 
 use glutin::event::{ElementState, Event, TouchPhase, VirtualKeyCode, WindowEvent};
 use glutin::event_loop::{ControlFlow, EventLoop};
 use glutin::window::WindowBuilder;
 use glutin::{Api, ContextBuilder, GlProfile, GlRequest, PossiblyCurrent, WindowedContext};
 use imgui::{DrawCmdParams, DrawData, DrawIdx, DrawVert};
+use winit::dpi::PhysicalSize;
+use winit::platform::windows::IconExtWindows;
 use winit::window::Icon;
 
 use crate::common::Rect;
@@ -22,6 +32,7 @@ use crate::framework::filesystem;
 use crate::framework::gl;
 use crate::framework::keyboard::ScanCode;
 use crate::framework::render_opengl::{GLContext, OpenGLRenderer};
+use crate::framework::ui::init_imgui;
 use crate::game::Game;
 use crate::game::GAME_SUSPENDED;
 use crate::input::touch_controls::TouchPoint;
@@ -84,8 +95,10 @@ impl GlutinEventLoop {
             }
 
             window = window.with_title("doukutsu-rs");
+            window = window.with_inner_size(PhysicalSize{width: ctx.size_hint.0 as u32, height: ctx.size_hint.1 as u32});
             
             #[cfg(not(any(target_os = "windows", target_os = "android", target_os = "horizon")))]
+            //#[cfg(not(any(target_os = "android", target_os = "horizon")))]
             {
                 let mut file = filesystem::open(&ctx, "/builtin/icon.bmp").unwrap();
                 let mut buf: Vec<u8> = Vec::new();
@@ -101,7 +114,7 @@ impl GlutinEventLoop {
                 
                 window = window.with_window_icon(Some(icon));
             }
-            
+
             let windowed_context = windowed_context.build_windowed(window, event_loop).unwrap();
 
             let windowed_context = unsafe { windowed_context.make_current().unwrap() };
@@ -172,23 +185,75 @@ fn get_scaled_size(width: u32, height: u32) -> (f32, f32) {
 
 impl BackendEventLoop for GlutinEventLoop {
     fn run(&mut self, game: &mut Game, ctx: &mut Context) {
+
+        //create a new event loop
         let event_loop = EventLoop::new();
+
+        //get a referencer to the game's current state
         let state_ref = unsafe { &mut *game.state.get() };
+
+        //create a window pointing to the parent context and with the event loop we made earlier
         let window: &'static mut WindowedContext<PossiblyCurrent> =
-            unsafe { std::mem::transmute(self.get_context(&ctx, &event_loop)) };        
+            unsafe { std::mem::transmute(self.get_context(&ctx, &event_loop)) };    
+
+        //load up icon
+        //TODO: this (glutin has trouble loading from internal resources; we must help)
+        // #[cfg(not(any(target_os = "android", target_os = "horizon")))]
+        // {
+        //     let mut file = filesystem::open(&ctx, "/builtin/icon.bmp").unwrap();
+        //     let mut buf: Vec<u8> = Vec::new();
+        //     file.seek(SeekFrom::Start(54));
+        //     file.read_to_end(&mut buf);
+        //     //let icoo = Icon::from_resource(unsafe{buf.as_ptr() as u16}, None).unwrap();
+        //     let icoo = Icon::from_rgba(buf, 64, 64).unwrap();
+        //     //window.window().set_window_icon(Some(icoo));
+        // }
+        
+
+
+
+        //resize the window (first time) and handle the size change
         {
-            let size = window.window().inner_size();
-            ctx.real_screen_size = (size.width, size.height);
-            ctx.screen_size = get_scaled_size(size.width.max(1), size.height.max(1));
-            state_ref.handle_resize(ctx).unwrap();
+            //already initialized this with correct size, see GlutinEventLoop::get_context
+            //let size: PhysicalSize<u32> = PhysicalSize{width: ctx.size_hint.0 as u32, height: ctx.size_hint.1 as u32};
+
+            //#[cfg(target_os = "android")]
+            let size = window.window().inner_size();//ctx.size_hint;//window.window().inner_size();
+            window.window().set_inner_size(size);
+
+            if let Some(renderer) = &ctx.renderer {
+                if let Ok(imgui) = renderer.imgui() {
+                    imgui.io_mut().display_size = [size.width as f32, size.height as f32];
+                }
+
+                ctx.real_screen_size = (size.width, size.height);
+                ctx.screen_size = get_scaled_size(size.width.max(1), size.height.max(1));
+                state_ref.handle_resize(ctx).unwrap();
+            }
         }
 
         // it won't ever return
         let (game, ctx): (&'static mut Game, &'static mut Context) =
             unsafe { (std::mem::transmute(game), std::mem::transmute(ctx)) };
 
+        let mut subinc = 0;
+        let mut inc = 0;
+        
         event_loop.run(move |event, _, control_flow| {
-            *control_flow = ControlFlow::Wait;
+            
+            //not sure why this was set the way it was... The stuff in here would not even attempt to run until you jiggle the mouse or something
+            //may be important for android...
+            #[cfg(target_os = "android")]
+            {
+                *control_flow = ControlFlow::Wait;
+            }
+            
+            //subinc += 1;
+            //if subinc % 5 == 0
+            //{
+            //    println!("Made it here! {}", inc);
+            //    inc += 1;
+            //}
 
             match event {
                 Event::WindowEvent { event: WindowEvent::CloseRequested, window_id }
@@ -196,10 +261,14 @@ impl BackendEventLoop for GlutinEventLoop {
                 {
                     state_ref.shutdown();
                 }
-                Event::Resumed => {
+                Event::Resumed | Event::WindowEvent {event: WindowEvent::Focused(true), ..} => {
+                    
+                    //note: how does this condition work on Android?
+                    if state_ref.settings.pause_on_focus_loss
                     {
                         let mut mutex = GAME_SUSPENDED.lock().unwrap();
                         *mutex = false;
+                        state_ref.sound_manager.resume();
                     }
 
                     #[cfg(target_os = "android")]
@@ -211,33 +280,50 @@ impl BackendEventLoop for GlutinEventLoop {
                         }
                     }
 
-                    state_ref.sound_manager.resume();
                 }
-                Event::Suspended => {
+                Event::Suspended | Event::WindowEvent {event: WindowEvent::Focused(false), ..}=> {
+
+                    if state_ref.settings.pause_on_focus_loss
                     {
                         let mut mutex = GAME_SUSPENDED.lock().unwrap();
                         *mutex = true;
+                        state_ref.sound_manager.pause();
                     }
 
                     #[cfg(target_os = "android")]
                     unsafe {
                         window.surface_destroyed();
                     }
-
-                    state_ref.sound_manager.pause();
                 }
                 Event::WindowEvent { event: WindowEvent::Resized(size), window_id }
                     if window_id == window.window().id() =>
                 {
+
+                    ctx.real_screen_size = (size.width, size.height);
+
+                    //we want the android version to fill the screen vertically with a x1 scale, while the computer version should scale in sharp increments
+                    #[cfg(target_os = "android")]
+                    {
+                        ctx.screen_size = get_scaled_size(size.width.max(1), size.height.max(1));
+                    }
+
+                    #[cfg(not(target_os = "android"))]
+                    {
+                        ctx.screen_size = (size.width as f32, size.height as f32);
+                    }
+
+                    state_ref.handle_resize(ctx).unwrap();
+
+                    //handle imgui debugger scaling
                     if let Some(renderer) = &ctx.renderer {
                         if let Ok(imgui) = renderer.imgui() {
-                            imgui.io_mut().display_size = [size.width as f32, size.height as f32];
-                        }
+                            //the old code used this: it placed the menu incorrectly on the screen
+                            //[size.width as f32, size.height as f32];
 
-                        ctx.real_screen_size = (size.width, size.height);
-                        ctx.screen_size = get_scaled_size(size.width.max(1), size.height.max(1));
-                        state_ref.handle_resize(ctx).unwrap();
+                            imgui.io_mut().display_size = [ctx.screen_size.0, ctx.screen_size.1];
+                        }
                     }
+
                 }
                 Event::WindowEvent { event: WindowEvent::Touch(touch), window_id }
                     if window_id == window.window().id() =>
@@ -279,12 +365,23 @@ impl BackendEventLoop for GlutinEventLoop {
                 {
                     if let Some(keycode) = input.virtual_keycode {
                         if let Some(drs_scan) = conv_keycode(keycode) {
+
                             let key_state = match input.state {
                                 ElementState::Pressed => true,
                                 ElementState::Released => false,
                             };
 
                             ctx.keyboard_context.set_key(drs_scan, key_state);
+
+                            //check for held key
+                            if !(ctx.keyboard_context.is_key_pressed(drs_scan))
+                            {
+                                //debug stuff
+                                if let Some(scene) = &mut game.scene {
+                                    scene.process_debug_keys(state_ref, ctx, drs_scan);
+                                }
+                            }
+
                         }
                     }
                 }
@@ -309,18 +406,34 @@ impl BackendEventLoop for GlutinEventLoop {
                     request_android_redraw();
                 }
                 Event::MainEventsCleared => {
+
                     if state_ref.shutdown {
                         log::info!("Shutting down...");
                         *control_flow = ControlFlow::Exit;
                         return;
                     }
 
+
+                    //use thread sleeping to conserve processing power
+                    //android device doesn't have focus loss, so it doesn't need this
+                    #[cfg(not(target_os = "android"))]
+                    {
+                        let mutex = GAME_SUSPENDED.lock().unwrap();
+                        if *mutex {
+                            std::thread::sleep(Duration::from_millis(10));
+                            return;
+                        }
+                    }
+                    #[cfg(target_os = "android")]
                     {
                         let mutex = GAME_SUSPENDED.lock().unwrap();
                         if *mutex {
                             return;
                         }
                     }
+
+
+
 
                     #[cfg(not(any(target_os = "android", target_os = "horizon")))]
                     {
@@ -333,6 +446,7 @@ impl BackendEventLoop for GlutinEventLoop {
                         }
                     }
 
+                    //mainloop
                     game.update(ctx).unwrap();
 
                     #[cfg(target_os = "android")]
@@ -345,10 +459,10 @@ impl BackendEventLoop for GlutinEventLoop {
                                 log::error!("Failed to update insets: {}", e);
                             }
                         }
-
-                        if let Err(err) = game.draw(ctx) {
-                            log::error!("Failed to draw frame: {}", err);
-                        }
+                    }
+                    //should be run for all cases, not just Android
+                    if let Err(err) = game.draw(ctx) {
+                        log::error!("Failed to draw frame: {}", err);
                     }
 
                     if state_ref.next_scene.is_some() {
@@ -361,12 +475,20 @@ impl BackendEventLoop for GlutinEventLoop {
                 }
                 _ => (),
             }
+
+
         });
+
+
+
+
+        
     }
 
     fn new_renderer(&self, ctx: *mut Context) -> GameResult<Box<dyn BackendRenderer>> {
         let mut imgui = imgui::Context::create();
         imgui.io_mut().display_size = [640.0, 480.0];
+        //let mut imgui = init_imgui()?;
 
         let refs = self.refs.clone();
         let user_data = Rc::into_raw(refs) as *mut c_void;

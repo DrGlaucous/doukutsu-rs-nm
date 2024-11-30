@@ -127,6 +127,11 @@ pub struct NPC {
     pub rng: Xoroshiro32PlusPlus,
     pub popup: NumberPopup,
     pub splash: bool,
+
+    //new rotation values
+    pub anchor_x: f32, //from corner of drawbox, pivot point
+    pub anchor_y: f32,
+    pub angle: f32, //angle in radians
 }
 
 impl NPC {
@@ -171,6 +176,9 @@ impl NPC {
             rng: Xoroshiro32PlusPlus::new(0),
             popup: NumberPopup::new(),
             splash: false,
+            anchor_x: 0.0,
+            anchor_y: 0.0,
+            angle: 0.0,
         }
     }
 
@@ -668,10 +676,34 @@ impl GameEntity<([&mut Player; 2], &NPCList, &mut Stage, &mut BulletManager, &mu
 
         if self.is_sue() && state.more_rust {
             // tint sue blue
-            batch.add_rect_tinted(final_x, final_y, (200, 200, 255, 255), &self.anim_rect);
+            //batch.add_rect_tinted(final_x, final_y, (200, 200, 255, 255), &self.anim_rect);
+            batch.add_rect_flip_scaled_tinted_rotated(
+                final_x,
+                final_y, 
+                false, 
+                false, 
+                self.angle as f64,
+                self.anchor_x, 
+                self.anchor_y,
+                (200,200,255,255),
+                1.0, 
+                1.0,
+                &self.anim_rect);
             batch.draw(ctx)?;
         } else {
-            batch.add_rect(final_x, final_y, &self.anim_rect);
+            //batch.add_rect(final_x, final_y, &self.anim_rect);
+            batch.add_rect_flip_scaled_tinted_rotated(
+                final_x,
+                final_y, 
+                false, 
+                false, 
+                self.angle as f64,
+                self.anchor_x, 
+                self.anchor_y,
+                (0xFF,0xFF,0xFF,0xFF),
+                1.0, 
+                1.0,
+                &self.anim_rect);
             batch.draw(ctx)?;
         }
 
