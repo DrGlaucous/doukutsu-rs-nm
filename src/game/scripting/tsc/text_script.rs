@@ -30,6 +30,7 @@ use crate::graphics::font::{Font, Symbols};
 use crate::input::touch_controls::TouchControlType;
 use crate::scene::game_scene::GameScene;
 use crate::components::tilemap::TileLayer;
+use crate::sound::SongFormat;
 
 const TSC_SUBSTITUTION_MAP_SIZE: usize = 1;
 
@@ -1052,10 +1053,13 @@ impl TextScriptVM {
 
                 exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
             }
-            TSCOpCode::FLJ => {
+            TSCOpCode::FLJ | TSCOpCode::FNJ => {
                 let flag_num = read_cur_varint(&mut cursor)? as usize;
                 let event_num = read_cur_varint(&mut cursor)? as u16;
-                if state.get_flag(flag_num) {
+                
+                let flag_state = state.get_flag(flag_num);
+                let is_fnj = op == TSCOpCode::FNJ;
+                if flag_state != is_fnj {
                     state.textscript_vm.clear_text_box();
                     exec_state = TextScriptExecutionState::Running(event_num, 0);
                 } else {
@@ -2067,6 +2071,28 @@ impl TextScriptVM {
                 exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
             }
 
+            TSCOpCode::CMF =>{
+                
+                //get mode
+                let typecode = read_cur_varint(&mut cursor)? as usize;
+                let song_type = match typecode {
+                    #[cfg(feature = "tracker-playback")]
+                    3 => SongFormat::Tracker,
+                    2 => SongFormat::OggMultiPart,
+                    1 => SongFormat::OggSinglePart,
+                    0 | _ => SongFormat::Organya,
+                };
+
+                //get path
+                let len = read_cur_varint(&mut cursor)? as usize;
+                let filepath = format!("/{}", read_string_tsc(&mut cursor, len).unwrap());
+
+
+                state.sound_manager.play_song_filepath(&filepath, song_type, &state.constants,  &state.settings, ctx, false)?;
+                exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
+
+
+            }
 
         
         }

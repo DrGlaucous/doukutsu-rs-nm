@@ -282,10 +282,12 @@ pub enum TSCOpCode {
     BKP,
     /// <BKR, Restores background to default parameters for the map, simmilar to a TRA command
     BKR,
-
     /// <MS4, Displays text on the bottom of the screen without background. (like MS2, but where MSG happens)
     MS4,
-
+    /// <CMFwwww:name_of_file$ Cue Music File, loads and starts music from `./data` (subdirectories can be included), [organya, multi-ogg, single-ogg, tracker]
+    CMF,
+    /// <FNJxxxx:yyyy, Jumps to event yyyy if flag xxxx is *NOT* set
+    FNJ,
 
 
 }

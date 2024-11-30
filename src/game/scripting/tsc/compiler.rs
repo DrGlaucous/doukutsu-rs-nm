@@ -6,7 +6,7 @@ use itertools::Itertools;
 
 use crate::framework::error::GameError::ParseError;
 use crate::framework::error::GameResult;
-use crate::game::scripting::tsc::bytecode_utils::{put_string, put_varint, put_string_tsc};
+use crate::game::scripting::tsc::bytecode_utils::{put_string, put_varint, put_string_multi_tsc};
 use crate::game::scripting::tsc::credit_script::CreditScript;
 use crate::game::scripting::tsc::opcodes::{CreditOpCode, TSCOpCode};
 use crate::game::scripting::tsc::parse_utils::{expect_char, read_number, skip_until};
@@ -247,7 +247,9 @@ impl TextScript {
             | TSCOpCode::SMP
             | TSCOpCode::PSp
             | TSCOpCode::IpN
-            | TSCOpCode::FFm => {
+            | TSCOpCode::FFm
+            | TSCOpCode::FNJ
+            => {
                 let operand_a = read_number(iter)?;
                 if strict {
                     expect_char(b':', iter)?;
@@ -322,11 +324,35 @@ impl TextScript {
             }
 
             //parses string delimited by $, no additional arguments
-            TSCOpCode::BKG =>
+            TSCOpCode::BKG
+            =>
             {
                 //stow opcode
                 put_varint(instr as i32, out);
-                put_string_tsc(iter, out);
+                put_string_multi_tsc(iter, out, 1, strict)?;
+            }
+
+            // parses 1 operand + string delimited by $.
+            TSCOpCode::CMF
+            =>
+            {
+
+                //get music type
+                let operand_a = read_number(iter)?;
+
+                //colon delimiter
+                if strict {
+                    expect_char(b':', iter)?;
+                } else {
+                    iter.next().ok_or_else(|| ParseError("Script unexpectedly ended.".to_owned()))?;
+                }
+                //stow opcode + numeric arg
+                put_varint(instr as i32, out);
+                put_varint(operand_a as i32, out);
+
+
+                put_string_multi_tsc(iter, out, 1, strict)?;
+
             }
         }
 

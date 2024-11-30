@@ -1,0 +1,15 @@
+
+[package]
+name = "libxmp-lite"
+version = "4.5.0"
+authors = ["Wrapped by Alula, Dr.G, et. al."]
+description = "A rust wrapper for libxmp-lite"
+license = "MIT OR Apache-2.0"
+#repository = "NA"
+#exclude = ["*.png", "doc/reference", "doc/formats"]
+publish = false
+
+[build-dependencies]
+cc = "1.0"
+
+

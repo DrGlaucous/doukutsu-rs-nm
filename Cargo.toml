@@ -38,9 +38,10 @@ category = "Game"
 osx_minimum_system_version = "10.12"
 
 [features]
-default = ["default-base", "backend-sdl", "render-opengl", "exe", "webbrowser", "discord-rpc"]
+default = ["default-base", "backend-sdl", "render-opengl", "exe", "webbrowser", "discord-rpc", "tracker-playback"]
 default-base = ["ogg-playback"]
 ogg-playback = ["lewton"]
+tracker-playback = ["libxmp-lite"]
 backend-sdl = ["sdl2", "sdl2-sys"]
 backend-glutin = ["winit", "glutin", "render-opengl"]
 backend-horizon = []
@@ -72,6 +73,7 @@ image = { version = "0.24", default-features = false, features = ["png", "bmp"] 
 itertools = "0.10"
 lazy_static = "1.4"
 lewton = { version = "0.10", optional = true }
+libxmp-lite = {path = "./3rdparty/libxmp-lite", optional = true}
 log = "0.4"
 num-derive = "0.3"
 num-traits = "0.2"

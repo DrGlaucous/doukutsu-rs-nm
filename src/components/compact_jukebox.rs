@@ -19,7 +19,7 @@ impl CompactJukebox {
     pub fn change_song(&mut self, song_id: usize, state: &mut SharedGameState, ctx: &mut Context) -> GameResult {
         self.song_id = song_id;
 
-        if self.song_id == state.sound_manager.current_song() {
+        if self.song_id == state.sound_manager.current_song().id {
             return Ok(());
         }
 

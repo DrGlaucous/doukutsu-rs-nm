@@ -298,8 +298,47 @@ Here's an example of a file:
 ```
 *(to try this out ingame, name it something like `Cave.json` and place it in the `/data/Stage` directory, then load any map that uses the `Cave` tileset and this will be loaded along side it)*
 
+## Additional TSC
 
+- `<MS4` - Displays text on the bottom of the screen without background. (like `MS2`, but where `MSG` happens)
+- `<CMFwwww:name_of_file$` - Cue Music File, loads and starts music from `./data` (subdirectories can be included) where `wwww` = `[0-organya, 1-multi-ogg, 2-single-ogg, 3-tracker]`, the string argument should not start with a leading `/`. Example: `<CMF0003:a_u.s3m$`. Because I want to preserve save file compatibility, setting songs this way are *not* saved in the `profile.dat`.
+- `<FNJxxxx:yyyy` - Jumps to event yyyy if flag xxxx is *NOT* set.
 
+## Rotation Framework
+
+The internal code now has ready-support for sprite rotation. *(which should work with all backends, but is untested on the `horizon` backend because I don't own a nintendo switch)*
+
+The SpriteBatch struct now has the following method:
+```
+fn add_rect_flip_scaled_tinted_rotated(
+    &mut self,
+    x: f32,
+    y: f32,
+    flip_x: bool,
+    flip_y: bool,
+    angle: f64,
+    anchor_x: f32,
+    anchor_y: f32,
+    color: (u8, u8, u8, u8),
+    scale_x: f32,
+    scale_y: f32,
+    rect: &common::Rect<u16>,
+);
+```
+
+The `NPC` struct now has these fields:
+- `angle: f32` - angle in radians that the NPC should rotate. *(Note: this does NOT rotate the NPC itself, just its sprite, so hitbox and collision remain stationary)*
+- `anchor_x: f32` - the center of rotation on the NPC's sprite from the top left corner.
+- `anchor_y: f32` - ditto for y axis
+
+Rotation unit circle:
+```
+      3pi/2
+        |
+   pi-------0
+        |
+       pi/2
+```
 
 
 

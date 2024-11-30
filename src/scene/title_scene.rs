@@ -181,7 +181,7 @@ impl TitleScene {
         if self.compact_jukebox.is_shown() {
             self.compact_jukebox.change_song(song_id, state, ctx)?;
         } else {
-            if song_id != state.sound_manager.current_song() {
+            if song_id != state.sound_manager.current_song().id {
                 state.sound_manager.play_song(song_id, &state.constants, &state.settings, ctx, false)?;
             }
         }

@@ -270,6 +270,7 @@ pub struct EngineConstants {
     pub soundtracks: Vec<ExtraSoundtrack>,
     pub music_table: Vec<String>,
     pub organya_paths: Vec<String>,
+    pub tracker_extensions: Vec<String>,
     pub credit_illustration_paths: Vec<String>,
     pub player_skin_paths: Vec<String>,
     pub animated_face_table: Vec<AnimatedFace>,
@@ -1513,6 +1514,12 @@ impl EngineConstants {
                 ExtraSoundtrack { id: "new".to_owned(), path: "/base/Ogg/".to_owned(), available: false },
                 ExtraSoundtrack { id: "famitracks".to_owned(), path: "/base/ogg17/".to_owned(), available: false },
                 ExtraSoundtrack { id: "ridiculon".to_owned(), path: "/base/ogg_ridic/".to_owned(), available: false },
+            ],
+            tracker_extensions: vec![
+                ".mod".to_owned(),
+                ".xm".to_owned(),
+                ".s3m".to_owned(),
+                ".it".to_owned(),
             ],
             music_table: vec![
                 "xxxx".to_owned(),

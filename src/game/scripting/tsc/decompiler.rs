@@ -127,7 +127,9 @@ impl TextScript {
                         | TSCOpCode::SMP
                         | TSCOpCode::PSp
                         | TSCOpCode::IpN
-                        | TSCOpCode::FFm => {
+                        | TSCOpCode::FFm
+                        | TSCOpCode::FNJ
+                        => {
                             let par_a = read_cur_varint(&mut cursor)?;
                             let par_b = read_cur_varint(&mut cursor)?;
 
@@ -157,6 +159,7 @@ impl TextScript {
                         }
                         // String code
                         TSCOpCode::BKG
+                        | TSCOpCode::CMF
                         => {
                             writeln!(&mut result, "{:?} (String-based code: Not trying to decompile...)", op).unwrap();
                         }

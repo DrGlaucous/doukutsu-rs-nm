@@ -169,7 +169,7 @@ impl GameProfile {
         };
 
         let current_map = game_scene.stage_id as u32;
-        let current_song = state.sound_manager.current_song() as u32;
+        let current_song = state.sound_manager.current_song().id as u32; //not sure if I want to expand the profile to take the full object or not.
         let pos_x = player.x as i32;
         let pos_y = player.y as i32;
         let direction = player.direction;
