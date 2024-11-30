@@ -114,18 +114,22 @@ These files can have any name, and the bitmap they load is determined by the fie
     - None (0),
     - BackgroundOnly (1),
     - Ambient (2),
+---
 - `layers` - a list of each layer to be drawn on the background, the first entry in the list will be drawn at the back, and the other entries will work their way up from there.
 - `bmp_x_offset` /  `bmp_y_offset` - the top left corner on the background image where the rect to draw for this layer is
 - `bmp_width` / `bmp_height` - how wide and tall the rect to draw should be
 - `draw_repeat_x` / `draw_repeat_y` - how many times to repeat the bitmap, starting from the top left corner and extending right and down. To repeat a definite count in the other direction, apply a negative value to the `draw_corner_offset` fields. If these are set to 0, they will repeat infinitely in both directions (left/right or up/down).
 - `draw_repeat_gap_x` / `draw_repeat_gap_y` how much space to have between bitmap "tiles", in pixels.
-- `draw_corner_offset_x` / `draw_corner_offset_y` - offset from the top left corner where the tiles should begin drawing
+- `draw_corner_offset_x` / `draw_corner_offset_y` - offset from the top left corner where the tiles should begin drawing.
+---
 - `animation_style` sub-group that controls how the background moves and changes
 - `frame_count` - how many frames of animation the layer should have, 0 and 1 both do the same thing
 - `frame_start` - what animation number to start on, [0 thru frame_count-1]
 - `animation_speed` - how many ingame ticks it takes to advance the frame by 1
 - `follow_speed_x` / `follow_speed_y` - how fast the background follows the camera's motion. For it to move with the foreground, set these values to `1.0`. For the classic "slow follow" effect, set them to `0.5`. They can also be negative. These will only be active if the flags `follow_pc_x` / `follow_pc_y` are set to `true`.
 - `autoscroll_speed_x` / `autoscroll_speed_y` - same as `follow_speed` parameters, but apply to the autoscrolling. Units are speed * 1 pixel per second.
+- `screen_width_add_percent` / `screen_height_add_percent` - percent multiplier (0.0-1.0) of the screen's width/height that will be added to the layer if `add_screen_width` / `add_screen_height` is marked as `true`. A value of 1 will align things with the right/bottom of the screen, a value of 0 is the same as if the setting were disabled. A value of 0.5 will align the layer to the screen center.
+---
 - `scroll_flags` - determines what properties to apply to the scrolling, the parameters of which are outlined above.
 - `follow_pc_x` / `follow_pc_y` - the background will move as a multiple of the user's camera.
 - `autoscroll_x` / `autoscroll_y` - the background will move as a multiple of time
@@ -133,13 +137,13 @@ These files can have any name, and the bitmap they load is determined by the fie
 - `draw_above_foreground` - draws the background above the frontmost tile layer
 - `random_offset_x` / `random_offset_y` - only applies to the opposite autoscroll mode with a finite number of `draw_repeat`. Each time the last rect in the chain goes offscreen, it will loop back on the other side. If this field is set to `true` it will have a randomized `x`/`y` value. This is good for things like clouds, where you'd set it to autoscroll along the x axis, but enable the `random_offset_y` flag to have each "cloud" come back onscreen with a randomized height. The amount that this value will deviate each time is between `-animation_speed` and `animation_speed`.
 - `lock_to_x_axis` / `lock_to_y_axis` - locks the map's background to either the X or Y axis by compounding x1 frame movement onto the current offset. This same effect can be achieved with other settings, but this can be combined with other settings to create different effects.
-- `add_screen_width` / `add_screen_height` - adds the width or height of the window to the background layer, this is useful for aligning the layer with the right or bottom edge of the screen instead of the top or left. What is added changes based on the the values of `relative_to_pillarbox` / `relative_to_letterbox`.
+- `add_screen_width` / `add_screen_height` - adds the width or height of the window to the background layer, this is useful for aligning the layer with the right or bottom edge of the screen instead of the top or left. What is added changes based on the the values of `relative_to_pillarbox` / `relative_to_letterbox` and `screen_width_add_percent` / `screen_height_add_percent`.
 - `relative_to_pillarbox` / `relative_to_letterbox` - Changes what is regarded as an "edge" to the background layer. For small maps or wide screens, there may be black "strips" along the sides or bottom of the viewing window. If these settings are enabled, the background will align itself with the edge of this black strip instead of the actual edge of the window. Typically, these should be `true` if there is detail on a background layer that is only repeated a few times, or is at risk of being covered by the black "strips". *If you're unsure on how to use these, it's safer to set them to `true`.*
 
 Here's an example of a file:
 ```
 {
-  "version": 2,
+  "version": 3,
   "bmp_filename": "bkBlue",
   "lighting_mode": 0,
   "layers": [
@@ -163,6 +167,8 @@ Here's an example of a file:
         "follow_speed_y": 1.0,
         "autoscroll_speed_x": 1.0,
         "autoscroll_speed_y": 1.0,
+        "screen_width_add_percent": 1.0,
+        "screen_height_add_percent": 1.0,
         "scroll_flags": {
           "follow_pc_x": false,
           "follow_pc_y": false,
@@ -202,6 +208,8 @@ Here's an example of a file:
         "follow_speed_y": 1.0,
         "autoscroll_speed_x": -0.5,
         "autoscroll_speed_y": 0.5,
+        "screen_width_add_percent": 1.0,
+        "screen_height_add_percent": 1.0,
         "scroll_flags": {
           "follow_pc_x": false,
           "follow_pc_y": true,

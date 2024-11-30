@@ -48,6 +48,10 @@ pub struct AnimationStyle {
     pub follow_speed_y: f32,
     pub autoscroll_speed_x: f32, //for automatic movement
     pub autoscroll_speed_y: f32,
+    #[serde(default = "default_add_width_percent")]
+    pub screen_width_add_percent: f32, //how much of the screen width to add with add_screen_width
+    #[serde(default = "default_add_height_percent")]
+    pub screen_height_add_percent: f32, //ditto for height
     pub scroll_flags: ScrollFlags,
 
     //internal only: do not save to or load from JSON
@@ -123,6 +127,8 @@ impl LayerConfig {
                 follow_speed_y: 0.0,
                 autoscroll_speed_x: 0.0,
                 autoscroll_speed_y: 0.0,
+                screen_width_add_percent: 1.0,
+                screen_height_add_percent: 1.0,
                 scroll_flags: ScrollFlags{
                     follow_pc_x: false,
                     follow_pc_y: false,
@@ -167,18 +173,27 @@ pub struct BkgConfig {
 
 }
 
-#[inline(always)]
-fn current_version() -> u32 {
-    2
-}
-
 fn default_false() -> bool {
     false
 }
+
 fn default_true() -> bool {
     true
 }
 
+#[inline(always)]
+fn current_version() -> u32 {
+    3
+}
+
+#[inline(always)]
+fn default_add_width_percent() -> f32 {
+    1.0
+}
+#[inline(always)]
+fn default_add_height_percent() -> f32 {
+    1.0
+}
 
 
 impl BkgConfig {
@@ -211,6 +226,10 @@ impl BkgConfig {
 
         if self.version == 1 {
             self.version = 2;
+        }
+
+        if self.version == 2 {
+            self.version = 3;
         }
 
         if self.version != initial_version {
@@ -394,41 +413,6 @@ impl Background {
 
     }
 
-
-    fn get_screen_margins(
-        &self,
-        state: &mut SharedGameState,
-        stage: &Stage,
-        frame: &Frame,
-    ) -> GameResult<Rect<f32>> {
-
-        //get scaled frame location
-        let (x, y) = frame.xy_interpolated(state.frame_time);
-        let (x, y) = (x * state.scale, y * state.scale);
-
-        //get scaled canvas size
-        let canvas_w_scaled = state.canvas_size.0 as f32 * state.scale;
-        let canvas_h_scaled = state.canvas_size.1 as f32 * state.scale;
-
-        //ge the size of a half-block (typically 8 or 4)
-        let half_block = stage.map.tile_size.as_float() * 0.5; // * state.scale;
-
-        //get map width + height
-        let level_width = (stage.map.width as f32) * stage.map.tile_size.as_float();
-        let level_height = (stage.map.height as f32) * stage.map.tile_size.as_float();
-
-
-
-        //relative to top left corner of the screen, the dimensions of the letter/pillarbox
-        let left_side = -x - half_block;
-        let right_side = left_side + level_width;// * state.scale;
-        let upper_side = -y - half_block;
-        let lower_side = upper_side + level_height;// * state.scale;
-
-
-        Ok(Rect::new(left_side * 0.5 , upper_side * 0.5, (right_side - left_side) * 0.5, (lower_side - upper_side) * 0.5))
-    }
-
     pub fn tick(
         &mut self,
         state: &mut SharedGameState,
@@ -436,7 +420,6 @@ impl Background {
         frame: &Frame,
     ) -> GameResult<()> {
         self.tick = self.tick.wrapping_add(1);
-
 
 
         //we need the map size so we can account for the letterboxing/pillarboxing
@@ -459,7 +442,9 @@ impl Background {
         let (frame_x, frame_y) = frame.xy_interpolated(state.frame_time);
         let pilrbox_width = - (frame_x + state.tile_size.as_float() / 2.0);
         let ltrbox_height = - (frame_y + state.tile_size.as_float() / 2.0);
-
+        //only use these width/heights if our screen is bigger than the level
+        let pilrbox_width = if canvas_size.0 > map_pxl_width {pilrbox_width} else {0.0};
+        let ltrbox_height = if canvas_size.1 > map_pxl_height {ltrbox_height} else {0.0};
 
         //the new offsets that should be used (if canvas is larger than map size, use map size offset over by width of pillarbox)
         let pb_canvas_width = if canvas_size.0 > map_pxl_width {pilrbox_width + map_pxl_width} else {canvas_size.0};
@@ -527,7 +512,7 @@ impl Background {
                 layer.frame_x_offset -= frame_x as f32;
             }
             if scroll_flags.add_screen_width {
-                layer.frame_x_offset += layer.edge_coords.width();
+                layer.frame_x_offset += layer.edge_coords.width() * layer.animation_style.screen_width_add_percent;
             }
 
             if scroll_flags.align_with_water_lvl {
@@ -540,7 +525,7 @@ impl Background {
                 layer.frame_y_offset -= frame_y as f32;
             }
             if scroll_flags.add_screen_height {
-                layer.frame_y_offset += layer.edge_coords.height()
+                layer.frame_y_offset += layer.edge_coords.height() * layer.animation_style.screen_height_add_percent;
             }
 
 
