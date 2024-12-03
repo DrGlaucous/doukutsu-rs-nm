@@ -1,6 +1,4 @@
-//#version 100
-
-precision mediump float;
+//#version 110
 
 uniform mat4 ProjMtx;
 attribute vec2 Position;

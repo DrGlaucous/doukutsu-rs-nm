@@ -7,6 +7,7 @@ use crate::framework::context::Context;
 use crate::framework::error::GameResult;
 use crate::framework::graphics::{BlendMode, VSyncMode};
 use crate::game::Game;
+use crate::game::shared_game_state::SharedGameState;
 
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -105,6 +106,8 @@ pub trait BackendGamepad {
     fn set_rumble(&mut self, low_freq: u16, high_freq: u16, duration_ms: u32) -> GameResult;
 
     fn instance_id(&self) -> u32;
+
+    fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
 #[allow(unreachable_code)]
@@ -126,6 +129,12 @@ pub fn init_backend(headless: bool, size_hint: (u16, u16)) -> GameResult<Box<dyn
     #[cfg(feature = "backend-sdl")]
     {
         return crate::framework::backend_sdl2::SDL2Backend::new(size_hint);
+    }
+
+    //using null backend for now until we get libretro setup
+    #[cfg(feature = "backend-libretro")]
+    {
+        return crate::framework::backend_libretro::LibretroBackend::new();
     }
 
     log::warn!("No backend compiled in, using null backend instead.");

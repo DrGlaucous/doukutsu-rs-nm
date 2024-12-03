@@ -8,6 +8,8 @@ pub mod backend_horizon;
 pub mod backend_null;
 #[cfg(feature = "backend-sdl")]
 pub mod backend_sdl2;
+#[cfg(feature = "backend-libretro")]
+pub mod backend_libretro;
 pub mod context;
 pub mod error;
 pub mod filesystem;

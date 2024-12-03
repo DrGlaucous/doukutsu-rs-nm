@@ -29,6 +29,7 @@ pub enum GamepadType {
     NintendoSwitchJoyConLeft,
     NintendoSwitchJoyConRight,
     NintendoSwitchJoyConPair,
+    Retropad,
 }
 
 impl GamepadType {
@@ -48,6 +49,7 @@ impl GamepadType {
             GamepadType::NintendoSwitchJoyConLeft => "Nintendo Switch Joy-Con (left)",
             GamepadType::NintendoSwitchJoyConRight => "Nintendo Switch Joy-Con (right)",
             GamepadType::NintendoSwitchJoyConPair => "Nintendo Switch Joy-Con (pair)",
+            GamepadType::Retropad => "Retroarch virtual controller",
         }
     }
 }
@@ -158,7 +160,7 @@ impl PlayerControllerInputType {
 }
 
 pub struct GamepadData {
-    controller: Box<dyn BackendGamepad>,
+    pub controller: Box<dyn BackendGamepad>,
     controller_type: GamepadType,
 
     left_x: f64,
@@ -206,6 +208,7 @@ impl GamepadData {
             | GamepadType::NintendoSwitchJoyConLeft
             | GamepadType::NintendoSwitchJoyConRight
             | GamepadType::NintendoSwitchJoyConPair => 3,
+            GamepadType::Retropad => 3,
             _ => 1,
         }
     }
@@ -241,7 +244,7 @@ impl GamepadContext {
         self.gamepads.iter_mut().find(|gamepad| gamepad.controller.instance_id() == gamepad_id)
     }
 
-    fn get_gamepad_by_index_mut(&mut self, gamepad_index: usize) -> Option<&mut GamepadData> {
+    pub fn get_gamepad_by_index_mut(&mut self, gamepad_index: usize) -> Option<&mut GamepadData> {
         self.gamepads.get_mut(gamepad_index)
     }
 

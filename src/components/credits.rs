@@ -77,9 +77,9 @@ impl GameEntity<()> for Credits {
 
         if state.more_rust {
             // draw sue's headband separately because rust doesn't let me mutate the texture set multiple times at once
-
+            
             let headband_spritesheet = {
-                let base = if state.settings.original_textures { "ogph" } else { "plus" };
+                let base = if state.settings.original_textures || !state.constants.supports_og_textures { "ogph" } else { "plus" };
                 format!("headband/{}/Casts", base)
             };
 

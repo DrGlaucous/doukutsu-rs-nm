@@ -7,7 +7,7 @@ use crate::graphics::font::Font;
 use crate::scene::Scene;
 
 pub struct NoDataScene {
-    #[cfg(target_os = "android")]
+    #[cfg(all(target_os = "android", not(feature = "backend-libretro")))]
     flag: bool,
     err: String,
 }
@@ -15,20 +15,20 @@ pub struct NoDataScene {
 impl NoDataScene {
     pub fn new(err: GameError) -> Self {
         Self {
-            #[cfg(target_os = "android")]
+            #[cfg(all(target_os = "android", not(feature = "backend-libretro")))]
             flag: false,
             err: err.to_string(),
         }
     }
 }
 
-#[cfg(target_os = "android")]
+#[cfg(all(target_os = "android", not(feature = "backend-libretro")))]
 static REL_URL: &str = "https://github.com/doukutsu-rs/doukutsu-rs#data-files";
 
 impl Scene for NoDataScene {
     #[allow(unused)]
     fn tick(&mut self, state: &mut SharedGameState, ctx: &mut Context) -> GameResult {
-        #[cfg(target_os = "android")]
+        #[cfg(all(target_os = "android", not(feature = "backend-libretro")))]
         {
             use crate::common::Rect;
             use crate::util::browser;
@@ -68,7 +68,7 @@ impl Scene for NoDataScene {
         )?;
 
         let mut y = 60.0;
-        #[cfg(target_os = "android")]
+        #[cfg(all(target_os = "android", not(feature = "backend-libretro")))]
         {
             let yellow = (255, 255, 0, 255);
             state.font.builder().center(state.canvas_size.0).y(y).color(yellow).draw(

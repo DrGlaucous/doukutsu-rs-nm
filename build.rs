@@ -10,7 +10,7 @@ fn main() {
 
     println!("cargo:rerun-if-changed=build.rs");
 
-    #[cfg(target_os = "windows")]
+    #[cfg(all(target_os = "windows", not(feature = "backend-libretro")))]
     {
         let mut res = winres::WindowsResource::new();
         res.set_icon("res/sue.ico");

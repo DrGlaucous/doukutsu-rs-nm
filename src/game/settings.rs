@@ -11,7 +11,7 @@ use crate::input::gamepad_player_controller::GamepadController;
 use crate::input::keyboard_player_controller::KeyboardController;
 use crate::input::player_controller::PlayerController;
 use crate::input::touch_player_controller::TouchPlayerController;
-use crate::sound::InterpolationMode;
+use crate::sound::backend::InterpolationMode;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Settings {
@@ -140,7 +140,7 @@ fn default_screen_shake_intensity() -> ScreenShakeIntensity {
 
 #[inline(always)]
 fn default_p1_controller_type() -> ControllerType {
-    if cfg!(any(target_os = "horizon")) {
+    if cfg!(any(target_os = "horizon", feature = "backend-libretro")) {
         ControllerType::Gamepad(0)
     } else {
         ControllerType::Keyboard
@@ -149,7 +149,7 @@ fn default_p1_controller_type() -> ControllerType {
 
 #[inline(always)]
 fn default_p2_controller_type() -> ControllerType {
-    if cfg!(any(target_os = "horizon")) {
+    if cfg!(any(target_os = "horizon", feature = "backend-libretro")) {
         ControllerType::Gamepad(1)
     } else {
         ControllerType::Keyboard
@@ -347,6 +347,18 @@ impl Settings {
             self.allow_strafe = true;
         }
 
+        // Force keyboardless implementations to use controllers regardless of what the settings were initially (in case a portable version was imported)
+        #[cfg(any(target_os = "horizon", feature = "backend-libretro"))]
+        {
+            // Don't touch pad assignments if they're already a controller
+            if self.player1_controller_type == ControllerType::Keyboard {
+                self.player1_controller_type = default_p1_controller_type();
+            }
+            if self.player2_controller_type == ControllerType::Keyboard {
+                self.player2_controller_type = default_p2_controller_type();
+            }
+        }
+
         if self.version != initial_version {
             log::info!("Upgraded configuration file from version {} to {}.", initial_version, self.version);
         }
@@ -422,7 +434,7 @@ impl Default for Settings {
             light_cone: true,
             subpixel_coords: true,
             motion_interpolation: true,
-            touch_controls: cfg!(target_os = "android"),
+            touch_controls: cfg!(all(target_os = "android", not(feature = "backend-libretro"))),//(target_os = "android"),
             display_touch_controls: true,
             soundtrack: "Organya".to_string(),
             bgm_volume: 1.0,

@@ -21,7 +21,7 @@ use crate::framework::error::GameResult;
 use crate::framework::filesystem;
 use crate::framework::gl;
 use crate::framework::keyboard::ScanCode;
-use crate::framework::render_opengl::{GLContext, OpenGLRenderer};
+use crate::framework::render_opengl::{GLContext, OpenGLRenderer, GlVersionInfo};
 use crate::game::Game;
 use crate::game::GAME_SUSPENDED;
 use crate::input::touch_controls::TouchPoint;
@@ -172,10 +172,11 @@ fn get_scaled_size(width: u32, height: u32) -> (f32, f32) {
 
 impl BackendEventLoop for GlutinEventLoop {
     fn run(&mut self, game: &mut Game, ctx: &mut Context) {
-        let event_loop = EventLoop::new();
-        let state_ref = unsafe { &mut *game.state.get() };
+        let event_loop = EventLoop::new(); //everything required to make a window
+        let state_ref = unsafe { &mut *game.state.get() }; //pointer to current game state
         let window: &'static mut WindowedContext<PossiblyCurrent> =
-            unsafe { std::mem::transmute(self.get_context(&ctx, &event_loop)) };        
+            unsafe { std::mem::transmute(self.get_context(&ctx, &event_loop)) }; //create a window
+        //size the window and snap the game to it
         {
             let size = window.window().inner_size();
             ctx.real_screen_size = (size.width, size.height);
@@ -183,10 +184,13 @@ impl BackendEventLoop for GlutinEventLoop {
             state_ref.handle_resize(ctx).unwrap();
         }
 
-        // it won't ever return
+        // it won't ever return, so this can be done without fear of problems
+
+        //create a game and context
         let (game, ctx): (&'static mut Game, &'static mut Context) =
             unsafe { (std::mem::transmute(game), std::mem::transmute(ctx)) };
 
+        //the function to be used with the glutin callbacks, this thread will be hijacked
         event_loop.run(move |event, _, control_flow| {
             *control_flow = ControlFlow::Wait;
 
@@ -403,7 +407,8 @@ impl BackendEventLoop for GlutinEventLoop {
             *user_data = Rc::into_raw(refs) as *mut c_void;
         }
 
-        let gl_context = GLContext { gles2_mode: true, is_sdl: false, get_proc_address, swap_buffers, user_data, ctx };
+        let gl_version = GlVersionInfo::OpenGLES;
+        let gl_context = GLContext { gl_version, is_sdl: false, get_proc_address, swap_buffers, user_data, ctx };
 
         Ok(Box::new(OpenGLRenderer::new(gl_context, UnsafeCell::new(imgui))))
     }

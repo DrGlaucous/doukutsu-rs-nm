@@ -2,7 +2,7 @@
 name = "doukutsu-rs"
 description = "A re-implementation of Cave Story (Doukutsu Monogatari) engine"
 version = "0.101.0"
-authors = ["Alula", "dawnDus"]
+authors = ["Alula", "dawnDus", "Dr. Glaucous"]
 edition = "2021"
 
 [lib]
@@ -37,7 +37,9 @@ category = "Game"
 osx_minimum_system_version = "10.12"
 
 [features]
-default = ["default-base", "backend-sdl", "render-opengl", "exe", "webbrowser", "discord-rpc"]
+default = ["default-base", "backend-sdl", "render-opengl", "audio-cpal", "exe", "webbrowser", "discord-rpc"]
+#default = ["default-base", "backend-glutin", "render-opengl", "exe", "webbrowser", "discord-rpc"]
+
 default-base = ["ogg-playback"]
 ogg-playback = ["lewton"]
 backend-sdl = ["sdl2", "sdl2-sys"]
@@ -51,6 +53,11 @@ editor = []
 exe = []
 android = []
 
+#new stuff
+audio-cpal = ["cpal"]
+backend-libretro = ["render-opengl"]
+
+
 [dependencies]
 #glutin = { path = "./3rdparty/glutin/glutin", optional = true }
 #lua-ffi = { path = "./3rdparty/luajit-rs", optional = true }
@@ -61,7 +68,7 @@ android = []
 byteorder = "1.4"
 case_insensitive_hashmap = "1.0.0"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
-cpal = { git = "https://github.com/doukutsu-rs/cpal", rev = "9d269d8724102404e73a61e9def0c0cbc921b676" }
+cpal = { git = "https://github.com/doukutsu-rs/cpal", rev = "9d269d8724102404e73a61e9def0c0cbc921b676", optional = true}
 directories = "3"
 discord-rich-presence = { version = "0.2", optional = true }
 downcast = "0.11"
@@ -93,6 +100,11 @@ vec_mut_scan = "0.4"
 webbrowser = { version = "0.8.6", optional = true }
 winit = { git = "https://github.com/doukutsu-rs/winit.git", rev = "878f206d19af01b0977277929eee5e32667453c0", optional = true, default_features = false, features = ["x11"] }
 xmltree = "0.10"
+
+
+#for libretro
+#libretro-rs = { path = "../libretro-rs-master/libretro-rs", optional = true, features = ["experimental"] }
+
 
 #hack to not link SDL_image on Windows(causes a linker error)
 [target.'cfg(not(target_os = "windows"))'.dependencies]

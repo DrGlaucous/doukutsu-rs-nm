@@ -34,7 +34,7 @@ fn main() {
 
         println!("__text_start = {:#x}", (&__text_start) as *const _ as usize);
 
-        let options = doukutsu_rs::game::LaunchOptions { server_mode: false, editor: false };
+        let options = doukutsu_rs::game::LaunchOptions { server_mode: false, editor: false, return_types: false, external_timer: false, resource_dir: None, usr_dir: None};
         let result = doukutsu_rs::game::init(options);
 
         if let Err(e) = result {

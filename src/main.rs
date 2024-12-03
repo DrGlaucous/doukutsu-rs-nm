@@ -2,9 +2,10 @@
 
 use std::process::exit;
 
+
 fn main() {
     let args = std::env::args();
-    let mut options = doukutsu_rs::game::LaunchOptions { server_mode: false, editor: false };
+    let mut options = doukutsu_rs::game::LaunchOptions { server_mode: false, editor: false, return_types: false, external_timer: false, resource_dir: None, usr_dir: None};
 
     for arg in args {
         if arg == "--server-mode" {

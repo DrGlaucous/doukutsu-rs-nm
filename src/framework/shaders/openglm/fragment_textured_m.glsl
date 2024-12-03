@@ -1,6 +1,4 @@
-//#version 100
-
-precision mediump float;
+//#version 110
 
 uniform sampler2D Texture;
 varying vec2 Frag_UV;

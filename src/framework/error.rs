@@ -115,6 +115,7 @@ impl From<strum::ParseError> for GameError {
     }
 }
 
+#[cfg(feature = "audio-cpal")]
 impl From<cpal::DefaultStreamConfigError> for GameError {
     fn from(s: cpal::DefaultStreamConfigError) -> GameError {
         let errstr = format!("Default stream config error: {}", s);
@@ -122,6 +123,7 @@ impl From<cpal::DefaultStreamConfigError> for GameError {
     }
 }
 
+#[cfg(feature = "audio-cpal")]
 impl From<cpal::PlayStreamError> for GameError {
     fn from(s: cpal::PlayStreamError) -> GameError {
         let errstr = format!("Play stream error: {}", s);
@@ -129,6 +131,7 @@ impl From<cpal::PlayStreamError> for GameError {
     }
 }
 
+#[cfg(feature = "audio-cpal")]
 impl From<cpal::BuildStreamError> for GameError {
     fn from(s: cpal::BuildStreamError) -> GameError {
         let errstr = format!("Build stream error: {}", s);

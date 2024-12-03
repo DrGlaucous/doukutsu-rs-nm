@@ -18,6 +18,7 @@ use crate::game::caret::{Caret, CaretType};
 use crate::game::npc::NPCTable;
 use crate::game::player::TargetPlayer;
 use crate::game::profile::GameProfile;
+use crate::game::LaunchOptions;
 #[cfg(feature = "scripting-lua")]
 use crate::game::scripting::lua::LuaScriptingState;
 use crate::game::scripting::tsc::credit_script::{CreditScript, CreditScriptVM};
@@ -33,7 +34,7 @@ use crate::mod_requirements::ModRequirements;
 use crate::scene::game_scene::GameScene;
 use crate::scene::title_scene::TitleScene;
 use crate::scene::Scene;
-use crate::sound::SoundManager;
+use crate::sound::backend::{init_sound_backend, SoundManager};
 use crate::util::bitvec::BitVec;
 use crate::util::rng::XorShift;
 
@@ -334,7 +335,7 @@ pub struct SharedGameState {
     pub texture_set: TextureSet,
     #[cfg(feature = "scripting-lua")]
     pub lua: LuaScriptingState,
-    pub sound_manager: SoundManager,
+    pub sound_manager: Box<dyn SoundManager>,
     pub settings: Settings,
     pub save_slot: usize,
     pub difficulty: GameDifficulty,
@@ -352,9 +353,9 @@ pub struct SharedGameState {
 }
 
 impl SharedGameState {
-    pub fn new(ctx: &mut Context) -> GameResult<SharedGameState> {
+    pub fn new(ctx: &mut Context, launch_options: &mut LaunchOptions) -> GameResult<SharedGameState> {
         let mut constants = EngineConstants::defaults();
-        let mut sound_manager = SoundManager::new(ctx)?;
+        let mut sound_manager = init_sound_backend(ctx, launch_options)?; //SoundManager::new(ctx)?;
         let settings = Settings::load(ctx)?;
         let mod_requirements = ModRequirements::load(ctx)?;
 
@@ -370,7 +371,7 @@ impl SharedGameState {
 
         #[cfg(not(target_os = "horizon"))]
         if let Some(vanilla_extractor) =
-            VanillaExtractor::from(ctx, vanilla_ext_exe.to_string(), vanilla_ext_outdir.to_string())
+            VanillaExtractor::from(ctx, vanilla_ext_exe.to_string(), vanilla_ext_outdir.to_string(), launch_options)
         {
             let result = vanilla_extractor.extract_data();
             if let Err(e) = result {
@@ -435,13 +436,13 @@ impl SharedGameState {
         for i in 0..0xffu8 {
             let path = format!("pxt/fx{:02x}.pxt", i);
             if let Ok(file) = filesystem::open_find(ctx, &constants.base_paths, path) {
-                sound_manager.set_sample_params_from_file(i, file)?;
+                sound_manager.set_sample_params_from_file(i, Box::new(file))?;
                 continue;
             }
 
             let path = format!("PixTone/{:03}.pxt", i);
             if let Ok(file) = filesystem::open_find(ctx, &constants.base_paths, path) {
-                sound_manager.set_sample_params_from_file(i, file)?;
+                sound_manager.set_sample_params_from_file(i, Box::new(file))?;
                 continue;
             }
         }

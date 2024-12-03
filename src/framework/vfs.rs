@@ -686,5 +686,5 @@ mod tests {
         assert!(!fs.exists(testdir));
     }
 
-    // BUGGO: TODO: Make sure all functions are tested for OverlayFS and ZipFS!!
+    // BUG: TODO: Make sure all functions are tested for OverlayFS and ZipFS!!
 }
