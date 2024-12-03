@@ -267,7 +267,7 @@ impl SoundManager for SoundManagerCpal {
             paths.insert(0, "/Soundtracks/".to_owned() + &settings.soundtrack + "/");
 
             if let Some(soundtrack) =
-            constants.soundtracks.iter().find(|s| s.available && s.name == settings.soundtrack)
+            constants.soundtracks.iter().find(|s| s.available && s.id == settings.soundtrack)
             {
                 paths.insert(0, soundtrack.path.clone());
             }

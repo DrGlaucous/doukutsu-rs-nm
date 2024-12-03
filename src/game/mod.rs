@@ -4,6 +4,7 @@ use std::panic::PanicInfo;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
+use std::pin::Pin;
 
 use lazy_static::lazy_static;
 
@@ -96,7 +97,7 @@ impl GameTimer {
 
 pub struct Game {
     pub(crate) scene: Option<Box<dyn Scene>>,
-    pub(crate) state: UnsafeCell<SharedGameState>,
+    pub state: UnsafeCell<SharedGameState>,
     ui: UI,
     game_timer: GameTimer,
     last_tick: u128,
@@ -363,6 +364,7 @@ pub fn init(options: LaunchOptions) -> GameResult<(Option<Pin<Box<Game>>>, Optio
     let mut options = options;
 
     let _ = init_logger(options.usr_dir.clone());
+    std::panic::set_hook(Box::new(panic_hook));
     
     let mut context = Box::pin(Context::new());
 
@@ -375,11 +377,6 @@ pub fn init(options: LaunchOptions) -> GameResult<(Option<Pin<Box<Game>>>, Optio
     }
 
     let mut game = Box::pin(Game::new(&mut context, &mut options)?);
-    #[cfg(feature = "scripting-lua")]
-    unsafe {
-        (*game.state.get()).lua.update_refs(&mut *game.state.get(), &mut *context);
-    }
-
     game.state.get_mut().fs_container = Some(fs_container);
 
     #[cfg(feature = "discord-rpc")]
@@ -402,38 +399,3 @@ pub fn init(options: LaunchOptions) -> GameResult<(Option<Pin<Box<Game>>>, Optio
         Ok((None, None))
     }
 }
-
-//new libretro stuff
-//this is like the function above, but returns the game and context it initialized instead of running it
-/*
-pub fn init_return(options: LaunchOptions) -> GameResult<(std::pin::Pin<Box<Game>>, std::pin::Pin<Box<Context>>)>
-{
-    let _ = init_logger();
-    std::panic::set_hook(Box::new(panic_hook));
-
-    let mut context = Box::pin(Context::new());
-
-    let mut fs_container = FilesystemContainer::new();
-    fs_container.mount_fs(&mut context)?;
-
-    if options.server_mode {
-        log::info!("Running in server mode...");
-        context.headless = true;
-    }
-
-    let mut game = Box::pin(Game::new(&mut context)?);
-    game.state.get_mut().fs_container = Some(fs_container);
-
-    #[cfg(feature = "discord-rpc")]
-    if game.state.get_mut().settings.discord_rpc {
-        game.state.get_mut().discord_rpc.enabled = true;
-        game.state.get_mut().discord_rpc.start()?;
-    }
-
-    game.state.get_mut().next_scene = Some(Box::new(LoadingScene::new()));
-    log::info!("Starting main loop...");
-    //context.run(game.as_mut().get_mut())?;
-
-    Ok((game, context))
-}
-*/
