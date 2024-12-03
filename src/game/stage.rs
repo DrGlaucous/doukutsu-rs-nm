@@ -1,29 +1,21 @@
 use std::io::{Cursor, Read};
 use std::str::from_utf8;
 
-use byteorder::LE;
 use byteorder::ReadBytesExt;
-use log::info;
+use byteorder::LE;
 
 use crate::common::Color;
 use crate::engine_constants::EngineConstants;
 use crate::framework::context::Context;
-use crate::framework::error::{GameError, GameResult};
 use crate::framework::error::GameError::ResourceLoadError;
+use crate::framework::error::{GameError, GameResult};
 use crate::framework::filesystem;
 use crate::game::map::{Map, NPCData};
-use crate::game::scripting::tsc::text_script::TextScript;
-use crate::util::encoding::read_cur_shift_jis;
+use crate::game::scripting::tsc::text_script::{TextScript, TextScriptEncoding};
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct NpcType {
     name: String,
-}
-
-impl Clone for NpcType {
-    fn clone(&self) -> Self {
-        Self { name: self.name.clone() }
-    }
 }
 
 impl NpcType {
@@ -36,15 +28,9 @@ impl NpcType {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Tileset {
     pub(crate) name: String,
-}
-
-impl Clone for Tileset {
-    fn clone(&self) -> Self {
-        Self { name: self.name.clone() }
-    }
 }
 
 impl Tileset {
@@ -66,15 +52,9 @@ impl Tileset {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Background {
     name: String,
-}
-
-impl Clone for Background {
-    fn clone(&self) -> Self {
-        Self { name: self.name.clone() }
-    }
 }
 
 impl Background {
@@ -195,7 +175,7 @@ pub struct PxPackStageData {
     pub offset_bg: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StageData {
     pub name: String,
     pub name_jp: String,
@@ -208,24 +188,6 @@ pub struct StageData {
     pub background_color: Color,
     pub npc1: NpcType,
     pub npc2: NpcType,
-}
-
-impl Clone for StageData {
-    fn clone(&self) -> Self {
-        StageData {
-            name: self.name.clone(),
-            name_jp: self.name_jp.clone(),
-            map: self.map.clone(),
-            boss_no: self.boss_no,
-            tileset: self.tileset.clone(),
-            pxpack_data: self.pxpack_data.clone(),
-            background: self.background.clone(),
-            background_type: self.background_type,
-            background_color: self.background_color,
-            npc1: self.npc1.clone(),
-            npc2: self.npc2.clone(),
-        }
-    }
 }
 
 const NXENGINE_BACKDROPS: [&str; 15] = [
@@ -261,21 +223,25 @@ fn zero_index(s: &[u8]) -> usize {
     s.iter().position(|&c| c == b'\0').unwrap_or(s.len())
 }
 
-fn from_shift_jis(s: &[u8]) -> String {
-    let mut cursor = Cursor::new(s);
-    let mut chars = Vec::new();
-    let mut bytes = s.len() as u32;
-
-    while bytes > 0 {
-        let (consumed, chr) = read_cur_shift_jis(&mut cursor, bytes);
-        chars.push(chr);
-        bytes -= consumed;
+fn from_encoding(s: &[u8], encoding: Option<TextScriptEncoding>) -> String {
+    if let Some(encoding) = encoding {
+        let encoding: &encoding_rs::Encoding = encoding.into();
+        return encoding.decode_without_bom_handling(s).0.into_owned();
     }
 
-    chars.iter().collect()
+    from_shift_jis(s)
 }
 
-fn from_csplus_stagetbl(s: &[u8], is_switch: bool) -> String {
+fn from_shift_jis(s: &[u8]) -> String {
+    encoding_rs::SHIFT_JIS.decode_without_bom_handling(s).0.into_owned()
+}
+
+fn from_csplus_stagetbl(s: &[u8], is_switch: bool, encoding: Option<TextScriptEncoding>) -> String {
+    if let Some(encoding) = encoding {
+        let encoding: &encoding_rs::Encoding = encoding.into();
+        return encoding.decode_without_bom_handling(s).0.into_owned();
+    }
+
     if is_switch {
         from_utf8(s).unwrap_or("").trim_matches('\0').to_string()
     } else {
@@ -284,7 +250,12 @@ fn from_csplus_stagetbl(s: &[u8], is_switch: bool) -> String {
 }
 
 impl StageData {
-    pub fn load_stage_table(ctx: &mut Context, roots: &Vec<String>, is_switch: bool) -> GameResult<Vec<Self>> {
+    pub fn load_stage_table(
+        ctx: &mut Context,
+        roots: &Vec<String>,
+        is_switch: bool,
+        encoding: Option<TextScriptEncoding>,
+    ) -> GameResult<Vec<Self>> {
         let stage_tbl_path = "/stage.tbl";
         let stage_sect_path = "/stage.sect";
         let mrmap_bin_path = "/mrmap.bin";
@@ -297,7 +268,7 @@ impl StageData {
 
             for path in roots.iter().rev() {
                 if let Ok(mut file) = filesystem::open(ctx, [path, stage_tbl_path].join("")) {
-                    info!("Loading Cave Story+ stage table from {}", &path);
+                    log::info!("Loading Cave Story+ stage table from {}", &path);
 
                     let mut new_stages = Vec::new();
 
@@ -325,13 +296,14 @@ impl StageData {
                         f.read_exact(&mut name_jap_buf)?;
                         f.read_exact(&mut name_buf)?;
 
-                        let tileset = from_csplus_stagetbl(&ts_buf[0..zero_index(&ts_buf)], is_switch);
-                        let map = from_csplus_stagetbl(&map_buf[0..zero_index(&map_buf)], is_switch);
-                        let background = from_csplus_stagetbl(&back_buf[0..zero_index(&back_buf)], is_switch);
-                        let npc1 = from_csplus_stagetbl(&npc1_buf[0..zero_index(&npc1_buf)], is_switch);
-                        let npc2 = from_csplus_stagetbl(&npc2_buf[0..zero_index(&npc2_buf)], is_switch);
-                        let name = from_csplus_stagetbl(&name_buf[0..zero_index(&name_buf)], is_switch);
-                        let name_jp = from_csplus_stagetbl(&name_jap_buf[0..zero_index(&name_jap_buf)], is_switch);
+                        let tileset = from_csplus_stagetbl(&ts_buf[0..zero_index(&ts_buf)], is_switch, encoding);
+                        let map = from_csplus_stagetbl(&map_buf[0..zero_index(&map_buf)], is_switch, encoding);
+                        let background = from_csplus_stagetbl(&back_buf[0..zero_index(&back_buf)], is_switch, encoding);
+                        let npc1 = from_csplus_stagetbl(&npc1_buf[0..zero_index(&npc1_buf)], is_switch, encoding);
+                        let npc2 = from_csplus_stagetbl(&npc2_buf[0..zero_index(&npc2_buf)], is_switch, encoding);
+                        let name = from_csplus_stagetbl(&name_buf[0..zero_index(&name_buf)], is_switch, encoding);
+                        let name_jp =
+                            from_csplus_stagetbl(&name_jap_buf[0..zero_index(&name_jap_buf)], is_switch, encoding);
 
                         let stage = StageData {
                             name: name.clone(),
@@ -362,7 +334,7 @@ impl StageData {
             // Cave Story freeware executable dump.
             let mut stages = Vec::new();
 
-            info!("Loading Cave Story freeware exe dump stage table from {}", &stage_sect_path);
+            log::info!("Loading Cave Story freeware exe dump stage table from {}", &stage_sect_path);
 
             let mut data = Vec::new();
             file.read_to_end(&mut data)?;
@@ -391,12 +363,12 @@ impl StageData {
                     let _ = f.read(&mut lol)?;
                 }
 
-                let tileset = from_shift_jis(&ts_buf[0..zero_index(&ts_buf)]);
-                let map = from_shift_jis(&map_buf[0..zero_index(&map_buf)]);
-                let background = from_shift_jis(&back_buf[0..zero_index(&back_buf)]);
-                let npc1 = from_shift_jis(&npc1_buf[0..zero_index(&npc1_buf)]);
-                let npc2 = from_shift_jis(&npc2_buf[0..zero_index(&npc2_buf)]);
-                let name = from_shift_jis(&name_buf[0..zero_index(&name_buf)]);
+                let tileset = from_encoding(&ts_buf[0..zero_index(&ts_buf)], encoding);
+                let map = from_encoding(&map_buf[0..zero_index(&map_buf)], encoding);
+                let background = from_encoding(&back_buf[0..zero_index(&back_buf)], encoding);
+                let npc1 = from_encoding(&npc1_buf[0..zero_index(&npc1_buf)], encoding);
+                let npc2 = from_encoding(&npc2_buf[0..zero_index(&npc2_buf)], encoding);
+                let name = from_encoding(&name_buf[0..zero_index(&name_buf)], encoding);
 
                 let stage = StageData {
                     name: name.clone(),
@@ -419,7 +391,7 @@ impl StageData {
             // Moustache Rider stage table
             let mut stages = Vec::new();
 
-            info!("Loading Moustache Rider stage table from {}", &mrmap_bin_path);
+            log::info!("Loading Moustache Rider stage table from {}", &mrmap_bin_path);
 
             let mut data = Vec::new();
 
@@ -450,12 +422,12 @@ impl StageData {
                 let boss_no = f.read_u8()?;
                 f.read_exact(&mut name_buf)?;
 
-                let tileset = from_shift_jis(&ts_buf[0..zero_index(&ts_buf)]);
-                let map = from_shift_jis(&map_buf[0..zero_index(&map_buf)]);
-                let background = from_shift_jis(&back_buf[0..zero_index(&back_buf)]);
-                let npc1 = from_shift_jis(&npc1_buf[0..zero_index(&npc1_buf)]);
-                let npc2 = from_shift_jis(&npc2_buf[0..zero_index(&npc2_buf)]);
-                let name = from_shift_jis(&name_buf[0..zero_index(&name_buf)]);
+                let tileset = from_encoding(&ts_buf[0..zero_index(&ts_buf)], encoding);
+                let map = from_encoding(&map_buf[0..zero_index(&map_buf)], encoding);
+                let background = from_encoding(&back_buf[0..zero_index(&back_buf)], encoding);
+                let npc1 = from_encoding(&npc1_buf[0..zero_index(&npc1_buf)], encoding);
+                let npc2 = from_encoding(&npc2_buf[0..zero_index(&npc2_buf)], encoding);
+                let name = from_encoding(&name_buf[0..zero_index(&name_buf)], encoding);
 
                 let stage = StageData {
                     name: name.clone(),
@@ -477,7 +449,7 @@ impl StageData {
         } else if let Ok(mut file) = filesystem::open_find(ctx, roots, stage_dat_path) {
             let mut stages = Vec::new();
 
-            info!("Loading NXEngine stage table from {}", &stage_dat_path);
+            log::info!("Loading NXEngine stage table from {}", &stage_dat_path);
 
             let mut data = Vec::new();
 

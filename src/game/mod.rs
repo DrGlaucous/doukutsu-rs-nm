@@ -1,8 +1,9 @@
+use std::backtrace::Backtrace;
 use std::cell::UnsafeCell;
+use std::panic::PanicInfo;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use std::pin::Pin;
 
 use lazy_static::lazy_static;
 
@@ -95,7 +96,7 @@ impl GameTimer {
 
 pub struct Game {
     pub(crate) scene: Option<Box<dyn Scene>>,
-    pub state: UnsafeCell<SharedGameState>,
+    pub(crate) state: UnsafeCell<SharedGameState>,
     ui: UI,
     game_timer: GameTimer,
     last_tick: u128,
@@ -346,6 +347,18 @@ fn init_logger(provided_dir: Option<PathBuf>) -> GameResult {
     Ok(())
 }
 
+fn panic_hook(info: &PanicInfo<'_>) {
+    let backtrace = Backtrace::force_capture();
+    let msg = info.payload().downcast_ref::<&str>().unwrap_or(&"");
+    let location = info.location();
+
+    if location.is_some() {
+        log::error!("Panic occurred in {} with message: '{msg}'\n {backtrace:#}", location.unwrap().to_string());
+    } else {
+        log::error!("Panic occurred with message: '{msg}'\n {backtrace:#}");
+    }
+}
+
 pub fn init(options: LaunchOptions) -> GameResult<(Option<Pin<Box<Game>>>, Option<Pin<Box<Context>>>)> {
     let mut options = options;
 
@@ -396,23 +409,19 @@ pub fn init(options: LaunchOptions) -> GameResult<(Option<Pin<Box<Game>>>, Optio
 pub fn init_return(options: LaunchOptions) -> GameResult<(std::pin::Pin<Box<Game>>, std::pin::Pin<Box<Context>>)>
 {
     let _ = init_logger();
-    
+    std::panic::set_hook(Box::new(panic_hook));
+
     let mut context = Box::pin(Context::new());
 
     let mut fs_container = FilesystemContainer::new();
     fs_container.mount_fs(&mut context)?;
-    
+
     if options.server_mode {
         log::info!("Running in server mode...");
         context.headless = true;
     }
 
     let mut game = Box::pin(Game::new(&mut context)?);
-    #[cfg(feature = "scripting-lua")]
-    unsafe {
-        (*game.state.get()).lua.update_refs(&mut *game.state.get(), &mut *context);
-    }
-
     game.state.get_mut().fs_container = Some(fs_container);
 
     #[cfg(feature = "discord-rpc")]

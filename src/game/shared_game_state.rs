@@ -19,10 +19,10 @@ use crate::game::npc::NPCTable;
 use crate::game::player::TargetPlayer;
 use crate::game::profile::GameProfile;
 use crate::game::LaunchOptions;
-#[cfg(feature = "scripting-lua")]
-use crate::game::scripting::lua::LuaScriptingState;
 use crate::game::scripting::tsc::credit_script::{CreditScript, CreditScriptVM};
-use crate::game::scripting::tsc::text_script::{ScriptMode, TextScript, TextScriptEncoding, TextScriptExecutionState, TextScriptVM};
+use crate::game::scripting::tsc::text_script::{
+    ScriptMode, TextScript, TextScriptEncoding, TextScriptExecutionState, TextScriptVM,
+};
 use crate::game::settings::Settings;
 use crate::game::stage::StageData;
 use crate::graphics::bmfont::BMFont;
@@ -333,8 +333,6 @@ pub struct SharedGameState {
     pub constants: EngineConstants,
     pub font: BMFont,
     pub texture_set: TextureSet,
-    #[cfg(feature = "scripting-lua")]
-    pub lua: LuaScriptingState,
     pub sound_manager: Box<dyn SoundManager>,
     pub settings: Settings,
     pub save_slot: usize,
@@ -409,7 +407,7 @@ impl SharedGameState {
 
         for soundtrack in constants.soundtracks.iter_mut() {
             if filesystem::exists(ctx, &soundtrack.path) {
-                log::info!("Enabling soundtrack {} from {}.", soundtrack.name, soundtrack.path);
+                log::info!("Enabling soundtrack {} from {}.", soundtrack.id, soundtrack.path);
                 soundtrack.available = true;
             }
         }
@@ -420,16 +418,7 @@ impl SharedGameState {
         constants.load_locales(ctx)?;
 
         let locale = SharedGameState::get_locale(&constants, &settings.locale).unwrap_or_default();
-        if (locale.code == "jp" || locale.code == "en") && constants.is_base() {
-            constants.textscript.encoding =  TextScriptEncoding::ShiftJIS
-        } else {
-            constants.textscript.encoding =  TextScriptEncoding::UTF8
-        }
-        
-        let font = BMFont::load(&constants.base_paths, &locale.font.path, ctx, locale.font.scale).or_else(|e| {
-            log::warn!("Failed to load font, using built-in: {}", e);
-            BMFont::load(&vec!["/".to_owned()], "builtin/builtin_font.fnt", ctx, 1.0)
-        })?;
+        let font = Self::try_update_locale(&mut constants, &locale, ctx).unwrap();
 
         let mod_list = ModList::load(ctx, &constants.string_table)?;
 
@@ -501,8 +490,6 @@ impl SharedGameState {
             constants,
             font,
             texture_set: TextureSet::new(),
-            #[cfg(feature = "scripting-lua")]
-            lua: LuaScriptingState::new(),
             sound_manager,
             settings,
             save_slot: 1,
@@ -521,6 +508,17 @@ impl SharedGameState {
         })
     }
 
+    pub fn reload_stage_table(&mut self, ctx: &mut Context) -> GameResult {
+        let stages = StageData::load_stage_table(
+            ctx,
+            &self.constants.base_paths,
+            self.constants.is_switch,
+            self.constants.stage_encoding,
+        )?;
+        self.stages = stages;
+        Ok(())
+    }
+
     pub fn reload_resources(&mut self, ctx: &mut Context) -> GameResult {
         self.constants.rebuild_path_list(self.mod_path.clone(), self.season, &self.settings);
         if !self.constants.is_demo {
@@ -530,8 +528,7 @@ impl SharedGameState {
         self.constants.load_csplus_tables(ctx)?;
         self.constants.load_animated_faces(ctx)?;
         self.constants.load_texture_size_hints(ctx)?;
-        let stages = StageData::load_stage_table(ctx, &self.constants.base_paths, self.constants.is_switch)?;
-        self.stages = stages;
+        self.reload_stage_table(ctx)?;
 
         let npc_tbl = filesystem::open_find(ctx, &self.constants.base_paths, "npc.tbl")?;
         let npc_table = NPCTable::load_from(npc_tbl)?;
@@ -570,24 +567,54 @@ impl SharedGameState {
         self.texture_set.unload_all();
     }
 
-    pub fn update_locale(&mut self, ctx: &mut Context) {
-        if let Some(locale) = SharedGameState::get_locale(&self.constants, &self.settings.locale) {
-            self.loc = locale;
-            if (self.loc.code == "jp" || self.loc.code == "en") && self.constants.is_base() {
-                self.constants.textscript.encoding =  TextScriptEncoding::ShiftJIS
-            } else {
-                self.constants.textscript.encoding =  TextScriptEncoding::UTF8
+    pub fn try_update_locale(
+        constants: &mut EngineConstants,
+        locale: &Locale,
+        ctx: &mut Context,
+    ) -> GameResult<BMFont> {
+        constants.textscript.encoding = if let Some(encoding) = locale.encoding {
+            encoding
+        } else {
+            // In freeware, Japanese and English text scripts use ShiftJIS.
+            // In Cave Story+, Japanese scripts use ShiftJIS and English scripts use UTF-8.
+            // The Switch version uses UTF-8 for both English and Japanese fonts.
+            match locale.code.as_str() {
+                "jp" => {
+                    if constants.is_switch {
+                        TextScriptEncoding::UTF8
+                    } else {
+                        TextScriptEncoding::ShiftJIS
+                    }
+                }
+                "en" => {
+                    if constants.is_base() {
+                        TextScriptEncoding::ShiftJIS
+                    } else {
+                        TextScriptEncoding::UTF8
+                    }
+                }
+                _ => TextScriptEncoding::UTF8,
             }
-        }
+        };
 
-        let font = BMFont::load(&self.constants.base_paths, &self.loc.font.path, ctx, self.loc.font.scale)
-            .or_else(|e| {
-                log::warn!("Failed to load font, using built-in: {}", e);
-                BMFont::load(&vec!["/".to_owned()], "builtin/builtin_font.fnt", ctx, 1.0)
-            })
-            .unwrap();
+        constants.stage_encoding = locale.stage_encoding;
 
+        let font = BMFont::load(&constants.base_paths, &locale.font.path, ctx, locale.font.scale).or_else(|e| {
+            log::warn!("Failed to load font, using built-in: {}", e);
+            BMFont::load(&vec!["/".to_owned()], "builtin/builtin_font.fnt", ctx, 1.0)
+        })?;
+
+        Ok(font)
+    }
+
+    pub fn update_locale(&mut self, ctx: &mut Context) {
+        let Some(locale) = SharedGameState::get_locale(&self.constants, &self.settings.locale) else {
+            return;
+        };
+        let font = Self::try_update_locale(&mut self.constants, &locale, ctx).unwrap();
+        self.loc = locale;
         self.font = font;
+        let _ = self.reload_stage_table(ctx);
     }
 
     pub fn graphics_reset(&mut self) {
@@ -596,8 +623,6 @@ impl SharedGameState {
 
     pub fn start_new_game(&mut self, ctx: &mut Context) -> GameResult {
         self.reset();
-        #[cfg(feature = "scripting-lua")]
-        self.lua.reload_scripts(ctx)?;
 
         #[cfg(feature = "discord-rpc")]
         self.discord_rpc.update_difficulty(self.difficulty)?;
@@ -621,9 +646,6 @@ impl SharedGameState {
     }
 
     pub fn start_intro(&mut self, ctx: &mut Context) -> GameResult {
-        #[cfg(feature = "scripting-lua")]
-        self.lua.reload_scripts(ctx)?;
-
         let start_stage_id = self.constants.game.intro_stage as usize;
 
         if self.stages.len() < start_stage_id {
@@ -648,7 +670,12 @@ impl SharedGameState {
         Ok(())
     }
 
-    pub fn save_game(&mut self, game_scene: &mut GameScene, ctx: &mut Context, target_player: Option<TargetPlayer>) -> GameResult {
+    pub fn save_game(
+        &mut self,
+        game_scene: &mut GameScene,
+        ctx: &mut Context,
+        target_player: Option<TargetPlayer>,
+    ) -> GameResult {
         if let Some(save_path) = self.get_save_filename(self.save_slot) {
             if let Ok(data) = filesystem::open_options(ctx, save_path, OpenOptions::new().write(true).create(true)) {
                 let profile = GameProfile::dump(self, game_scene, target_player);
@@ -672,9 +699,6 @@ impl SharedGameState {
                         let mut next_scene = GameScene::new(self, ctx, profile.current_map as usize)?;
 
                         profile.apply(self, &mut next_scene, ctx);
-
-                        #[cfg(feature = "scripting-lua")]
-                        self.lua.reload_scripts(ctx)?;
 
                         #[cfg(feature = "discord-rpc")]
                         self.discord_rpc.update_difficulty(self.difficulty)?;
@@ -895,6 +919,18 @@ impl SharedGameState {
         }
 
         out_locale
+    }
+
+    pub fn get_localized_soundtrack_name(&self, id: &str) -> String {
+        if id == "organya" {
+            return self.loc.t("soundtrack.organya").to_owned();
+        }
+
+        self.constants
+            .soundtracks
+            .iter()
+            .find(|s| s.id == id)
+            .map_or_else(|| id.to_owned(), |s| self.loc.t(format!("soundtrack.{}", s.id).as_str()).to_owned())
     }
 
     pub fn tt(&self, key: &str, args: &[(&str, &str)]) -> String {

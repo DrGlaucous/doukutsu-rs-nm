@@ -4,6 +4,7 @@ description = "A re-implementation of Cave Story (Doukutsu Monogatari) engine"
 version = "0.101.0"
 authors = ["Alula", "dawnDus", "Dr. Glaucous"]
 edition = "2021"
+rust-version = "1.65"
 
 [lib]
 crate-type = ["lib"]
@@ -46,7 +47,6 @@ backend-sdl = ["sdl2", "sdl2-sys"]
 backend-glutin = ["winit", "glutin", "render-opengl"]
 backend-horizon = []
 render-opengl = []
-scripting-lua = ["lua-ffi"]
 discord-rpc = ["discord-rich-presence"]
 netplay = ["serde_cbor"]
 editor = []
@@ -60,7 +60,6 @@ backend-libretro = ["render-opengl"]
 
 [dependencies]
 #glutin = { path = "./3rdparty/glutin/glutin", optional = true }
-#lua-ffi = { path = "./3rdparty/luajit-rs", optional = true }
 #winit = { path = "./3rdparty/winit", optional = true, default_features = false, features = ["x11"] }
 #sdl2 = { path = "./3rdparty/rust-sdl2", optional = true, features = ["unsafe_textures", "bundled", "static-link"] }
 #sdl2-sys = { path = "./3rdparty/rust-sdl2/sdl2-sys", optional = true, features = ["bundled", "static-link"] }
@@ -72,15 +71,15 @@ cpal = { git = "https://github.com/doukutsu-rs/cpal", rev = "9d269d8724102404e73
 directories = "3"
 discord-rich-presence = { version = "0.2", optional = true }
 downcast = "0.11"
+encoding_rs = "0.8.33"
 fern = "0.6.2"
 glutin = { git = "https://github.com/doukutsu-rs/glutin.git", rev = "2dd95f042e6e090d36f577cbea125560dd99bd27", optional = true, default_features = false, features = ["x11"] }
-imgui = "0.8"
+imgui = { git = "https://github.com/imgui-rs/imgui-rs.git", rev = "5d771a83b82c5cc3dd58cca3f969d900369262e6" }
 image = { version = "0.24", default-features = false, features = ["png", "bmp"] }
 itertools = "0.10"
 lazy_static = "1.4"
 lewton = { version = "0.10", optional = true }
 log = "0.4"
-lua-ffi = { git = "https://github.com/doukutsu-rs/lua-ffi.git", rev = "e0b2ff5960f7ef9974aa9675cebe4907bee0134f", optional = true }
 num-derive = "0.3"
 num-traits = "0.2"
 open = "3.2"
@@ -95,7 +94,7 @@ serde_cbor = { version = "0.11", optional = true }
 serde_json = "1.0"
 strum = "0.24"
 strum_macros = "0.24"
-# remove and replace when drain_filter is in stable
+# remove and replace when extract_if is in stable
 vec_mut_scan = "0.4"
 webbrowser = { version = "0.8.6", optional = true }
 winit = { git = "https://github.com/doukutsu-rs/winit.git", rev = "878f206d19af01b0977277929eee5e32667453c0", optional = true, default_features = false, features = ["x11"] }

@@ -40,7 +40,9 @@
       "title": "難易度選択",
       "easy": "簡単",
       "normal": "普通",
-      "hard": "難しい"
+      "hard": "難しい",
+      "difficulty_name": "難易度: {difficulty}",
+      "unknown": "(未知)"
     },
     "coop_menu": {
       "title": "プレイヤー数を選択",
@@ -187,7 +189,8 @@
     "organya": "オルガーニャ",
     "remastered": "リマスター",
     "new": "新",
-    "famitracks": "ファミトラック"
+    "famitracks": "ファミトラック",
+    "ridiculon": "リディキュロン"
   },
   "game": {
     "cutscene_skip": "{key} を押し続け、カットシーンをスキップ"
