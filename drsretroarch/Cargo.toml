@@ -1,5 +1,5 @@
 [package]
-name = "drsretroarch"
+name = "doukutsu-rs-libretro"
 description = "doukutsu-rs targeted for Retroarch"
 version = "0.1.0"
 edition = "2021"

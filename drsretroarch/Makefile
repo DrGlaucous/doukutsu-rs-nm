@@ -10,9 +10,9 @@ all:
 ios: release-path = ./target/aarch64-apple-ios/release
 ios:
 	cargo lipo --release
-	mv ${release-path}/libdrsretroarch.dylib ${release-path}/drsretroarch.dylib
-	codesign -s - ${release-path}/drsretroarch.dylib
-	codesign -d -v ${release-path}/drsretroarch.dylib
+	mv ${release-path}/libdoukutsu-rs-libretro.dylib ${release-path}/doukutsu_rs_libretro.dylib
+	codesign -s - ${release-path}/doukutsu_rs_libretro.dylib
+	codesign -d -v ${release-path}/doukutsu_rs_libretro.dylib
 
 
 #ditto, but for android ndk
