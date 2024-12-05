@@ -1,16 +1,38 @@
 #real programmers will vomit at this makefile (I did not vomit)
 
 
+
+#builds it for whatever system we're on right now 
+system: release-path = ./target/release
+system:
+	cargo build --release
+	make rename-files
+
+#trims leading "lib" off built files. Must be done in seperate command to make sure none of it executes before "system" is finished
+rename-files: release-path = ./target/release
+rename-files:
+	$(eval FILES := $(wildcard $(release-path)/lib*))
+
+	@for file in ${FILES}; do \
+		if [ -e "$$file" ]; then \
+			newname=$$(basename "$$file" | sed 's/^lib//'); \
+			mv "$$file" "$(release-path)/$$newname"; \
+			echo "Renamed: $$file -> $(release-path)/$$newname"; \
+		fi; \
+	done
+
+
+
 all:
-	ios system
+	make ios system
 
 
-
-#requires proper targets and lipo to be installed
+#requires cargo-lipo to be installed (the only target we're looking at here is the aarch64 one, which is current physical apple deivces)
 ios: release-path = ./target/aarch64-apple-ios/release
 ios:
+	rustup target add aarch64-apple-ios
 	cargo lipo --release
-	mv ${release-path}/libdoukutsu-rs-libretro.dylib ${release-path}/doukutsu_rs_libretro.dylib
+	mv ${release-path}/libdoukutsu_rs_libretro.dylib ${release-path}/doukutsu_rs_libretro.dylib
 	codesign -s - ${release-path}/doukutsu_rs_libretro.dylib
 	codesign -d -v ${release-path}/doukutsu_rs_libretro.dylib
 
@@ -18,10 +40,6 @@ ios:
 #ditto, but for android ndk
 android:
 	cargo-ndk build --release
-
-#builds it for whatever system we're on right now
-system:
-	cargo build --release
 
 
 clean:
