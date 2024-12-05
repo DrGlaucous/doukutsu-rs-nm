@@ -38,7 +38,7 @@ pub fn handle_err(gl: &Gl, extra_info: u32) {
         //gl::INVALID_ENUM
         if err != 0 && extra_info != 1 {
         //if err != 0 {
-            log::error!("OpenGL error: {}", err);
+            //log::error!("OpenGL error: {}", err);
         }
     }
 
@@ -583,10 +583,23 @@ impl RenderShader {
         handle_err(gl, 0);
         gl.gl.EnableVertexAttribArray(self.position);
         handle_err(gl, 0);
-        gl.gl.EnableVertexAttribArray(self.uv);
-        handle_err(gl, 0);
         gl.gl.EnableVertexAttribArray(self.color);
         handle_err(gl, 0);
+
+        //don't try to use the uv attributes if optimized out (as some compilers tend to do) (self.uv has signed value of '-1')
+        if self.uv != GLuint::MAX {
+            gl.gl.EnableVertexAttribArray(self.uv);
+            handle_err(gl, 0);
+            gl.gl.VertexAttribPointer(
+                self.uv,
+                2,
+                gl::FLOAT,
+                gl::FALSE,
+                mem::size_of::<VertexData>() as _,
+                field_offset::<VertexData, _, _>(|v| &v.uv) as _,
+            );
+            handle_err(gl, 0);
+        }
 
         gl.gl.VertexAttribPointer(
             self.position,
@@ -595,15 +608,6 @@ impl RenderShader {
             gl::FALSE,
             mem::size_of::<VertexData>() as _,
             field_offset::<VertexData, _, _>(|v| &v.position) as _,
-        );
-        handle_err(gl, 0);
-        gl.gl.VertexAttribPointer(
-            self.uv,
-            2,
-            gl::FLOAT,
-            gl::FALSE,
-            mem::size_of::<VertexData>() as _,
-            field_offset::<VertexData, _, _>(|v| &v.uv) as _,
         );
         handle_err(gl, 0);
         gl.gl.VertexAttribPointer(
