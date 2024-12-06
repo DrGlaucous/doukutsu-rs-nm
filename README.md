@@ -46,7 +46,11 @@ If the command line is used to load in the core instead, both of these prerequis
 
 ### Building
 
-Simply run the `cargo build` command from within the drsretroarch subdirectory to build the core for the parent system. To build it for other systems, the process is no different than building a generic library. (For instance, for android, you'd use [cargo-ndk](https://github.com/bbqsrc/cargo-ndk), or for iOS, [cargo lipo](https://github.com/TimNN/cargo-lipo).)
+Simply run the `cargo build` command from within the drsretroarch subdirectory to build the core for the parent system. To build it for other systems, the process is no different than building a generic library. (For instance, for android, you'd use [cargo ndk](https://github.com/bbqsrc/cargo-ndk), or for iOS, [cargo lipo](https://github.com/TimNN/cargo-lipo).)
+
+
+Optionally, there's a makefile in the `drsretroarch` subdirectory that automates things like codesigning for the IOS libraries and renaming for the linux and android libraries. (It automatically downloads the proper targets for compilation and trims the `lib` prefix from the built libraries to match the retorarch naming semantics.)
+Using `make` will build the retroarch library for the current system. `make ios` will build for IOS (requires `cargo lipo`), `make android` will build for android (requires `cargo ndk`).
 
 
 ### Personal notes

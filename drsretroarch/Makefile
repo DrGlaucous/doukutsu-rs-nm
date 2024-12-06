@@ -6,10 +6,9 @@
 system: release-path = ./target/release
 system:
 	cargo build --release
-	make rename-files
+	make rename-files release-path=${release-path}
 
 #trims leading "lib" off built files. Must be done in seperate command to make sure none of it executes before "system" is finished
-rename-files: release-path = ./target/release
 rename-files:
 	$(eval FILES := $(wildcard $(release-path)/lib*))
 
@@ -23,9 +22,11 @@ rename-files:
 
 
 
-all:
+all-apple:
 	make ios system
 
+all-linux:
+	make android system
 
 #requires cargo-lipo to be installed (the only target we're looking at here is the aarch64 one, which is current physical apple deivces)
 ios: release-path = ./target/aarch64-apple-ios/release
@@ -39,16 +40,14 @@ ios:
 
 #ditto, but for android ndk
 android:
-	cargo-ndk build --release
+	rustup target add aarch64-linux-android
+	rustup target add armv7-linux-androideabi
+	cargo ndk build --release
+	make rename-files release-path=./target/aarch64-linux-android/release
+	make rename-files release-path=./target/armv7-linux-androideabi/release
 
 
 clean:
 	cargo clean
-
-
-
-
-
-
 
 
