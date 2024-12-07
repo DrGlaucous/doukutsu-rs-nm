@@ -26,21 +26,21 @@ use crate::game::GAME_SUSPENDED;
 use std::fs::File;
 use std::io::prelude::*;
 
-pub fn handle_err(gl: &Gl, extra_info: u32) {
+//disable this without removing it from the backend in case it is needed later
+#[inline]
+pub fn handle_err(_gl: &Gl, _extra_info: u32) {
     
     //extra_info = 0: nothing
     //1: pulled from load_gl (655)
 
-
-
-    unsafe{
-        let err = gl.gl.GetError();
-        //gl::INVALID_ENUM
-        if err != 0 && extra_info != 1 {
-        //if err != 0 {
-            //log::error!("OpenGL error: {}", err);
-        }
-    }
+    // unsafe{
+    //     let err = gl.gl.GetError();
+    //     //gl::INVALID_ENUM
+    //     if err != 0 && extra_info != 1 {
+    //     //if err != 0 {
+    //         log::error!("OpenGL error: {}", err);
+    //     }
+    // }
 
 }
 
@@ -576,9 +576,9 @@ impl RenderShader {
         gl.gl.UseProgram(self.program_id);
         handle_err(gl, 0);
 
+        //some old versions of opengl don't like this operation, yet some of the new ones require it... fun.
         gl.gl.BindVertexArray(vao);
         handle_err(gl, 0);
-
         gl.gl.BindBuffer(gl::ARRAY_BUFFER, vbo);
         handle_err(gl, 0);
         gl.gl.EnableVertexAttribArray(self.position);
@@ -672,6 +672,7 @@ impl RenderData {
                 if maj == 3 {
                     if min == 0 {
                         // (desktop gl requests 3.0) (which also includes 2.1 compatability)
+                        log::info!("Using shader set 3.0");
                         (
                             VERTEX_SHADER_BASIC,
                             FRAGMENT_SHADER_TEXTURED,
@@ -680,6 +681,7 @@ impl RenderData {
                         )
                     } else {
                         // (retroarch mac requests strict 3.3)
+                        log::info!("Using shader set 3.3");
                         (
                             VERTEX_SHADER3_BASIC,
                             FRAGMENT_SHADER3_TEXTURED,
@@ -689,6 +691,7 @@ impl RenderData {
                     }
                 } else {
                     // (retroarch requests 2.1)
+                    log::info!("Using shader set 2.1 (headerless)");
                     (
                         VERTEX_SHADERM_BASIC,
                         FRAGMENT_SHADERM_TEXTURED,
@@ -700,6 +703,7 @@ impl RenderData {
             },
             GlVersionInfo::OpenGLES => {
                 // mobile uses openGLES 2 regardless of port
+                log::info!("Using shader set GLES");
                 (
                     VERTEX_SHADER_BASIC_GLES,
                     FRAGMENT_SHADER_TEXTURED_GLES,
@@ -718,7 +722,12 @@ impl RenderData {
             self.fill_water_shader =
                 RenderShader::compile(gl, vshdr_basic, fshdr_fill_water).unwrap_or_else(|_| RenderShader::default());
 
-            self.vao = return_param(|x| gl.gl.GenVertexArrays(1, x));
+            //only create a non-default set of vertex arrays if we aren't running openGLES because some very old versions of GLES don't play nice with the vertex arrays
+            //(hopefully, all versions of GLES play nice without them)
+            if gl_version != GlVersionInfo::OpenGLES {
+                self.vao = return_param(|x| gl.gl.GenVertexArrays(1, x));
+            }
+
             self.vbo = return_param(|x| gl.gl.GenBuffers(1, x));
             self.ebo = return_param(|x| gl.gl.GenBuffers(1, x));
 
