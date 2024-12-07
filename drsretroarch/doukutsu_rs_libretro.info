@@ -6,7 +6,7 @@ corename = "doukutsu-rs"
 categories = "Game"
 license = "MIT"
 permissions = ""
-display_version = "0.101.0"
+display_version = "1.2.0 - 0.101.0"
 
 # Hardware Information
 systemname = "Cave Story Game Engine"
