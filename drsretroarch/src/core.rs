@@ -111,10 +111,10 @@ libretro_variables!(
     struct CoreVariables (prefix = "d-rs") {
         internal_upscale_factor: u32, parse_numeric
             => "Internal upscaling factor; \
-                1x (freeware)|2x (CS+)|3x|4x",
+                2x (CS+, default)|1x (freeware, fastest)|3x (smoother motion)|4x (smoothest motion)",
         screen_ratio: (u32, u32), parse_ratio
             => "Screen Ratio; \
-                4:3 (original)|16:9|21:9",
+                4:3 (original)|16:9 (switch)|16:10|21:9",
         draw_debug_outlines: bool, parse_bool
             => "Debug Outlines; disabled|enabled",       
         show_fps: bool, parse_bool

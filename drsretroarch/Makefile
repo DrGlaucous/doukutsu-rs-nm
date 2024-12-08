@@ -1,5 +1,5 @@
 #real programmers will vomit at this makefile (I did not vomit)
-
+#this makefile is not strictly required, but does make building more convenient
 
 
 #builds it for whatever system we're on right now 
@@ -14,7 +14,7 @@ rename-files:
 
 	@for file in ${FILES}; do \
 		if [ -e "$$file" ]; then \
-			newname=$$(basename "$$file" | sed 's/^lib//'); \
+			newname=$$(basename "$$file" | sed 's/^lib\(.*\)$/\1_libretro'); \
 			mv "$$file" "$(release-path)/$$newname"; \
 			echo "Renamed: $$file -> $(release-path)/$$newname"; \
 		fi; \
@@ -33,7 +33,7 @@ ios: release-path = ./target/aarch64-apple-ios/release
 ios:
 	rustup target add aarch64-apple-ios
 	cargo lipo --release
-	mv ${release-path}/libdoukutsu_rs_libretro.dylib ${release-path}/doukutsu_rs_libretro.dylib
+	mv ${release-path}/libdoukutsu_rs.dylib ${release-path}/doukutsu_rs_libretro.dylib
 	codesign -s - ${release-path}/doukutsu_rs_libretro.dylib
 	codesign -d -v ${release-path}/doukutsu_rs_libretro.dylib
 

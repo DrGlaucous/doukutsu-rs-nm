@@ -4,24 +4,13 @@ description = "doukutsu-rs targeted for Retroarch"
 version = "1.2.0"
 edition = "2021"
 
-#some botched stuff when setting up the cargo files
-#default = ["default-base", "backend-libretro", "render-opengl", "exe", "webbrowser"]
-# [lib]
-# crate-type = ["cdylib"]
-# path = "src/lib.rs"
-# test = false
-# bench = false
-# required-features = ["clib"]
-
-
 [lib]
+name = "doukutsu_rs"
 crate-type = ["staticlib", "cdylib"]
 
 [dependencies]
 libc = "0.2"
 log = "0.4"
-#note: libretro-rs will be removed in the future
-#libretro-rs = { path = "../../libretro-rs-master/libretro-rs", features = ["experimental"] }
 doukutsu-rs = { path = "../", default-features = false, features = ["default-base", "backend-libretro"]}
 
 
