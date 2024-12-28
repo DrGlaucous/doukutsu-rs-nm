@@ -91,6 +91,10 @@ Built versions using xcode can be found in:
 and [here](https://stackoverflow.com/questions/61393040/debug-a-release-version-of-an-osx-app-via-lldb)
 
 
+how to build for a tier 3 system:
+`cargo +nightly build -Zbuild-std --target=aarch64-apple-tvos`
+
+
 </details>
 
 The rest of this readme is unchanged.

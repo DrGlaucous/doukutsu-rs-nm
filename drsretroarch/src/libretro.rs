@@ -161,6 +161,32 @@ pub struct Message {
     pub frames: c_uint,
 }
 
+#[repr(C)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum MessageTarget {
+    All = 0,
+    Osd = 1,
+    Log = 2,
+}
+#[repr(C)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum MessageType {
+    Notification = 0,
+    NotificationAlt = 1,
+    Status = 2,
+    Progress = 3,
+}
+#[repr(C)]
+pub struct MessageExt {
+    pub msg: *const c_char,
+    pub duration: c_uint,
+    pub priority: c_uint,
+    pub level: log::Level,
+    pub m_target: MessageTarget,
+    pub m_type: MessageType,
+    pub progress: c_char,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Environment {
     SetMessage = 6,
@@ -179,6 +205,7 @@ pub enum Environment {
     SetGeometry = 37,
     SetFrameCallback = 21,
     SetAudioCallback = 22,
+    SetMessageExt = 60,
     GetVFSInterface = (45 | 0x10000),
 }
 
@@ -405,7 +432,7 @@ pub enum PixelFormat {
 //module used for using async audio (may/may not successfully be initialized depending on the frontend)
 pub mod async_audio_context {
     use super::{call_environment_mut, Environment, context};
-
+    use std::ptr::addr_of_mut;
 
     #[repr(C)]
     pub struct AsyncAudioCallback {
@@ -444,7 +471,7 @@ pub mod async_audio_context {
     pub fn register_async_audio_callback() -> bool {
         unsafe {
             call_environment_mut(Environment::SetAudioCallback,
-                                &mut STATIC_ASY_AUDIO_CONTEXT)
+                                &mut *addr_of_mut!(STATIC_ASY_AUDIO_CONTEXT))
         }
     }
 
@@ -458,6 +485,7 @@ pub mod hw_context {
     use std::ffi::CString;
     use libc::{uintptr_t, c_char, c_uint, c_void};
     use super::{call_environment_mut, Environment};
+    use std::ptr::addr_of_mut;
 
     pub type ResetFn = extern "C" fn();
 
@@ -533,7 +561,7 @@ pub mod hw_context {
             STATIC_HW_CONTEXT.version_minor = version_min;
 
             call_environment_mut(Environment::SetHwRender,
-                &mut STATIC_HW_CONTEXT)
+                &mut *addr_of_mut!(STATIC_HW_CONTEXT))
         }
     }
 
@@ -558,7 +586,7 @@ pub mod hw_context {
 //push messages to the frontend
 pub mod log {
     use super::{call_environment_mut, Environment};
-    use std::ffi::CString;
+    use std::ffi::CStr;
     use libc::c_char;
 
     #[repr(C)]
@@ -575,8 +603,10 @@ pub mod log {
     /// variadic `dummy_log`. It doesn't matter anyway, we'll let Rust
     /// do all the formatting and simply pass a single ("%s",
     /// "formatted string").
+    /// 
+    /// Edit: Turns out that apple silicon doesn't like anything more than a single argument, so 100% of the formatting will be done in the rust layer from now on.
     pub type PrintfFn = extern "C" fn(Level,
-                                      *const c_char,
+                                      //*const c_char,
                                       *const c_char);
 
     #[repr(C)]
@@ -585,7 +615,7 @@ pub mod log {
     }
 
     extern "C" fn dummy_log(_: Level,
-                            _: *const c_char,
+                            //_: *const c_char,
                             _: *const c_char) {
         panic!("Called missing log callback");
     }
@@ -610,40 +640,15 @@ pub mod log {
     /// Send `msg` to the frontend's logger.
     pub fn log(lvl: Level, msg: &str) {
         // Make sure the message ends in a \n, mandated by the
-        // libretro API.
-
-        let trailing_newline =
-            msg.as_bytes().last().map_or(false, |&c| c == b'\n');
-
-        let format =
-            if trailing_newline {
-                // Message already contains a \n
-                "%s\0"
-            } else {
-                "%s\n\0"
-            };
-
-        let msg = CString::new(msg);
-
-        let cstr =
-            match msg.as_ref() {
-                Ok(s) => s.as_ptr(),
-                // XXX we could replace \0 in the log with something
-                // else instead.
-                _ => b"<Invalid log message>" as *const _ as *const c_char,
-            };
+        // libretro API. (otherwise the next line will not be offset down, which looks bad)
+        let message = format!("{}\n\0", msg);
+        //convert string to CStr (ensures we have a trailing null terminator)
+        let output = unsafe{CStr::from_ptr(message.as_str().as_ptr() as *const _)};
 
         unsafe {
-            STATIC_LOG(lvl, format.as_ptr() as *const _, cstr);
+            STATIC_LOG(lvl, output.as_ptr() as *const _);
         }
     }
-
-
-    //simple-as function for getting *something* into the terminal
-    pub fn dirty_log(msg: String) {
-        log(Level::Info, msg.as_str());
-    }
-
 
 }
 
@@ -651,6 +656,7 @@ pub mod log {
 pub mod joypad_rumble_context {
     use super::{call_environment_mut, Environment};
     use libc::{c_uint, c_ushort};
+    use std::ptr::addr_of_mut;
 
     #[repr(C)]
     pub enum RumbleMotor {
@@ -686,7 +692,7 @@ pub mod joypad_rumble_context {
     pub fn register_rumble_callback() -> bool {
         unsafe {
             call_environment_mut(Environment::GetRumbleInterface,
-                                &mut STATIC_RUMBLE_CONTEXT)
+                &mut *addr_of_mut!(STATIC_RUMBLE_CONTEXT))
         }
     }
 
@@ -709,7 +715,7 @@ pub mod retro_filesystem_context {
     use std::{ffi::CStr, path::PathBuf};
     use super::{call_environment_mut, Environment};
     use libc::{c_uint, c_void, c_char, c_int};
-
+    use std::ptr::addr_of;
 
     #[derive(Clone, Copy, PartialEq, Eq)]
     pub enum FileAccessMode {
@@ -944,7 +950,7 @@ pub mod retro_filesystem_context {
 
             let mut vfs_getter = VFSInterfaceInfo {
                 required_version: interface_version,
-                interface: &STATIC_VFS_CONTEXT as *const _ as *mut VFSInterface,
+                interface: & *addr_of!(STATIC_VFS_CONTEXT) as *const _ as *mut VFSInterface,
             };
 
             let result = call_environment_mut(Environment::GetVFSInterface,
@@ -1327,6 +1333,31 @@ pub fn set_message(nframes: u32, msg: &str) {
 
     unsafe {
         call_environment(Environment::SetMessage, &message);
+    }
+}
+
+///extra message (for newer frontends)
+pub fn set_message_ext(duration_ms: u32, msg: &str, priority: u32) {
+    let msg = CString::new(msg);
+
+    let cstr =
+        match msg.as_ref() {
+            Ok(s) => s.as_ptr(),
+            _ => b"<Invalid log message>" as *const _ as *const c_char,
+        };
+
+    let message = MessageExt{
+        msg: cstr,
+        duration: duration_ms as c_uint,
+        priority: priority as c_uint,
+        level: log::Level::Debug,
+        m_target: MessageTarget::All,
+        m_type: MessageType::Notification,
+        progress: 0,
+    };
+
+    unsafe {
+        call_environment(Environment::SetMessageExt, &message);
     }
 }
 

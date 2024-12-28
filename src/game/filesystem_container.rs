@@ -248,8 +248,12 @@ impl FilesystemContainer {
     }
 
     fn open_directory(&self, path: PathBuf) -> GameResult {
-        #[cfg(target_os = "horizon")]
-        return Ok(()); // can't open directories on switch
+
+        //if the target is one of these or if it's android with retroarch (because android without retroarch has its own special conditions)
+        #[cfg(any(target_os = "horizon", target_os = "tvos", target_os = "ios",
+            all(target_os = "android", feature = "backend-libretro")
+        ))]
+        return Ok(()); // can't open directories on switch / ATV / ios
 
         #[cfg(target_os = "android")]
         unsafe {
@@ -268,7 +272,7 @@ impl FilesystemContainer {
             return Ok(());
         }
 
-        #[cfg(not(any(target_os = "android", target_os = "horizon")))]
+        #[cfg(not(any(target_os = "android", target_os = "horizon", target_os = "tvos", target_os = "ios")))]
         open::that(path).map_err(|e| {
             use crate::framework::error::GameError;
             GameError::FilesystemError(format!("Failed to open directory: {}", e))

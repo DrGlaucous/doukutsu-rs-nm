@@ -1,6 +1,6 @@
 # Software Information
 display_name = "Cave Story (drs)"
-authors = "Alula|Dr. G"
+authors = "Alula|Dr. Glaucous"
 supported_extensions = "exe|dll|so"
 corename = "doukutsu-rs"
 categories = "Game"

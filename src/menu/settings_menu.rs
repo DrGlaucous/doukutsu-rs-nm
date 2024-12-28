@@ -247,7 +247,7 @@ impl SettingsMenu {
                 ],
             ),
         );
-        #[cfg(not(any(target_os = "android", target_os = "horizon")))]
+        #[cfg(not(any(target_os = "android", target_os = "horizon", feature = "backend-libretro")))]
         self.graphics.push_entry(
             GraphicsMenuEntry::WindowMode,
             MenuEntry::Options(

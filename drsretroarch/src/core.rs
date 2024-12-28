@@ -1,7 +1,7 @@
 
-use std::path::{Path, PathBuf};
-use std::fs::File;
-use std::io::Read;
+use std::path::PathBuf;
+//use std::fs::File;
+//use std::io::Read;
 use std::str::FromStr;
 use std::pin::Pin;
 use std::ffi::CStr;
@@ -13,10 +13,9 @@ use std::ffi::c_void;
 
 //use doukutsu_rs::framework::backend::BackendEventLoop;
 use doukutsu_rs::framework::backend_libretro::{LibretroEventLoop, LibretroBackend, RenderMode};
-use doukutsu_rs::framework::backend::{BackendEventLoop, Backend};
 use doukutsu_rs::framework::keyboard::ScanCode;
 use doukutsu_rs::framework::gamepad::{Button, Axis};
-use doukutsu_rs::framework::context::{self, Context};
+use doukutsu_rs::framework::context::Context;
 use doukutsu_rs::game::Game;
 use doukutsu_rs::scene::title_scene;
 use doukutsu_rs::game::shared_game_state::SharedGameState;
@@ -64,9 +63,8 @@ pub const GAMEPAD_COUNT: u16 = 2;
 
 /// Called when a game is loaded and a new context must be built
 pub fn load_game(target: PathBuf) -> Option<Box<dyn libretro::Context>> {
-    log::info!("Loading {:?}", target); //info!
 
-    //todo: get disk into there
+    
     Core::new(target).ok()
         .map(|c| Box::new(c) as Box<dyn libretro::Context>)
 }
@@ -136,7 +134,7 @@ libretro_variables!(
 
 struct Core<'a>  {
     //runner backend and other loop pointers are in here
-	backend: Box<LibretroBackend>,
+	_backend: Box<LibretroBackend>,
 	event_loop: Box<LibretroEventLoop>,
     ////data_path: PathBuf,
 
@@ -147,7 +145,7 @@ struct Core<'a>  {
     screen_height: u32,
 
     rumble_enabled: bool,
-    async_audio_enabled: bool, //true if async audio has been enabled
+    _async_audio_enabled: bool, //true if async audio has been enabled
     delta_time: i64, //time since last frame
     audio_runner: Runner, //object that containst the audio context
 }
@@ -162,6 +160,8 @@ impl<'a>  Core<'a>  {
         if !rlog::init() {
             return Err(());
         }
+
+        rlog::log(Level::Debug, format!("Loading from {:?}", target).as_str()); //info!
 
         rlog::log(Level::Debug, "Initializing Core.");
 
@@ -286,7 +286,7 @@ impl<'a>  Core<'a>  {
         let initial_width = initial_height * ratio.0 / ratio.1;
 
         let mut core = Core {
-            backend,
+            _backend: backend,
             event_loop,
             context,
             state_ref,
@@ -294,7 +294,7 @@ impl<'a>  Core<'a>  {
             screen_height: initial_height,
             screen_width: initial_width,
             rumble_enabled,
-            async_audio_enabled,
+            _async_audio_enabled: async_audio_enabled,
             delta_time: 0,
             audio_runner: audio_runner.unwrap(),
 
