@@ -13,19 +13,15 @@ include:
   - project: 'libretro-infrastructure/ci-templates'
     file: '/rust-linux-x64.yml'
 
-  # MacOS
+  # MacOS/iOS/tvOS
   - project: 'libretro-infrastructure/ci-templates'
-    file: '/rust-osx.yml'
+    file: '/rust-apple.yml'
 
   ################################## CELLULAR ################################
   # Android
   - project: 'libretro-infrastructure/ci-templates'
     file: '/rust-android-jni.yml'
     
-  # iOS
-  - project: 'libretro-infrastructure/ci-templates'
-    file: '/rust-ios.yml'
-
   #################################### MISC ##################################
   # Stages for building
 stages:
@@ -89,4 +85,10 @@ android-x86:
 libretro-build-ios-arm64:
   extends:
     - .libretro-rust-ios-arm64-default
+    - .core-defs
+
+# tvOS
+libretro-build-tvos-arm64:
+  extends:
+    - .libretro-rust-tvos-arm64-default
     - .core-defs
