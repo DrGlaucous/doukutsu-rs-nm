@@ -6,18 +6,17 @@ extern crate winres;
 fn main() {
     // let dest = PathBuf::from(&env::var("OUT_DIR").unwrap());
     let target = env::var("TARGET").unwrap_or_else(|e| panic!("{}", e));
-    let is_android = cfg!(target_os = "android") || (cfg!(target_os = "linux") && target.contains("android")); // hack
 
     println!("cargo:rerun-if-changed=build.rs");
 
     #[cfg(all(target_os = "windows", not(feature = "backend-libretro")))]
-    {
+    if target.contains("windows") {
         let mut res = winres::WindowsResource::new();
         res.set_icon("res/sue.ico");
         res.compile().unwrap();
 
         if target.contains("i686") {
-            // yet another hack
+            // hack
             println!("cargo:rustc-link-arg=/FORCE:MULTIPLE");
             println!("cargo:rustc-link-lib=shlwapi");
         }
@@ -31,7 +30,7 @@ fn main() {
         println!("cargo:rustc-link-arg=CoreHaptics");
     }
 
-    if is_android {
+    if target.contains("android") {
         println!("cargo:rustc-link-lib=dylib=GLESv2");
         println!("cargo:rustc-link-lib=dylib=EGL");
     }
