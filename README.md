@@ -28,7 +28,7 @@ This branch is an updated version of the work I did in my dedicated [d-rs retroa
   - [X] Mac OS *(at least openGL 3 required)*
   - [x] Android
   - [X] iOS
-
+  - [X] tvOS *(Apple TV 4 or newer)*
 
 ### Use
 It its current state, d-rs runs on 5/5 "big" platforms. ~~*(mac OS was tried, but the compatibility context for hardware rendering was broken. Shaders for the backend would not compile, and if the openGL context were set to a version where they'd work, the **frontend's** shaders would break. This doesn't matter too much since d-rs already has a native mac port)*~~

@@ -33,6 +33,7 @@ This branch is an updated version of the work I did in my dedicated [d-rs retroa
   - [X] Mac OS *(at least openGL 3 required)*
   - [x] Android
   - [X] iOS
+  - [X] tvOS *(Apple TV 4 or newer)*
 
 
 ### Use
