@@ -62,7 +62,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install dependencies
         if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: sudo apt install libasound2-dev libudev-dev libgl1-mesa-dev
+        run: sudo apt install libasound2-dev libudev-dev libgl1-mesa-dev libxext-dev
 
       - name: Restore cache
         uses: actions/cache/restore@v4
@@ -88,7 +88,7 @@ jobs:
       - name: Build
         run: |
           if [ "${{ github.ref_type }}" == "tag" ]; then
-            export DRS_BUILD_VERSION_OVERRIDE="{{ github.ref_name }}"
+            export DRS_BUILD_VERSION_OVERRIDE="${{ github.ref_name }}"
           elif [ "${{ github.ref_name }}" == "master"]; then
             export DRS_BUILD_VERSION_OVERRIDE="${{ env.VERSION }}-$((${{ github.run_number }} + 654))"
           else
@@ -103,10 +103,10 @@ jobs:
             cp -a ./target/${{ matrix.target }}/release/bundle/osx/doukutsu-rs.app release/doukutsu-rs.app
             codesign -s - -f ./release/doukutsu-rs.app/Contents/MacOS/doukutsu-rs
           elif [ "${{ runner.os }}" == "Windows" ]; then
-            CARGO_INCREMENTAL=1 cargo build --release --bin doukutsu-rs --target ${{ matrix.target }}
+            CARGO_INCREMENTAL=1 cargo build --release --locked --bin doukutsu-rs --target ${{ matrix.target }}
             cp ./target/${{ matrix.target }}/release/doukutsu-rs.exe release/doukutsu-rs.${{ matrix.arch_name }}.exe
           elif [ "${{ runner.os }}" == "Linux" ]; then
-            RUSTFLAGS="-C link-args=-s" CARGO_INCREMENTAL=1 cargo build --release --bin doukutsu-rs
+            RUSTFLAGS="-C link-args=-s" CARGO_INCREMENTAL=1 cargo build --release --locked --bin doukutsu-rs
             cp -a ./target/release/doukutsu-rs release/doukutsu-rs.${{ matrix.arch_name }}.elf
           fi
 
@@ -152,7 +152,7 @@ jobs:
       - name: Setup rust toolchain
         run: |
           rustup default stable
-          rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android
+          rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
           rustc -vV
           cargo -vV
           cargo install cargo-ndk
@@ -164,7 +164,7 @@ jobs:
       - name: Build
         run: |
           if [ "${{ github.ref_type }}" == "tag" ]; then
-            export DRS_BUILD_VERSION_OVERRIDE="{{ github.ref_name }}"
+            export DRS_BUILD_VERSION_OVERRIDE="${{ github.ref_name }}"
           elif [ "${{ github.ref_name }}" == "master"]; then
             export DRS_BUILD_VERSION_OVERRIDE="${{ env.VERSION }}-$((${{ github.run_number }} + 654))"
           else
@@ -172,6 +172,7 @@ jobs:
           fi
           
           cd app
+          touch local.properties
           chmod +x ./gradlew
           ./gradlew assembleRelease
 
