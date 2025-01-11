@@ -12,7 +12,7 @@ fn main() {
     #[cfg(all(target_os = "windows", not(feature = "backend-libretro")))]
     if target.contains("windows") {
         let mut res = winres::WindowsResource::new();
-        res.set_icon("res/sue.ico");
+        res.set_icon("res/crabsue-icon.ico");
         res.compile().unwrap();
 
         if target.contains("i686") {
