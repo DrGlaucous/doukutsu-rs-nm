@@ -47,7 +47,7 @@ use crate::libretro::{self,
 /// Static system information sent to the frontend on request
 pub const SYSTEM_INFO: libretro::SystemInfo = libretro::SystemInfo {
     library_name: cstring!("d-rs"),
-    library_version: "0.0.1" as *const _ as *const c_char,
+    library_version: cstring!(env!("CARGO_PKG_VERSION")),
     valid_extensions: cstring!("exe"),
     need_fullpath: true,
     block_extract: false,
