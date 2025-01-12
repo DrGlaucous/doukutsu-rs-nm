@@ -30,7 +30,7 @@ use crate::graphics::font::{Font, Symbols};
 use crate::input::touch_controls::TouchControlType;
 use crate::scene::game_scene::GameScene;
 use crate::components::tilemap::TileLayer;
-use crate::sound::SongFormat;
+use crate::sound::backend::SongFormat;
 
 const TSC_SUBSTITUTION_MAP_SIZE: usize = 1;
 

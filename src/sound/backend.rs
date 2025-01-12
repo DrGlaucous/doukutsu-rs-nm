@@ -9,13 +9,33 @@ use crate::game::settings::Settings;
 use crate::game::LaunchOptions;
 use crate::sound::pixtone::PixToneParameters;
 
+#[derive(Clone, PartialEq)]
+pub struct SongId {
+    pub loaded_from_path: bool,
+    pub song_format: SongFormat,
+    pub path: String,
+    pub id: usize,
+}
+impl SongId {
+    pub fn new() -> Self {
+        SongId {
+            loaded_from_path: false,
+            song_format: SongFormat::Organya,
+            path: String::new(),
+            id: 0,
+        }
+    }
+}
 
+#[derive(Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SongFormat {
     Organya,
     #[cfg(feature = "ogg-playback")]
     OggSinglePart,
     #[cfg(feature = "ogg-playback")]
     OggMultiPart,
+    #[cfg(feature = "tracker-playback")]
+    Tracker,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -52,9 +72,29 @@ pub trait SoundManager {
 
     fn reload_songs(&mut self, constants: &EngineConstants, settings: &Settings, ctx: &mut Context) -> GameResult;
 
+    fn play_song_from_id(
+        &mut self,
+        song_id: &mut SongId,
+        constants: &EngineConstants,
+        settings: &Settings,
+        ctx: &mut Context,
+        fadeout: bool,
+    ) -> GameResult;
+
     fn play_song(
         &mut self,
         song_id: usize,
+        constants: &EngineConstants,
+        settings: &Settings,
+        ctx: &mut Context,
+        fadeout: bool,
+    ) -> GameResult;
+
+    //load song using file path
+    fn play_song_filepath(
+        &mut self,
+        song_path: &String,
+        file_format: SongFormat,
         constants: &EngineConstants,
         settings: &Settings,
         ctx: &mut Context,
@@ -67,7 +107,7 @@ pub trait SoundManager {
 
     fn set_speed(&mut self, speed: f32) -> GameResult;
 
-    fn current_song(&self) -> usize;
+    fn current_song(&self) -> SongId;
 
     fn set_sample_params_from_file(&mut self, id: u8, data: Box<dyn io::Read>) -> GameResult;
 

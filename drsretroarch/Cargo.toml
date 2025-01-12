@@ -11,6 +11,6 @@ crate-type = ["staticlib", "cdylib"]
 [dependencies]
 libc = "0.2"
 log = "0.4"
-doukutsu-rs = { path = "../", default-features = false, features = ["default-base", "backend-libretro"]}
+doukutsu-rs = { path = "../", default-features = false, features = ["default-base", "backend-libretro", "tracker-playback"]}
 
 

@@ -27,7 +27,7 @@ use crate::sound::backend::*;
 
 
 pub struct SoundManagerNull {
-    current_song_id: usize,
+    current_song_id: SongId,
 }
 
 
@@ -43,7 +43,7 @@ impl SoundManagerNull {
         // }
         //let bnk = wave_bank::SoundBank::load_from(filesystem::open(ctx, "/builtin/organya-wavetable-doukutsu.bin")?)?;
 
-        Ok(Box::new(SoundManagerNull{current_song_id: 0}))
+        Ok(Box::new(SoundManagerNull{current_song_id: SongId::new()}))
     }
 
 }
@@ -80,6 +80,23 @@ impl SoundManager for SoundManagerNull {
         Ok(())
     }
 
+    fn play_song_from_id(
+        &mut self,
+        song_id: &mut SongId,
+        constants: &EngineConstants,
+        settings: &Settings,
+        ctx: &mut Context,
+        fadeout: bool,
+    ) -> GameResult {
+
+        if song_id.loaded_from_path {
+            self.play_song_filepath(&song_id.path, song_id.song_format, constants, settings, ctx, fadeout)
+        } else {
+            self.play_song(song_id.id, constants, settings, ctx, fadeout)
+        }
+
+    }
+
     fn play_song(
         &mut self,
         song_id: usize,
@@ -88,7 +105,24 @@ impl SoundManager for SoundManagerNull {
         ctx: &mut Context,
         fadeout: bool,
     ) -> GameResult {
-        self.current_song_id = song_id;
+        self.current_song_id = SongId::new();
+        self.current_song_id.id = song_id;
+        Ok(())
+    }
+
+    //load song using file path
+    fn play_song_filepath(
+        &mut self,
+        song_path: &String,
+        file_format: SongFormat,
+        constants: &EngineConstants,
+        settings: &Settings,
+        ctx: &mut Context,
+        fadeout: bool,
+    ) -> GameResult {
+        self.current_song_id = SongId::new();
+        self.current_song_id.path = song_path.clone();
+        self.current_song_id.loaded_from_path = true;
         Ok(())
     }
 
@@ -104,8 +138,8 @@ impl SoundManager for SoundManagerNull {
         Ok(())
     }
 
-    fn current_song(&self) -> usize {
-        self.current_song_id
+    fn current_song(&self) -> SongId {
+        self.current_song_id.clone()
     }
 
     fn set_sample_params_from_file(&mut self, id: u8, data: Box<dyn io::Read>) -> GameResult {
