@@ -2,7 +2,7 @@
 name = "doukutsu-rs"
 description = "A re-implementation of Cave Story (Doukutsu Monogatari) engine"
 version = "0.101.0"
-authors = ["Alula", "dawnDus"]
+authors = ["Alula", "dawnDus", "Dr. Glaucous"]
 edition = "2021"
 rust-version = "1.65"
 
@@ -39,7 +39,9 @@ category = "Game"
 osx_minimum_system_version = "10.12"
 
 [features]
-default = ["default-base", "backend-sdl", "render-opengl", "exe", "webbrowser", "discord-rpc", "tracker-playback"]
+default = ["default-base", "backend-sdl", "render-opengl", "audio-cpal", "exe", "webbrowser", "discord-rpc", "tracker-playback"]
+#default = ["default-base", "backend-glutin", "render-opengl", "exe", "webbrowser", "discord-rpc"]
+
 default-base = ["ogg-playback"]
 ogg-playback = ["lewton"]
 tracker-playback = ["libxmp-lite"]
@@ -53,6 +55,11 @@ editor = []
 exe = []
 android = []
 
+#new stuff
+audio-cpal = ["cpal"]
+backend-libretro = ["render-opengl"]
+
+
 [dependencies]
 #glutin = { path = "./3rdparty/glutin/glutin", optional = true }
 #winit = { path = "./3rdparty/winit", optional = true, default_features = false, features = ["x11"] }
@@ -62,7 +69,7 @@ android = []
 byteorder = "1.4"
 case_insensitive_hashmap = "1.0.0"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
-cpal = { git = "https://github.com/doukutsu-rs/cpal", rev = "9d269d8724102404e73a61e9def0c0cbc921b676" }
+cpal = { git = "https://github.com/doukutsu-rs/cpal", rev = "9d269d8724102404e73a61e9def0c0cbc921b676", optional = true}
 directories = "3"
 discord-rich-presence = { version = "0.2", optional = true }
 downcast = "0.11"
@@ -78,7 +85,6 @@ libxmp-lite = {path = "./3rdparty/libxmp-lite", optional = true}
 log = "0.4"
 num-derive = "0.3"
 num-traits = "0.2"
-open = "3.2"
 paste = "1.0"
 pelite = { version = ">=0.9.2", default-features = false, features = ["std"] }
 sdl2 = { git = "https://github.com/doukutsu-rs/rust-sdl2.git", rev = "f2f1e29a416bcc22f2faf411866db2c8d9536308", optional = true, features = ["unsafe_textures", "bundled", "static-link"] }
@@ -95,6 +101,7 @@ vec_mut_scan = "0.4"
 webbrowser = { version = "0.8.6", optional = true }
 winit = { git = "https://github.com/doukutsu-rs/winit.git", rev = "878f206d19af01b0977277929eee5e32667453c0", optional = true, default_features = false, features = ["x11"] }
 xmltree = "0.10"
+
 
 #hack to not link SDL_image on Windows(causes a linker error)
 [target.'cfg(not(target_os = "windows"))'.dependencies]
@@ -118,3 +125,7 @@ jni = "0.20"
 [target.'cfg(target_os = "horizon")'.dependencies]
 #deko3d = { path = "./3rdparty/deko3d" }
 deko3d = { git = "https://github.com/doukutsu-rs/deko3d-rs", branch = "master" }
+
+#only enable use of the "open" library for specific targets
+[target.'cfg(not(any(target_os = "android", target_os = "horizon", target_os = "tvos", target_os = "ios")))'.dependencies]
+open = "3.2"

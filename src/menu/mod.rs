@@ -595,7 +595,7 @@ impl<T: std::cmp::PartialEq + std::default::Default + Clone> Menu<T> {
                         graphics::draw_rect(ctx, bar_rect, Color::new(1.0, 1.0, 1.0, 1.0))?;
                     }
 
-                    #[cfg(target_os = "android")]
+                    #[cfg(all(target_os = "android", not(feature = "backend-libretro")))]
                     {
                         state.font.builder().x(self.x as f32 - 25.0).y(y).shadow(true).draw(
                             "<",

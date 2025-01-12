@@ -232,7 +232,9 @@ impl BackendEventLoop for GlutinEventLoop {
             }
         }
 
-        // it won't ever return
+        // it won't ever return, so this can be done without fear of problems
+
+        //create a game and context
         let (game, ctx): (&'static mut Game, &'static mut Context) =
             unsafe { (std::mem::transmute(game), std::mem::transmute(ctx)) };
 
@@ -525,7 +527,8 @@ impl BackendEventLoop for GlutinEventLoop {
             *user_data = Rc::into_raw(refs) as *mut c_void;
         }
 
-        let gl_context = GLContext { gles2_mode: true, is_sdl: false, get_proc_address, swap_buffers, user_data, ctx };
+        let gl_version = GlVersionInfo::OpenGLES;
+        let gl_context = GLContext { gl_version, is_sdl: false, get_proc_address, swap_buffers, user_data, ctx };
 
         Ok(Box::new(OpenGLRenderer::new(gl_context, UnsafeCell::new(imgui))))
     }

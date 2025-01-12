@@ -30,7 +30,6 @@ use crate::framework::gamepad;
 use crate::framework::gamepad::{Axis, Button, GamepadType};
 use crate::framework::graphics::BlendMode;
 use crate::framework::util::field_offset;
-use crate::game::shared_game_state::SharedGameState;
 use crate::game::Game;
 
 mod nx {

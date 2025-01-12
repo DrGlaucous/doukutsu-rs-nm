@@ -10,7 +10,7 @@ use crate::input::combined_menu_controller::CombinedMenuController;
 use crate::menu::MenuEntry;
 use crate::menu::{Menu, MenuSelectionResult};
 use crate::scene::title_scene::TitleScene;
-use crate::sound::InterpolationMode;
+use crate::sound::backend::InterpolationMode;
 use crate::util::browser;
 
 use super::controls_menu::ControlsMenu;
@@ -247,7 +247,7 @@ impl SettingsMenu {
                 ],
             ),
         );
-        #[cfg(not(any(target_os = "android", target_os = "horizon")))]
+        #[cfg(not(any(target_os = "android", target_os = "horizon", feature = "backend-libretro")))]
         self.graphics.push_entry(
             GraphicsMenuEntry::WindowMode,
             MenuEntry::Options(

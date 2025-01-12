@@ -21,12 +21,141 @@ use crate::framework::graphics::{BlendMode, VSyncMode};
 use crate::framework::util::{field_offset, return_param};
 use crate::game::GAME_SUSPENDED;
 
+
+
+use std::fs::File;
+use std::io::prelude::*;
+
+//disable this without removing it from the backend in case it is needed later
+#[inline]
+pub fn handle_err(_gl: &Gl, _extra_info: u32) {
+    
+    //extra_info = 0: nothing
+    //1: pulled from load_gl (655)
+
+    // unsafe{
+    //     let err = gl.gl.GetError();
+    //     //gl::INVALID_ENUM
+    //     if err != 0 && extra_info != 1 {
+    //     //if err != 0 {
+    //         log::error!("OpenGL error: {}", err);
+    //     }
+    // }
+
+}
+
+pub fn dump_texture(tx_id: u32, fb_id: Option<u32>, width: u32, height: u32, name: &str, gl: &Gl) {
+    unsafe
+    {
+
+        let err_0 = gl.gl.GetError();
+
+        //input: texture ID
+        //let tx_id = self.font_texture;
+        //let (width, height) = (width, height);
+
+        gl.gl.BindTexture(gl::TEXTURE_2D, tx_id);
+        //let width = return_param(|x| gl.gl.GetTexParameteriv(gl::TEXTURE_2D, gl::TEXTURE_WIDTH, x));
+        //let height = return_param(|x| gl.gl.GetTexParameteriv(gl::TEXTURE_2D, gl::TEXTURE_HEIGHT, 
+            
+            
+        let tex_fbid = if fb_id.is_some(){
+            fb_id.unwrap()
+        }else {
+            let tex_fbid = return_param(|x| gl.gl.GenFramebuffers(1, x));
+            gl.gl.BindFramebuffer(gl::FRAMEBUFFER, tex_fbid);
+            gl.gl.FramebufferTexture2D(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, gl::TEXTURE_2D, tx_id, 0);
+            tex_fbid
+        };
+
+        let err_1 = gl.gl.GetError();
+
+        let mut outbuf: Vec<u8> = vec![0; (width * height * 4) as usize];
+        gl.gl.ReadPixels(0, 0, width as _, height as _, gl::RGBA, gl::UNSIGNED_BYTE, outbuf.as_mut_ptr() as _);
+        let err = gl.gl.GetError();
+
+        let address = outbuf.as_ptr() as *mut c_void;
+        
+        //dump contents to file
+        {
+            //let file_path = name;//"./texture_data.bin";
+
+            //let mut file = File::create(file_path).expect("Failed to create file");
+            //file.write_all(&outbuf).expect("Failed to write to file");
+            save_bitmap(name, width, height, &outbuf);
+            
+        }
+
+        if fb_id.is_none(){
+            //unbind framebuffer
+            gl.gl.BindFramebuffer(gl::FRAMEBUFFER, 0);
+            gl.gl.DeleteFramebuffers(1, &tex_fbid);
+        }
+
+
+
+    }
+}
+
+
+pub fn save_bitmap(filename: &str, width: u32, height: u32, pixels: &[u8]) {
+    // Bitmap file header (14 bytes)
+    let mut header = vec![0u8; 14];
+    header[0] = b'B'; // Magic number 'BM'
+    header[1] = b'M';
+    let file_size = 14 + 40 + (width * height * 4); // File size in bytes
+    header[2] = file_size as u8;
+    header[3] = (file_size >> 8) as u8;
+    header[4] = (file_size >> 16) as u8;
+    header[5] = (file_size >> 24) as u8;
+    header[10] = 54; // Offset to pixel data (14 header + 40 DIB header)
+
+    // DIB header (40 bytes)
+    let mut dib_header = vec![0u8; 40];
+    dib_header[0] = 40; // DIB header size
+    dib_header[4] = width as u8;
+    dib_header[5] = (width >> 8) as u8;
+    dib_header[6] = (width >> 16) as u8;
+    dib_header[7] = (width >> 24) as u8;
+    dib_header[8] = height as u8;
+    dib_header[9] = (height >> 8) as u8;
+    dib_header[10] = (height >> 16) as u8;
+    dib_header[11] = (height >> 24) as u8;
+    dib_header[12] = 1; // Number of color planes
+    dib_header[14] = 32; // Bits per pixel (RGB with alpha)
+    dib_header[20] = 1; // Compression method (BI_RGB)
+    dib_header[24] = (width * height * 4) as u8; // Image size
+    dib_header[25] = ((width * height * 4) >> 8) as u8;
+    dib_header[26] = ((width * height * 4) >> 16) as u8;
+    dib_header[27] = ((width * height * 4) >> 24) as u8;
+    dib_header[28] = 0; // Horizontal resolution
+    dib_header[29] = 0;
+    dib_header[30] = 0; // Vertical resolution
+    dib_header[31] = 0;
+    dib_header[32] = 0; // Number of colors in palette
+    dib_header[33] = 0;
+
+    // Write header and pixel data to file
+    let mut file = File::create(filename).expect("Failed to create file");
+    file.write_all(&header).expect("Failed to write header to file");
+    file.write_all(&dib_header).expect("Failed to write DIB header to file");
+    file.write_all(&pixels).expect("Failed to write pixels to file");
+}
+
+#[derive(PartialEq, Clone, Copy)]
+pub enum GlVersionInfo {
+    OpenGL(u32, u32),
+    OpenGLES,
+}
+
 pub struct GLContext {
-    pub gles2_mode: bool,
+    //pub gles2_mode: bool,
+    pub gl_version: GlVersionInfo,
     pub is_sdl: bool,
-    pub get_proc_address: unsafe fn(user_data: &mut *mut c_void, name: &str) -> *const c_void,
-    pub swap_buffers: unsafe fn(user_data: &mut *mut c_void),
-    pub user_data: *mut c_void,
+    pub get_proc_address: unsafe fn(user_data: &mut *mut c_void, name: &str) -> *const c_void, //gets the address of the opengl function
+    pub swap_buffers: unsafe fn(user_data: &mut *mut c_void), //swaps hardware buffers for rendering (only for double-buffered systems)
+    pub get_current_buffer: unsafe fn(user_data: &mut *mut c_void) -> usize, //get number of the current frambebuffer for the screen (only for single-buffered systems)
+    pub user_data: *mut c_void, //void pointer to opengl user data
     pub ctx: *mut Context,
 }
 
@@ -37,6 +166,7 @@ pub struct OpenGLTexture {
     framebuffer_id: u32,
     shader: RenderShader,
     vbo: GLuint,
+    vao: GLuint,
     vertices: Vec<VertexData>,
     context_active: Arc<RefCell<bool>>,
 }
@@ -289,6 +419,7 @@ impl BackendTexture for OpenGLTexture {
     fn draw(&mut self) -> GameResult {
         unsafe {
             if let Some(gl) = &GL_PROC {
+                handle_err(gl, 0);
                 if self.texture_id == 0 {
                     return Ok(());
                 }
@@ -296,12 +427,23 @@ impl BackendTexture for OpenGLTexture {
                 if gl.gl.BindSampler.is_loaded() {
                     gl.gl.BindSampler(0, 0);
                 }
+                handle_err(gl, 0);
 
-                gl.gl.Enable(gl::TEXTURE_2D);
+                //err between this
+                handle_err(gl, 0);
+                //gl.gl.Enable(gl::TEXTURE_2D); //screams at us with context version 3,3, but not with 2,1 or 3,0 (new pipeline depricates this function)
+
+
+                handle_err(gl, 0);
                 gl.gl.Enable(gl::BLEND);
-                gl.gl.Disable(gl::DEPTH_TEST);
 
-                self.shader.bind_attrib_pointer(gl, self.vbo);
+                handle_err(gl, 0);
+                gl.gl.Disable(gl::DEPTH_TEST);
+                handle_err(gl, 0);
+                //... and this
+
+
+                self.shader.bind_attrib_pointer(gl, self.vbo, self.vao);
 
                 gl.gl.BindTexture(gl::TEXTURE_2D, self.texture_id);
                 gl.gl.BufferData(
@@ -316,6 +458,7 @@ impl BackendTexture for OpenGLTexture {
                 gl.gl.BindTexture(gl::TEXTURE_2D, 0);
                 gl.gl.BindBuffer(gl::ARRAY_BUFFER, 0);
 
+                handle_err(gl, 0);
                 Ok(())
             } else {
                 Err(RenderError("No OpenGL context available!".to_string()))
@@ -333,12 +476,14 @@ impl Drop for OpenGLTexture {
         if *self.context_active.as_ref().borrow() {
             unsafe {
                 if let Some(gl) = &GL_PROC {
+                    handle_err(gl, 0);
                     if self.texture_id != 0 {
                         let texture_id = &self.texture_id;
                         gl.gl.DeleteTextures(1, texture_id as *const _);
                     }
 
                     if self.framebuffer_id != 0 {}
+                    handle_err(gl, 0);
                 }
             }
         }
@@ -347,6 +492,7 @@ impl Drop for OpenGLTexture {
 
 fn check_shader_compile_status(shader: u32, gl: &Gl) -> GameResult {
     unsafe {
+        handle_err(gl, 0);
         let mut status: GLint = 0;
         gl.gl.GetShaderiv(shader, gl::COMPILE_STATUS, (&mut status) as *mut _);
 
@@ -364,21 +510,41 @@ fn check_shader_compile_status(shader: u32, gl: &Gl) -> GameResult {
             );
 
             let data = String::from_utf8_lossy(&data);
+
+            //print shader compilation problem
+            log::error!("Failed to compile shader {}: {}", shader, data);
+
+
             return Err(GameError::RenderError(format!("Failed to compile shader {}: {}", shader, data)));
         }
+        handle_err(gl, 0);
     }
 
     Ok(())
 }
 
+// opengl 2.1 shaders with header "#version 110"
 const VERTEX_SHADER_BASIC: &str = include_str!("shaders/opengl/vertex_basic_110.glsl");
 const FRAGMENT_SHADER_TEXTURED: &str = include_str!("shaders/opengl/fragment_textured_110.glsl");
 const FRAGMENT_SHADER_COLOR: &str = include_str!("shaders/opengl/fragment_color_110.glsl");
 const FRAGMENT_SHADER_WATER: &str = include_str!("shaders/opengl/fragment_water_110.glsl");
 
+// openglES shaders
 const VERTEX_SHADER_BASIC_GLES: &str = include_str!("shaders/opengles/vertex_basic_100.glsl");
 const FRAGMENT_SHADER_TEXTURED_GLES: &str = include_str!("shaders/opengles/fragment_textured_100.glsl");
 const FRAGMENT_SHADER_COLOR_GLES: &str = include_str!("shaders/opengles/fragment_color_100.glsl");
+
+// opengl 3.3 shaders with header "#version 330 core" (mainly for retroarch macOS)
+const VERTEX_SHADER3_BASIC: &str = include_str!("shaders/opengl3/vertex_basic_330.glsl");
+const FRAGMENT_SHADER3_TEXTURED: &str = include_str!("shaders/opengl3/fragment_textured_330.glsl");
+const FRAGMENT_SHADER3_COLOR: &str = include_str!("shaders/opengl3/fragment_color_330.glsl");
+const FRAGMENT_SHADER3_WATER: &str = include_str!("shaders/opengl3/fragment_water_330.glsl");
+
+// same as stock 2.1 shaders but without version headers (mainly for retroarch, but also works on desktop)
+const VERTEX_SHADERM_BASIC: &str = include_str!("shaders/openglm/vertex_basic_m.glsl");
+const FRAGMENT_SHADERM_TEXTURED: &str = include_str!("shaders/openglm/fragment_textured_m.glsl");
+const FRAGMENT_SHADERM_COLOR: &str = include_str!("shaders/openglm/fragment_color_m.glsl");
+const FRAGMENT_SHADERM_WATER: &str = include_str!("shaders/openglm/fragment_water_m.glsl");
 
 #[derive(Copy, Clone)]
 struct RenderShader {
@@ -413,6 +579,7 @@ impl RenderShader {
     fn compile(gl: &Gl, vertex_shader: &str, fragment_shader: &str) -> GameResult<RenderShader> {
         let mut shader = RenderShader::default();
         unsafe {
+            handle_err(gl, 0);
             shader.program_id = gl.gl.CreateProgram();
 
             unsafe fn cleanup(shader: &mut RenderShader, gl: &Gl, vert: GLuint, frag: GLuint) {
@@ -468,17 +635,41 @@ impl RenderShader {
             shader.position = gl.gl.GetAttribLocation(shader.program_id, b"Position\0".as_ptr() as _) as _;
             shader.uv = gl.gl.GetAttribLocation(shader.program_id, b"UV\0".as_ptr() as _) as _;
             shader.color = gl.gl.GetAttribLocation(shader.program_id, b"Color\0".as_ptr() as _) as _;
+            handle_err(gl, 0);
         }
 
         Ok(shader)
     }
 
-    unsafe fn bind_attrib_pointer(&self, gl: &Gl, vbo: GLuint) -> GameResult {
+    unsafe fn bind_attrib_pointer(&self, gl: &Gl, vbo: GLuint, vao: GLuint) -> GameResult {
+        handle_err(gl, 0);
         gl.gl.UseProgram(self.program_id);
+        handle_err(gl, 0);
+
+        //some old versions of opengl don't like this operation, yet some of the new ones require it... fun.
+        gl.gl.BindVertexArray(vao);
+        handle_err(gl, 0);
         gl.gl.BindBuffer(gl::ARRAY_BUFFER, vbo);
+        handle_err(gl, 0);
         gl.gl.EnableVertexAttribArray(self.position);
-        gl.gl.EnableVertexAttribArray(self.uv);
+        handle_err(gl, 0);
         gl.gl.EnableVertexAttribArray(self.color);
+        handle_err(gl, 0);
+
+        //don't try to use the uv attributes if optimized out (as some compilers tend to do) (self.uv has signed value of '-1')
+        if self.uv != GLuint::MAX {
+            gl.gl.EnableVertexAttribArray(self.uv);
+            handle_err(gl, 0);
+            gl.gl.VertexAttribPointer(
+                self.uv,
+                2,
+                gl::FLOAT,
+                gl::FALSE,
+                mem::size_of::<VertexData>() as _,
+                field_offset::<VertexData, _, _>(|v| &v.uv) as _,
+            );
+            handle_err(gl, 0);
+        }
 
         gl.gl.VertexAttribPointer(
             self.position,
@@ -488,16 +679,7 @@ impl RenderShader {
             mem::size_of::<VertexData>() as _,
             field_offset::<VertexData, _, _>(|v| &v.position) as _,
         );
-
-        gl.gl.VertexAttribPointer(
-            self.uv,
-            2,
-            gl::FLOAT,
-            gl::FALSE,
-            mem::size_of::<VertexData>() as _,
-            field_offset::<VertexData, _, _>(|v| &v.uv) as _,
-        );
-
+        handle_err(gl, 0);
         gl.gl.VertexAttribPointer(
             self.color,
             4,
@@ -506,7 +688,7 @@ impl RenderShader {
             mem::size_of::<VertexData>() as _,
             field_offset::<VertexData, _, _>(|v| &v.color) as _,
         );
-
+        handle_err(gl, 0);
         Ok(())
     }
 }
@@ -516,6 +698,7 @@ struct RenderData {
     tex_shader: RenderShader,
     fill_shader: RenderShader,
     fill_water_shader: RenderShader,
+    vao: GLuint,
     vbo: GLuint,
     ebo: GLuint,
     font_texture: GLuint,
@@ -532,31 +715,88 @@ impl RenderData {
             tex_shader: RenderShader::default(),
             fill_shader: RenderShader::default(),
             fill_water_shader: RenderShader::default(),
+            vao: 0,
             vbo: 0,
             ebo: 0,
             font_texture: 0,
             font_tex_size: (1.0, 1.0),
             surf_framebuffer: 0,
             surf_texture: 0,
-            last_size: (320, 240),
+            last_size: (640, 480),
         }
     }
 
-    fn init(&mut self, gles2_mode: bool, imgui: &mut imgui::Context, gl: &Gl) {
+    fn init(&mut self, gl_version: GlVersionInfo, imgui: &mut imgui::Context, gl: &Gl) {
         self.initialized = true;
 
-        let vshdr_basic = if gles2_mode { VERTEX_SHADER_BASIC_GLES } else { VERTEX_SHADER_BASIC };
-        let fshdr_tex = if gles2_mode { FRAGMENT_SHADER_TEXTURED_GLES } else { FRAGMENT_SHADER_TEXTURED };
-        let fshdr_fill = if gles2_mode { FRAGMENT_SHADER_COLOR_GLES } else { FRAGMENT_SHADER_COLOR };
-        let fshdr_fill_water = if gles2_mode { FRAGMENT_SHADER_COLOR_GLES } else { FRAGMENT_SHADER_WATER };
+
+
+        // decide what shader files to use
+        let (
+            vshdr_basic,
+            fshdr_tex,
+            fshdr_fill,
+            fshdr_fill_water,
+        ) = match gl_version {
+            GlVersionInfo::OpenGL(maj, min) => {
+                if maj == 3 {
+                    if min == 0 {
+                        // (desktop gl requests 3.0) (which also includes 2.1 compatability)
+                        log::info!("Using shader set 3.0");
+                        (
+                            VERTEX_SHADER_BASIC,
+                            FRAGMENT_SHADER_TEXTURED,
+                            FRAGMENT_SHADER_COLOR,
+                            FRAGMENT_SHADER_WATER
+                        )
+                    } else {
+                        // (retroarch mac requests strict 3.3)
+                        log::info!("Using shader set 3.3");
+                        (
+                            VERTEX_SHADER3_BASIC,
+                            FRAGMENT_SHADER3_TEXTURED,
+                            FRAGMENT_SHADER3_COLOR,
+                            FRAGMENT_SHADER3_WATER
+                        )
+                    }
+                } else {
+                    // (retroarch requests 2.1)
+                    log::info!("Using shader set 2.1 (headerless)");
+                    (
+                        VERTEX_SHADERM_BASIC,
+                        FRAGMENT_SHADERM_TEXTURED,
+                        FRAGMENT_SHADERM_COLOR,
+                        FRAGMENT_SHADERM_WATER
+                    )
+                }
+
+            },
+            GlVersionInfo::OpenGLES => {
+                // mobile uses openGLES 2 regardless of port
+                log::info!("Using shader set GLES");
+                (
+                    VERTEX_SHADER_BASIC_GLES,
+                    FRAGMENT_SHADER_TEXTURED_GLES,
+                    FRAGMENT_SHADER_COLOR_GLES,
+                    FRAGMENT_SHADER_COLOR_GLES
+                )
+            },
+        };
 
         unsafe {
+            handle_err(gl, 0);
             self.tex_shader =
                 RenderShader::compile(gl, vshdr_basic, fshdr_tex).unwrap_or_else(|_| RenderShader::default());
             self.fill_shader =
                 RenderShader::compile(gl, vshdr_basic, fshdr_fill).unwrap_or_else(|_| RenderShader::default());
             self.fill_water_shader =
                 RenderShader::compile(gl, vshdr_basic, fshdr_fill_water).unwrap_or_else(|_| RenderShader::default());
+
+            //only create a non-default set of vertex arrays if we aren't running openGLES because some very old versions of GLES don't play nice with the vertex arrays
+            //(hopefully, all versions of GLES play nice without them)
+            if gl_version != GlVersionInfo::OpenGLES {
+                self.vao = return_param(|x| gl.gl.GenVertexArrays(1, x));
+            }
 
             self.vbo = return_param(|x| gl.gl.GenBuffers(1, x));
             self.ebo = return_param(|x| gl.gl.GenBuffers(1, x));
@@ -599,8 +839,8 @@ impl RenderData {
                 gl::TEXTURE_2D,
                 0,
                 gl::RGBA as _,
-                320 as _,
-                240 as _,
+                640 as _,
+                480 as _,
                 0,
                 gl::RGBA,
                 gl::UNSIGNED_BYTE,
@@ -619,6 +859,7 @@ impl RenderData {
             gl.gl.DrawBuffers(1, draw_buffers.as_ptr() as _);
 
             self.surf_framebuffer = framebuffer_id;
+            handle_err(gl, 0);
         }
     }
 }
@@ -632,8 +873,10 @@ static mut GL_PROC: Option<Gl> = None;
 pub fn load_gl(gl_context: &mut GLContext) -> &'static Gl {
     unsafe {
         if let Some(gl) = &GL_PROC {
+            handle_err(gl, 1);
             return gl;
         }
+        
 
         let gl = gl::Gles2::load_with(|ptr| (gl_context.get_proc_address)(&mut gl_context.user_data, ptr));
 
@@ -647,7 +890,14 @@ pub fn load_gl(gl_context: &mut GLContext) -> &'static Gl {
             }
         };
 
+        {
+            let v_major = return_param(|x| gl.GetIntegerv(gl::MAJOR_VERSION, x)) as u32;
+            let v_minor = return_param(|x| gl.GetIntegerv(gl::MINOR_VERSION, x)) as u32;
+            log::info!("OpenGL context versions: M:{} m:{}", v_major, v_minor);
+        }
+
         log::info!("OpenGL version {}", version);
+
 
         GL_PROC = Some(Gl { gl });
         GL_PROC.as_ref().unwrap()
@@ -678,31 +928,46 @@ impl OpenGLRenderer {
     fn get_context(&mut self) -> Option<(&mut GLContext, &'static Gl)> {
         let imgui = unsafe { &mut *self.imgui.get() };
 
-        let gles2 = self.refs.gles2_mode;
+        let gl_version = self.refs.gl_version;
         let gl = load_gl(&mut self.refs);
 
+        handle_err(gl, 0);
+
         if !self.render_data.initialized {
-            self.render_data.init(gles2, imgui, gl);
+            self.render_data.init(gl_version, imgui, gl);
         }
 
         Some((&mut self.refs, gl))
     }
+
+
 }
 
 impl BackendRenderer for OpenGLRenderer {
     fn renderer_name(&self) -> String {
-        if self.refs.gles2_mode {
-            "OpenGL ES 2.0".to_string()
-        } else {
-            "OpenGL 2.1".to_string()
+
+        match self.refs.gl_version {
+            GlVersionInfo::OpenGL(maj, min) => {
+                format!("OpenGL {}.{}", maj, min).to_string()
+            },
+            GlVersionInfo::OpenGLES => {
+                "OpenGL ES 2.0".to_string()
+            }
         }
+        // if self.refs.gles2_mode {
+        //     "OpenGL ES 2.0".to_string()
+        // } else {
+        //     "OpenGL 2.1".to_string()
+        // }
     }
 
     fn clear(&mut self, color: Color) {
         if let Some((_, gl)) = self.get_context() {
             unsafe {
+                handle_err(gl, 0);
                 gl.gl.ClearColor(color.r, color.g, color.b, color.a);
                 gl.gl.Clear(gl::COLOR_BUFFER_BIT);
+                handle_err(gl, 0);
             }
         }
     }
@@ -717,14 +982,43 @@ impl BackendRenderer for OpenGLRenderer {
 
         unsafe {
             if let Some((_, gl)) = self.get_context() {
-                gl.gl.BindFramebuffer(gl::FRAMEBUFFER, 0);
+                handle_err(gl, 0);
+
+                //framebuffer here is not cropped.
+                // let mut bob = self.render_data.last_size.0;
+                // if bob == 1 {
+                //     bob += 1;
+                //     dump_texture(
+                //         self.render_data.surf_texture,
+                //         Some(self.render_data.surf_framebuffer),
+                //         self.render_data.last_size.0,
+                //         self.render_data.last_size.1,
+                //         "./JScreen.bmp",
+                //         gl);
+                // }
+
+
+                //Bind the output framebuffer provided by the frontend
+                //let fbo = self.get_screen_fb();
+                let fbo = if let Some((context, _)) = self.get_context() {
+                    ((context.get_current_buffer))(&mut context.user_data)
+    
+                } else {0} as GLuint;
+
+
+                gl.gl.BindFramebuffer(gl::FRAMEBUFFER, fbo);
+
+                gl.gl.Viewport(0, 0, (self.render_data.last_size.0) as GLsizei, (self.render_data.last_size.1) as GLsizei);
+
+
                 gl.gl.ClearColor(0.0, 0.0, 0.0, 1.0);
                 gl.gl.Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+                handle_err(gl, 0);
 
                 let matrix =
                     [[2.0f32, 0.0, 0.0, 0.0], [0.0, -2.0, 0.0, 0.0], [0.0, 0.0, -1.0, 0.0], [-1.0, 1.0, 0.0, 1.0]];
 
-                self.render_data.tex_shader.bind_attrib_pointer(gl, self.render_data.vbo);
+                self.render_data.tex_shader.bind_attrib_pointer(gl, self.render_data.vbo, self.render_data.vao);
                 gl.gl.UniformMatrix4fv(self.render_data.tex_shader.proj_mtx, 1, gl::FALSE, matrix.as_ptr() as _);
 
                 let color = (255, 255, 255, 255);
@@ -736,15 +1030,19 @@ impl BackendRenderer for OpenGLRenderer {
                     VertexData { position: (1.0, 0.0), uv: (1.0, 1.0), color },
                     VertexData { position: (1.0, 1.0), uv: (1.0, 0.0), color },
                 ];
+                handle_err(gl, 0);
 
+                //todo: re-enable this later (cannot draw to framebuffer 0)
                 self.draw_arrays_tex_id(
                     gl::TRIANGLES,
                     &vertices,
                     self.render_data.surf_texture,
                     BackendShader::Texture,
                 )?;
+                handle_err(gl, 0);
 
                 gl.gl.Finish();
+                handle_err(gl, 0);
             }
 
             if let Some((context, _)) = self.get_context() {
@@ -786,6 +1084,7 @@ impl BackendRenderer for OpenGLRenderer {
     fn prepare_draw(&mut self, width: f32, height: f32) -> GameResult {
         if let Some((_, gl)) = self.get_context() {
             unsafe {
+                handle_err(gl, 0);
                 let (width_u, height_u) = (width as u32, height as u32);
                 if self.render_data.last_size != (width_u, height_u) {
                     self.render_data.last_size = (width_u, height_u);
@@ -806,14 +1105,17 @@ impl BackendRenderer for OpenGLRenderer {
 
                     gl.gl.BindTexture(gl::TEXTURE_2D, 0 as _);
                 }
+                handle_err(gl, 0);
 
                 gl.gl.BindFramebuffer(gl::FRAMEBUFFER, self.render_data.surf_framebuffer);
                 gl.gl.ClearColor(0.0, 0.0, 0.0, 0.0);
                 gl.gl.Clear(gl::COLOR_BUFFER_BIT);
+                handle_err(gl, 0);
 
                 gl.gl.ActiveTexture(gl::TEXTURE0);
                 gl.gl.BlendEquation(gl::FUNC_ADD);
                 gl.gl.BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
+                handle_err(gl, 0);
 
                 gl.gl.Viewport(0, 0, width_u as _, height_u as _);
 
@@ -825,15 +1127,26 @@ impl BackendRenderer for OpenGLRenderer {
                 ];
                 self.curr_matrix = self.def_matrix;
 
+                //error within these bounds ====================>
+                handle_err(gl, 0);
                 gl.gl.BindBuffer(gl::ARRAY_BUFFER, 0);
+                handle_err(gl, 0);
                 gl.gl.BindBuffer(gl::ELEMENT_ARRAY_BUFFER, 0);
-                gl.gl.UseProgram(self.render_data.fill_shader.program_id);
+                handle_err(gl, 0);
+
+                //this is the problem:
+                gl.gl.UseProgram(self.render_data.fill_shader.program_id); //activate the fill shader program
+                handle_err(gl, 0); //no errors (this is fine)
                 gl.gl.UniformMatrix4fv(
-                    self.render_data.fill_shader.proj_mtx,
-                    1,
-                    gl::FALSE,
-                    self.curr_matrix.as_ptr() as _,
+                    self.render_data.fill_shader.proj_mtx, //variable to edit
+                    1, //how many variables in this array (just one matrix)
+                    gl::FALSE, //should it be transposed?
+                    self.curr_matrix.as_ptr() as _, //new values to change to
                 );
+                handle_err(gl, 0); //has error (reason: the fill shader is unpopulated)
+                //<===================== error within these bounds
+
+
                 gl.gl.UseProgram(self.render_data.fill_water_shader.program_id);
                 gl.gl.Uniform1i(self.render_data.fill_water_shader.texture, 0);
                 gl.gl.UniformMatrix4fv(
@@ -842,6 +1155,7 @@ impl BackendRenderer for OpenGLRenderer {
                     gl::FALSE,
                     self.curr_matrix.as_ptr() as _,
                 );
+                handle_err(gl, 0);
                 gl.gl.UseProgram(self.render_data.tex_shader.program_id);
                 gl.gl.Uniform1i(self.render_data.tex_shader.texture, 0);
                 gl.gl.UniformMatrix4fv(
@@ -850,6 +1164,7 @@ impl BackendRenderer for OpenGLRenderer {
                     gl::FALSE,
                     self.curr_matrix.as_ptr() as _,
                 );
+                handle_err(gl, 0);
             }
 
             Ok(())
@@ -861,6 +1176,7 @@ impl BackendRenderer for OpenGLRenderer {
     fn create_texture_mutable(&mut self, width: u16, height: u16) -> GameResult<Box<dyn BackendTexture>> {
         if let Some((_, gl)) = self.get_context() {
             unsafe {
+                handle_err(gl, 0);
                 let current_texture_id = return_param(|x| gl.gl.GetIntegerv(gl::TEXTURE_BINDING_2D, x)) as u32;
                 let texture_id = return_param(|x| gl.gl.GenTextures(1, x));
 
@@ -895,7 +1211,7 @@ impl BackendRenderer for OpenGLRenderer {
                 gl.gl.BindFramebuffer(gl::FRAMEBUFFER, 0);
 
                 // todo error checking: glCheckFramebufferStatus()
-
+                handle_err(gl, 0);
                 Ok(Box::new(OpenGLTexture {
                     texture_id,
                     framebuffer_id,
@@ -904,6 +1220,7 @@ impl BackendRenderer for OpenGLRenderer {
                     vertices: Vec::new(),
                     shader: self.render_data.tex_shader,
                     vbo: self.render_data.vbo,
+                    vao: self.render_data.vao,
                     context_active: self.context_active.clone(),
                 }))
             }
@@ -915,6 +1232,7 @@ impl BackendRenderer for OpenGLRenderer {
     fn create_texture(&mut self, width: u16, height: u16, data: &[u8]) -> GameResult<Box<dyn BackendTexture>> {
         if let Some((_, gl)) = self.get_context() {
             unsafe {
+                handle_err(gl, 0);
                 let current_texture_id = return_param(|x| gl.gl.GetIntegerv(gl::TEXTURE_BINDING_2D, x)) as u32;
                 let texture_id = return_param(|x| gl.gl.GenTextures(1, x));
                 gl.gl.BindTexture(gl::TEXTURE_2D, texture_id);
@@ -934,7 +1252,7 @@ impl BackendRenderer for OpenGLRenderer {
                 );
 
                 gl.gl.BindTexture(gl::TEXTURE_2D, current_texture_id);
-
+                handle_err(gl, 0);
                 Ok(Box::new(OpenGLTexture {
                     texture_id,
                     framebuffer_id: 0,
@@ -943,6 +1261,7 @@ impl BackendRenderer for OpenGLRenderer {
                     vertices: Vec::new(),
                     shader: self.render_data.tex_shader,
                     vbo: self.render_data.vbo,
+                    vao: self.render_data.vao,
                     context_active: self.context_active.clone(),
                 }))
             }
@@ -953,6 +1272,7 @@ impl BackendRenderer for OpenGLRenderer {
 
     fn set_blend_mode(&mut self, blend: BlendMode) -> GameResult {
         if let Some((_, gl)) = self.get_context() {
+            handle_err(gl, 0);
             match blend {
                 BlendMode::Add => unsafe {
                     gl.gl.Enable(gl::BLEND);
@@ -973,7 +1293,7 @@ impl BackendRenderer for OpenGLRenderer {
                     gl.gl.Disable(gl::BLEND);
                 },
             }
-
+            handle_err(gl, 0);
             Ok(())
         } else {
             Err(RenderError("No OpenGL context available!".to_string()))
@@ -983,6 +1303,7 @@ impl BackendRenderer for OpenGLRenderer {
     fn set_render_target(&mut self, texture: Option<&Box<dyn BackendTexture>>) -> GameResult {
         if let Some((_, gl)) = self.get_context() {
             unsafe {
+                handle_err(gl, 0);
                 if let Some(texture) = texture {
                     let gl_texture = texture
                         .as_any()
@@ -1049,6 +1370,7 @@ impl BackendRenderer for OpenGLRenderer {
                     gl.gl.BindFramebuffer(gl::FRAMEBUFFER, self.render_data.surf_framebuffer);
                     gl.gl.Viewport(0, 0, self.render_data.last_size.0 as _, self.render_data.last_size.1 as _);
                 }
+                handle_err(gl, 0);
             }
 
             Ok(())
@@ -1060,6 +1382,7 @@ impl BackendRenderer for OpenGLRenderer {
     fn draw_rect(&mut self, rect: Rect<isize>, color: Color) -> GameResult {
         unsafe {
             if let Some(gl) = &GL_PROC {
+                handle_err(gl, 0);
                 let color = color.to_rgba();
                 let mut uv = self.render_data.font_tex_size;
                 uv.0 = 0.0 / uv.0;
@@ -1074,7 +1397,7 @@ impl BackendRenderer for OpenGLRenderer {
                     VertexData { position: (rect.right as _, rect.bottom as _), uv, color },
                 ];
 
-                self.render_data.fill_shader.bind_attrib_pointer(gl, self.render_data.vbo);
+                self.render_data.fill_shader.bind_attrib_pointer(gl, self.render_data.vbo, self.render_data.vao);
 
                 gl.gl.BindTexture(gl::TEXTURE_2D, self.render_data.font_texture);
                 gl.gl.BindBuffer(gl::ARRAY_BUFFER, self.render_data.vbo);
@@ -1089,7 +1412,7 @@ impl BackendRenderer for OpenGLRenderer {
 
                 gl.gl.BindTexture(gl::TEXTURE_2D, 0);
                 gl.gl.BindBuffer(gl::ARRAY_BUFFER, 0);
-
+                handle_err(gl, 0);
                 Ok(())
             } else {
                 Err(RenderError("No OpenGL context available!".to_string()))
@@ -1104,6 +1427,7 @@ impl BackendRenderer for OpenGLRenderer {
     fn set_clip_rect(&mut self, rect: Option<Rect>) -> GameResult {
         if let Some((_, gl)) = self.get_context() {
             unsafe {
+                handle_err(gl, 0);
                 if let Some(rect) = &rect {
                     gl.gl.Enable(gl::SCISSOR_TEST);
                     gl.gl.Scissor(
@@ -1115,6 +1439,7 @@ impl BackendRenderer for OpenGLRenderer {
                 } else {
                     gl.gl.Disable(gl::SCISSOR_TEST);
                 }
+                handle_err(gl, 0);
             }
 
             Ok(())
@@ -1144,6 +1469,7 @@ impl BackendRenderer for OpenGLRenderer {
         // https://github.com/michaelfairley/rust-imgui-opengl-renderer
         if let Some((_, gl)) = self.get_context() {
             unsafe {
+                handle_err(gl, 0);
                 gl.gl.ActiveTexture(gl::TEXTURE0);
                 gl.gl.Enable(gl::BLEND);
                 gl.gl.BlendEquation(gl::FUNC_ADD);
@@ -1259,6 +1585,7 @@ impl BackendRenderer for OpenGLRenderer {
                 }
 
                 gl.gl.Disable(gl::SCISSOR_TEST);
+                handle_err(gl, 0);
             }
         }
 
@@ -1317,21 +1644,23 @@ impl OpenGLRenderer {
         shader: BackendShader,
     ) -> GameResult<()> {
         if let Some(gl) = &GL_PROC {
+            handle_err(gl, 0);
             match shader {
                 BackendShader::Fill => {
-                    self.render_data.fill_shader.bind_attrib_pointer(gl, self.render_data.vbo)?;
+                    self.render_data.fill_shader.bind_attrib_pointer(gl, self.render_data.vbo, self.render_data.vao)?;
                 }
                 BackendShader::Texture => {
-                    self.render_data.tex_shader.bind_attrib_pointer(gl, self.render_data.vbo)?;
+                    self.render_data.tex_shader.bind_attrib_pointer(gl, self.render_data.vbo, self.render_data.vao)?;
                 }
                 BackendShader::WaterFill(scale, t, frame_pos) => {
-                    self.render_data.fill_water_shader.bind_attrib_pointer(gl, self.render_data.vbo)?;
+                    self.render_data.fill_water_shader.bind_attrib_pointer(gl, self.render_data.vbo, self.render_data.vao)?;
                     gl.gl.Uniform1f(self.render_data.fill_water_shader.scale, scale);
                     gl.gl.Uniform1f(self.render_data.fill_water_shader.time, t);
                     gl.gl.Uniform2f(self.render_data.fill_water_shader.frame_offset, frame_pos.0, frame_pos.1);
                     texture = self.render_data.surf_texture;
                 }
             }
+            handle_err(gl, 0);
 
             gl.gl.BindTexture(gl::TEXTURE_2D, texture);
             gl.gl.BufferData(
@@ -1340,12 +1669,15 @@ impl OpenGLRenderer {
                 vertices.as_ptr() as _,
                 gl::STREAM_DRAW,
             );
+            handle_err(gl, 0); //error between this
 
             gl.gl.DrawArrays(vert_type, 0, vertices.len() as _);
+            handle_err(gl, 0); //and this
 
             gl.gl.BindTexture(gl::TEXTURE_2D, 0);
             gl.gl.BindBuffer(gl::ARRAY_BUFFER, 0);
 
+            handle_err(gl, 0); //error here (solved)
             Ok(())
         } else {
             Err(RenderError("No OpenGL context available!".to_string()))

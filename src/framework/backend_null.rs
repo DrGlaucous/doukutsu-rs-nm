@@ -41,7 +41,7 @@ impl BackendEventLoop for NullEventLoop {
         state_ref.handle_resize(ctx).unwrap();
 
         loop {
-            game.update(ctx).unwrap();
+            game.update(ctx, 0).unwrap();
 
             if state_ref.shutdown {
                 log::info!("Shutting down...");

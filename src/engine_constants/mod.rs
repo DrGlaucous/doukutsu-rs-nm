@@ -18,7 +18,7 @@ use crate::game::settings::Settings;
 use crate::game::shared_game_state::{FontData, Season};
 use crate::i18n::Locale;
 use crate::sound::pixtone::{Channel, Envelope, PixToneParameters, Waveform};
-use crate::sound::SoundManager;
+use crate::sound::backend::SoundManager;
 
 mod npcs;
 
@@ -230,17 +230,17 @@ pub struct TitleConsts {
 
 #[derive(Debug, Clone)]
 pub struct GamepadConsts {
-    pub button_rects: HashMap<Button, [Rect<u16>; 4]>,
+    pub button_rects: HashMap<Button, [Rect<u16>; 4]>, //each button has 4 rects
     pub axis_rects: HashMap<Axis, [Rect<u16>; 4]>,
 }
 
 impl GamepadConsts {
     fn rects(base: Rect<u16>) -> [Rect<u16>; 4] {
         [
-            base,
-            Rect::new(base.left + 64, base.top, base.right + 64, base.bottom),
-            Rect::new(base.left + 128, base.top, base.right + 128, base.bottom),
-            Rect::new(base.left + 64, base.top + 128, base.right + 64, base.bottom + 128),
+            base, //psx
+            Rect::new(base.left + 64, base.top, base.right + 64, base.bottom), //xbox
+            Rect::new(base.left + 128, base.top, base.right + 128, base.bottom), //psx (mono)
+            Rect::new(base.left + 64, base.top + 128, base.right + 64, base.bottom + 128), //nintendo (but wrong?)
         ]
     }
 }
@@ -290,7 +290,7 @@ impl EngineConstants {
             is_demo: false,
             supports_og_textures: false,
             has_difficulty_menu: true,
-            supports_two_player: cfg!(not(target_os = "android")),
+            supports_two_player: cfg!(any(not(target_os = "android"), feature = "backend-libretro")),
             game: GameConsts {
                 intro_stage: 72,
                 intro_event: 100,
@@ -1623,7 +1623,7 @@ impl EngineConstants {
         }
     }
 
-    pub fn apply_csplus_patches(&mut self, sound_manager: &mut SoundManager) {
+    pub fn apply_csplus_patches(&mut self, sound_manager: &mut Box<dyn SoundManager>) {
         log::info!("Applying Cave Story+ constants patches...");
 
         self.is_cs_plus = true;

@@ -1,0 +1,16 @@
+[package]
+name = "doukutsu-rs-libretro"
+description = "doukutsu-rs targeted for Retroarch"
+version = "1.2.0"
+edition = "2021"
+
+[lib]
+name = "doukutsu_rs"
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies]
+libc = "0.2"
+log = "0.4"
+doukutsu-rs = { path = "../", default-features = false, features = ["default-base", "backend-libretro"]}
+
+
