@@ -1134,7 +1134,7 @@ impl Runner {
                     #[cfg(feature = "ogg-playback")]
                     self.ogg_engine.set_sample_rate((self.sample_rate / new_speed) as usize);
                     #[cfg(feature = "tracker-playback")]
-                    tracker_engine.set_sample_rate((sample_rate / new_speed) as usize);
+                    self.tracker_engine.set_sample_rate((self.sample_rate / new_speed) as usize);
                     self.org_engine.set_sample_rate((self.sample_rate / new_speed) as usize);
                 }
                 Ok(PlaybackMessage::SetSongVolume(new_volume)) => {
