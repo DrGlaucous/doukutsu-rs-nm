@@ -243,7 +243,7 @@ impl WaterRenderer {
             return Ok(());
         }
 
-        graphics::set_render_target(ctx, state.lightmap_canvas.as_ref())?;
+        graphics::set_render_target(ctx, state.lightmap_canvas.as_ref().unwrap().get_texture())?;
         graphics::clear(ctx, Color::from_rgba(0, 0, 0, 0));
         graphics::set_blend_mode(ctx, BlendMode::None)?;
 
@@ -346,12 +346,22 @@ impl WaterRenderer {
         graphics::set_render_target(ctx, None)?;
 
         {
+            let width = state.lightmap_canvas.as_ref().unwrap().width();
+            let height = state.lightmap_canvas.as_ref().unwrap().height();
+
             let canvas = state.lightmap_canvas.as_mut().unwrap();
-            let rect = Rect { left: 0.0, top: 0.0, right: state.screen_size.0, bottom: state.screen_size.1 };
+            let rect = Rect { left: 0, top: 0, right: width as u16, bottom: height as u16};
+
+            //canvas.clear();
+            //canvas.add(SpriteBatchCommand::DrawRect(rect, rect));
+            //canvas.draw()?;
 
             canvas.clear();
-            canvas.add(SpriteBatchCommand::DrawRect(rect, rect));
-            canvas.draw()?;
+            canvas.add_rect_scaled(
+                0.0,
+                0.0,
+                1.0, 1.0, &rect);
+            canvas.draw(ctx)?;
         }
 
         Ok(())

@@ -87,6 +87,11 @@ pub struct Settings {
     pub discord_rpc: bool,
     #[serde(default = "default_true")]
     pub allow_strafe: bool,
+
+
+    //new
+    //#[serde(default = "default_true")]
+    //pub pixel_perfect_lighting: bool,
 }
 
 fn default_true() -> bool {

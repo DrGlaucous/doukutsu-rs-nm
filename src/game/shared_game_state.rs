@@ -8,7 +8,7 @@ use crate::data::vanilla::VanillaExtractor;
 #[cfg(feature = "discord-rpc")]
 use crate::discord::DiscordRPC;
 use crate::engine_constants::EngineConstants;
-use crate::framework::backend::BackendTexture;
+use crate::framework::backend::{BackendTexture, SpriteBatchCommand};
 use crate::framework::context::Context;
 use crate::framework::error::GameResult;
 use crate::framework::graphics::{create_texture_mutable, set_render_target};
@@ -26,7 +26,7 @@ use crate::game::scripting::tsc::text_script::{
 use crate::game::settings::Settings;
 use crate::game::stage::StageData;
 use crate::graphics::bmfont::BMFont;
-use crate::graphics::texture_set::TextureSet;
+use crate::graphics::texture_set::{SpriteBatch, SubBatch, TextureSet};
 use crate::i18n::Locale;
 use crate::input::touch_controls::TouchControls;
 use crate::mod_list::ModList;
@@ -326,7 +326,7 @@ pub struct SharedGameState {
     pub next_scene: Option<Box<dyn Scene>>,
     pub textscript_vm: TextScriptVM,
     pub creditscript_vm: CreditScriptVM,
-    pub lightmap_canvas: Option<Box<dyn BackendTexture>>,
+    pub lightmap_canvas: Option<Box<dyn SpriteBatch>>,
     pub season: Season,
     pub menu_character: MenuCharacter,
     pub fs_container: Option<FilesystemContainer>,
@@ -733,6 +733,14 @@ impl SharedGameState {
     }
 
     pub fn handle_resize(&mut self, ctx: &mut Context) -> GameResult {
+
+        /*
+        self-note: how scaling works:
+        the state.scale variable tells the game how big to draw the sprites
+        how many sprites to draw comes down to the window (see: width and height)
+
+        */
+
         self.screen_size = graphics::screen_size(ctx);
         let scale_x = self.screen_size.1.div(self.preferred_viewport_size.1).floor().max(1.0);
         let scale_y = self.screen_size.0.div(self.preferred_viewport_size.0).floor().max(1.0);
@@ -744,7 +752,29 @@ impl SharedGameState {
 
         // ensure no texture is bound before destroying them.
         set_render_target(ctx, None)?;
-        self.lightmap_canvas = Some(create_texture_mutable(ctx, width, height)?);
+
+        //create the lightmap surface with the ingame canvas size rather than the 
+        let (lm_width, lm_height) = if true {(self.canvas_size.0 as u16, self.canvas_size.1 as u16)} else {(width, height)};
+
+        //self.lightmap_canvas = Some(create_texture_mutable(ctx, lm_width, lm_height)?);
+
+        let lightmap_canvas = create_texture_mutable(ctx, lm_width, lm_height)?;
+
+        let size = lightmap_canvas.dimensions();
+        let scale = 1.0 / self.scale;
+        let width = (size.0 as f32 * scale) as _;
+        let height = (size.1 as f32 * scale) as _;
+
+        let spb: Box<dyn SpriteBatch> = Box::new(SubBatch {
+            batch: lightmap_canvas,
+            width,
+            height,
+            scale_x: scale,
+            scale_y: scale,
+            real_width: size.0,
+            real_height: size.1,
+        });
+        self.lightmap_canvas = Some(spb);
 
         Ok(())
     }
