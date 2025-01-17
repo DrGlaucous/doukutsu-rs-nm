@@ -40,6 +40,12 @@ use crate::util::rng::XorShift;
 
 use super::filesystem_container::FilesystemContainer;
 
+
+//todo: determine intended game scale automatically (for now, manually change this to the intended game's scale)
+//1 for freeware, 2 for CS+, 0.5 for some evil downscale thing, etc.
+//pub static LIGHTMAP_SCALE: f32 = 0.0625;
+pub static LIGHTMAP_SCALE: f32 = 1.0;
+
 #[derive(PartialEq, Eq, Copy, Clone, serde::Serialize, serde::Deserialize)]
 pub enum TimingMode {
     _50Hz,
@@ -753,15 +759,16 @@ impl SharedGameState {
         // ensure no texture is bound before destroying them.
         set_render_target(ctx, None)?;
 
-        //create the lightmap surface with the ingame canvas size rather than the 
-        let (lm_width, lm_height) = if true {(self.canvas_size.0 as u16, self.canvas_size.1 as u16)} else {(width, height)};
+
+        //create the lightmap surface with the ingame canvas size rather than the real screen size
+        let (lm_width, lm_height) = if true {((self.canvas_size.0 * LIGHTMAP_SCALE) as u16, (self.canvas_size.1 * LIGHTMAP_SCALE) as u16)} else {(width, height)};
 
         //self.lightmap_canvas = Some(create_texture_mutable(ctx, lm_width, lm_height)?);
 
         let lightmap_canvas = create_texture_mutable(ctx, lm_width, lm_height)?;
 
         let size = lightmap_canvas.dimensions();
-        let scale = 1.0 / self.scale;
+        let scale = 1.0 / (self.scale * LIGHTMAP_SCALE);
         let width = (size.0 as f32 * scale) as _;
         let height = (size.1 as f32 * scale) as _;
 
