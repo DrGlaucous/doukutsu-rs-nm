@@ -90,8 +90,8 @@ pub struct Settings {
 
 
     //new
-    //#[serde(default = "default_true")]
-    //pub pixel_perfect_lighting: bool,
+    #[serde(default = "default_true")]
+    pub game_scale_lighting: bool,
 }
 
 fn default_true() -> bool {
@@ -484,6 +484,7 @@ impl Default for Settings {
             cutscene_skip_mode: CutsceneSkipMode::Hold,
             discord_rpc: true,
             allow_strafe: true,
+            game_scale_lighting: true,
         }
     }
 }

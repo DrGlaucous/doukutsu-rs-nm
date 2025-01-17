@@ -761,14 +761,21 @@ impl SharedGameState {
 
 
         //create the lightmap surface with the ingame canvas size rather than the real screen size
-        let (lm_width, lm_height) = if true {((self.canvas_size.0 * LIGHTMAP_SCALE) as u16, (self.canvas_size.1 * LIGHTMAP_SCALE) as u16)} else {(width, height)};
+        let (lm_width, lm_height, scale) = if self.settings.game_scale_lighting {
+            (
+                (self.canvas_size.0 * LIGHTMAP_SCALE) as u16,
+                (self.canvas_size.1 * LIGHTMAP_SCALE) as u16,
+                1.0 / (self.scale * LIGHTMAP_SCALE),
+            )
+        } else {
+            (width, height, 1.0)
+        };
 
         //self.lightmap_canvas = Some(create_texture_mutable(ctx, lm_width, lm_height)?);
 
         let lightmap_canvas = create_texture_mutable(ctx, lm_width, lm_height)?;
 
         let size = lightmap_canvas.dimensions();
-        let scale = 1.0 / (self.scale * LIGHTMAP_SCALE);
         let width = (size.0 as f32 * scale) as _;
         let height = (size.1 as f32 * scale) as _;
 

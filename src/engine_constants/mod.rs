@@ -279,6 +279,7 @@ pub struct EngineConstants {
     pub locales: Vec<Locale>,
     pub gamepad: GamepadConsts,
     pub stage_encoding: Option<TextScriptEncoding>,
+    pub lightmap_scale: f32,
 }
 
 impl EngineConstants {
@@ -1620,6 +1621,7 @@ impl EngineConstants {
                 holder
             },
             stage_encoding: None,
+            lightmap_scale: 1.0,
         }
     }
 
@@ -1628,6 +1630,7 @@ impl EngineConstants {
 
         self.is_cs_plus = true;
         self.supports_og_textures = true;
+        self.lightmap_scale = 2.0;
         self.tex_sizes.insert("Caret".to_owned(), (320, 320));
         self.tex_sizes.insert("MyChar".to_owned(), (200, 384));
         self.tex_sizes.insert("Npc/NpcRegu".to_owned(), (320, 410));
@@ -1683,6 +1686,7 @@ impl EngineConstants {
 
         self.is_switch = true;
         self.supports_og_textures = true;
+        self.lightmap_scale = 2.0;
         self.tex_sizes.insert("bkMoon".to_owned(), (427, 240));
         self.tex_sizes.insert("bkFog".to_owned(), (427, 240));
         self.tex_sizes.insert("ui".to_owned(), (128, 32));

@@ -69,6 +69,7 @@
           "fullscreen": "Fullscreen"
         },
         "lighting_effects": "Lighting effects:",
+        "lighting_effects_game_scale": "Use Game Scale Lighting:",
         "weapon_light_cone": "Weapon light cone:",
         "screen_shake": {
           "entry": "Screen shake intensity:",
