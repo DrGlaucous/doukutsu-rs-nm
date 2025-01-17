@@ -521,6 +521,7 @@ impl GameScene {
 
     fn draw_light_raycast_temp(
         &self,
+        frame_time: f64,
         tile_size: TileSize,
         world_point_x: f32,
         world_point_y: f32,
@@ -533,8 +534,13 @@ impl GameScene {
         let px = world_point_x as f32 / 512.0;
         let py = world_point_y as f32 / 512.0;
 
-        let fx2 = self.frame.x as f32 / 512.0;
-        let fy2 = self.frame.y as f32 / 512.0;
+        let (fx2, fy2) = self.frame.xy_interpolated(frame_time);
+        //let fx2 = self.frame.x as f32 / 512.0;
+        //let fy2 = self.frame.y as f32 / 512.0;
+
+        //extra offsets with screen jittering
+        let frame_x = -fx2.fract();
+        let frame_y = -fy2.fract();
 
         let ti = tile_size.as_int();
         let tf = tile_size.as_float();
@@ -628,8 +634,8 @@ impl GameScene {
                 }
 
                 self.draw_light(
-                    x - fx2,
-                    y - fy2,
+                    x - fx2 - frame_x,
+                    y - fy2 - frame_y,
                     0.15 + i as f32 / 75.0,
                     ((r * m) as u8, (g * m) as u8, (b * m) as u8),
                     batch,
@@ -721,14 +727,14 @@ impl GameScene {
                             player.prev_x,
                             player.x,
                             state.frame_time,
-                        ) - frame_x) * 512.0;
+                        )) * 512.0;
                         //let plx = player.x as f32;
 
                         let ply = (interpolate_fix9_scale(
                             player.prev_y,
                             player.y,
                             state.frame_time,
-                        ) - frame_y) * 512.0;
+                        )) * 512.0;
 
 
                         unsafe{
@@ -738,9 +744,9 @@ impl GameScene {
 
 
                         self.draw_light_raycast_temp(
+                            state.frame_time,
                             state.tile_size,
                             plx,
-
                             ply as f32 - (512.0 * 16.0),// + gun_off_y * 0x200 + 0x400,
                             color,
                             att,
@@ -1320,8 +1326,8 @@ impl GameScene {
             let canvas = state.lightmap_canvas.as_mut().unwrap();
             let rect = Rect { left: 0, top: 0, right: width as u16, bottom: height as u16};
             canvas.add_rect_scaled(
-                0.0,
-                0.0,
+                frame_x,
+                frame_y,
                 state.scale, state.scale, &rect);
             canvas.draw(ctx)?;
 
