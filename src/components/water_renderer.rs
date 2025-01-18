@@ -243,6 +243,12 @@ impl WaterRenderer {
             return Ok(());
         }
 
+        let (scale, draw_scale) = if state.settings.game_scale_lighting {
+            (state.constants.lightmap_scale, state.scale)
+        } else {
+            (state.scale, 1.0 / state.scale)
+        };
+
         graphics::set_render_target(ctx, state.lightmap_canvas.as_ref().unwrap().get_texture())?;
         graphics::clear(ctx, Color::from_rgba(0, 0, 0, 0));
         graphics::set_blend_mode(ctx, BlendMode::None)?;
@@ -250,7 +256,7 @@ impl WaterRenderer {
         let (o_x, o_y) = frame.xy_interpolated(state.frame_time);
         let uv = (0.0, 0.0);
         let t = *self.t.borrow_mut() as f32 + state.frame_time as f32;
-        let shader = BackendShader::WaterFill(state.scale, t, (o_x, o_y));
+        let shader = BackendShader::WaterFill(scale, t, (o_x, o_y));
         let mut vertices = Vec::new();
 
         {
@@ -260,10 +266,10 @@ impl WaterRenderer {
                 vertices.clear();
                 vertices.reserve(6);
 
-                let left = (region.rect.left - o_x - 8.0) * state.scale;
-                let top = (region.rect.top - o_y - 8.0) * state.scale;
-                let right = (region.rect.right - o_x + 8.0) * state.scale;
-                let bottom = (region.rect.bottom - o_y + 8.0) * state.scale;
+                let left = (region.rect.left - o_x - 8.0) * scale;
+                let top = (region.rect.top - o_y - 8.0) * scale;
+                let right = (region.rect.right - o_x + 8.0) * scale;
+                let bottom = (region.rect.bottom - o_y + 8.0) * scale;
 
                 vertices.push(VertexData { position: (left, bottom), uv, color: color_btm_rgba });
                 vertices.push(VertexData { position: (left, top), uv, color: color_mid_rgba });
@@ -304,14 +310,14 @@ impl WaterRenderer {
                 vertices.clear();
                 vertices.reserve(12 * surf.columns.len());
 
-                let bottom = (pos_y - o_y + 8.0) * state.scale;
+                let bottom = (pos_y - o_y + 8.0) * scale;
                 for i in 1..surf.columns.len() {
-                    let x_right = (pos_x - 8.0 - o_x + i as f32 * 2.0) * state.scale;
-                    let x_left = x_right - 2.0 * state.scale;
-                    let top_left = (pos_y - o_y - 13.0 + surf.columns[i - 1].height) * state.scale;
-                    let top_right = (pos_y - o_y - 13.0 + surf.columns[i].height) * state.scale;
-                    let middle_left = top_left + 6.0 * state.scale;
-                    let middle_right = top_left + 6.0 * state.scale;
+                    let x_right = (pos_x - 8.0 - o_x + i as f32 * 2.0) * scale;
+                    let x_left = x_right - 2.0 * scale;
+                    let top_left = (pos_y - o_y - 13.0 + surf.columns[i - 1].height) * scale;
+                    let top_right = (pos_y - o_y - 13.0 + surf.columns[i].height) * scale;
+                    let middle_left = top_left + 6.0 * scale;
+                    let middle_right = top_left + 6.0 * scale;
 
                     vertices.push(VertexData { position: (x_left, middle_left), uv, color: color_mid_rgba });
                     vertices.push(VertexData { position: (x_left, top_left), uv, color: color_top_rgba });
@@ -360,7 +366,7 @@ impl WaterRenderer {
             canvas.add_rect_scaled(
                 0.0,
                 0.0,
-                1.0, 1.0, &rect);
+                draw_scale, draw_scale, &rect);
             canvas.draw(ctx)?;
         }
 

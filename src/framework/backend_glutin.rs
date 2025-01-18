@@ -197,17 +197,107 @@ impl BackendEventLoop for GlutinEventLoop {
             unsafe { std::mem::transmute(self.get_context(&ctx, &event_loop)) };    
 
         //load up icon
-        //TODO: this (glutin has trouble loading from internal resources; we must help)
-        // #[cfg(not(any(target_os = "android", target_os = "horizon")))]
-        // {
-        //     let mut file = filesystem::open(&ctx, "/builtin/icon.bmp").unwrap();
-        //     let mut buf: Vec<u8> = Vec::new();
-        //     file.seek(SeekFrom::Start(54));
-        //     file.read_to_end(&mut buf);
-        //     //let icoo = Icon::from_resource(unsafe{buf.as_ptr() as u16}, None).unwrap();
-        //     let icoo = Icon::from_rgba(buf, 64, 64).unwrap();
-        //     //window.window().set_window_icon(Some(icoo));
-        // }
+        //TODO: clean this loading process (very quick and dirty currently)
+        #[cfg(not(any(target_os = "android", target_os = "horizon")))]
+        {
+            let mut file = filesystem::open(&ctx, "/builtin/icon.bmp").unwrap();
+            let mut buf: Vec<u8> = Vec::new();
+            //file.seek(SeekFrom::Start(54));
+            file.read_to_end(&mut buf);
+
+
+            //straight from the depths of the LLM (supports 8bpp and 24bpp ONLY!)
+            fn bmp_to_rgba(bitmap: &[u8]) -> Option<Vec<u8>> {
+                // Verify BMP signature ("BM" at the beginning)
+                if bitmap.len() < 54 || &bitmap[0..2] != b"BM" {
+                    return None; // Not a valid BMP file
+                }
+            
+                // Extract header information
+                let pixel_data_offset = u32::from_le_bytes([bitmap[10], bitmap[11], bitmap[12], bitmap[13]]) as usize;
+                let width = i32::from_le_bytes([bitmap[18], bitmap[19], bitmap[20], bitmap[21]]);
+                let height = i32::from_le_bytes([bitmap[22], bitmap[23], bitmap[24], bitmap[25]]);
+                let bits_per_pixel = u16::from_le_bytes([bitmap[28], bitmap[29]]);
+            
+                // Only support 8-bit (indexed) or 24-bit BMP
+                if bits_per_pixel != 8 && bits_per_pixel != 24 {
+                    return None; // Unsupported BMP format
+                }
+            
+                // Row size: padded to a multiple of 4 bytes
+                let row_size = ((bits_per_pixel as usize * width.abs() as usize + 31) / 32) * 4;
+            
+                // Create RGBA output
+                let mut rgba_data = Vec::new();
+            
+                if bits_per_pixel == 8 {
+                    // Handle 8bpp: Extract color palette
+                    let palette_size = 256 * 4; // 256 entries, each 4 bytes (B, G, R, 0)
+                    let palette = &bitmap[54..54 + palette_size];
+            
+                    let pixel_data = &bitmap[pixel_data_offset..];
+                    for y in (0..height.abs()).rev() {
+                        let row_start = y as usize * row_size;
+                        for x in 0..width.abs() {
+                            let pixel_index = row_start + x as usize;
+                            if pixel_index >= pixel_data.len() {
+                                return None; // Out of bounds
+                            }
+                            let color_index = pixel_data[pixel_index] as usize * 4;
+                            if color_index + 2 >= palette.len() {
+                                return None; // Out of bounds
+                            }
+            
+                            let b = palette[color_index];
+                            let g = palette[color_index + 1];
+                            let r = palette[color_index + 2];
+            
+                            // Append RGBA values
+                            rgba_data.push(r);
+                            rgba_data.push(g);
+                            rgba_data.push(b);
+                            rgba_data.push(255); // Full alpha
+                        }
+                    }
+                } else if bits_per_pixel == 24 {
+                    // Handle 24bpp
+                    let pixel_data = &bitmap[pixel_data_offset..];
+                    for y in (0..height.abs()).rev() {
+                        let row_start = y as usize * row_size;
+                        for x in 0..width.abs() {
+                            let pixel_start = row_start + x as usize * 3;
+                            if pixel_start + 2 >= pixel_data.len() {
+                                return None; // Out of bounds
+                            }
+            
+                            let b = pixel_data[pixel_start];
+                            let g = pixel_data[pixel_start + 1];
+                            let r = pixel_data[pixel_start + 2];
+            
+                            // Append RGBA values
+                            rgba_data.push(r);
+                            rgba_data.push(g);
+                            rgba_data.push(b);
+                            rgba_data.push(255); // Full alpha
+                        }
+                    }
+                }
+            
+                Some(rgba_data)
+            }
+
+            if let Some(vvec) = bmp_to_rgba(&buf) {
+
+                match Icon::from_rgba(vvec, 32, 32) {
+                    Err(a) => {
+                        log::warn!("{}", a);
+                    }
+                    Ok(icon) => {
+                        window.window().set_window_icon(Some(icon));
+                    }
+                }
+            }
+        }
         
 
 
