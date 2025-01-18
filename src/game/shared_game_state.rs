@@ -1,8 +1,9 @@
 use std::{cmp, ops::Div};
 
 use chrono::{Datelike, Local};
+use num_traits::Float;
 
-use crate::common::{ControlFlags, Direction, FadeState};
+use crate::common::{Color, ControlFlags, Direction, FadeState};
 use crate::components::draw_common::{draw_number, Alignment};
 use crate::data::vanilla::VanillaExtractor;
 #[cfg(feature = "discord-rpc")]
@@ -39,12 +40,6 @@ use crate::util::bitvec::BitVec;
 use crate::util::rng::XorShift;
 
 use super::filesystem_container::FilesystemContainer;
-
-
-//todo: determine intended game scale automatically (for now, manually change this to the intended game's scale)
-//1 for freeware, 2 for CS+, 0.5 for some evil downscale thing, etc.
-//pub static LIGHTMAP_SCALE: f32 = 0.0625;
-pub static LIGHTMAP_SCALE: f32 = 1.0;
 
 #[derive(PartialEq, Eq, Copy, Clone, serde::Serialize, serde::Deserialize)]
 pub enum TimingMode {
@@ -661,6 +656,7 @@ impl SharedGameState {
         }
 
         let mut next_scene = GameScene::new(self, ctx, start_stage_id)?;
+        next_scene.stage.data.background_color = Color::from_rgb(0, 0, 0);
         next_scene.player1.cond.set_hidden(true);
         let (pos_x, pos_y) = self.constants.game.intro_player_pos;
         next_scene.player1.x = pos_x as i32 * next_scene.stage.map.tile_size.as_int() * 0x200;
@@ -740,12 +736,6 @@ impl SharedGameState {
 
     pub fn handle_resize(&mut self, ctx: &mut Context) -> GameResult {
 
-        /*
-        self-note: how scaling works:
-        the state.scale variable tells the game how big to draw the sprites
-        how many sprites to draw comes down to the window (see: width and height)
-
-        */
 
         self.screen_size = graphics::screen_size(ctx);
         let scale_x = self.screen_size.1.div(self.preferred_viewport_size.1).floor().max(1.0);
@@ -759,19 +749,19 @@ impl SharedGameState {
         // ensure no texture is bound before destroying them.
         set_render_target(ctx, None)?;
 
-
-        //create the lightmap surface with the ingame canvas size rather than the real screen size
+        //get custom canvas scaling
         let (lm_width, lm_height, scale) = if self.settings.game_scale_lighting {
+
+            //create the lightmap surface with the ingame canvas size rather than the real screen size
+            //adding the inverse of the scale so the canvas jittering doesn't leave a gap in the screen (which is needed to keep the map pixels aligned)
             (
-                (self.canvas_size.0 * LIGHTMAP_SCALE) as u16,
-                (self.canvas_size.1 * LIGHTMAP_SCALE) as u16,
-                1.0 / (self.scale * LIGHTMAP_SCALE),
+                ((self.canvas_size.0 + self.scale) * self.constants.lightmap_scale).ceil() as u16,
+                ((self.canvas_size.1 + self.scale) * self.constants.lightmap_scale).ceil() as u16,
+                1.0 / (self.scale * self.constants.lightmap_scale),
             )
         } else {
             (width, height, 1.0)
         };
-
-        //self.lightmap_canvas = Some(create_texture_mutable(ctx, lm_width, lm_height)?);
 
         let lightmap_canvas = create_texture_mutable(ctx, lm_width, lm_height)?;
 

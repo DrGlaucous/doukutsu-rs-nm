@@ -394,7 +394,7 @@ impl BackendEventLoop for HorizonEventLoop {
         loop {
             self.gamepad_update(state_ref, ctx);
 
-            game.update(ctx).unwrap();
+            game.update(ctx, 0).unwrap();
 
             if state_ref.shutdown {
                 log::info!("Shutting down...");

@@ -31,7 +31,7 @@ use crate::framework::error::GameResult;
 use crate::framework::filesystem;
 use crate::framework::gl;
 use crate::framework::keyboard::ScanCode;
-use crate::framework::render_opengl::{GLContext, OpenGLRenderer};
+use crate::framework::render_opengl::{GLContext, OpenGLRenderer, GlVersionInfo};
 use crate::framework::ui::init_imgui;
 use crate::game::Game;
 use crate::game::GAME_SUSPENDED;
@@ -449,7 +449,7 @@ impl BackendEventLoop for GlutinEventLoop {
                     }
 
                     //mainloop
-                    game.update(ctx).unwrap();
+                    game.update(ctx, 0).unwrap();
 
                     #[cfg(target_os = "android")]
                     {
@@ -527,8 +527,14 @@ impl BackendEventLoop for GlutinEventLoop {
             *user_data = Rc::into_raw(refs) as *mut c_void;
         }
 
-        let gl_version = GlVersionInfo::OpenGLES;
-        let gl_context = GLContext { gl_version, is_sdl: false, get_proc_address, swap_buffers, user_data, ctx };
+        unsafe fn get_current_buffer(user_data: &mut *mut c_void) -> usize {
+            let refs = Rc::from_raw(*user_data as *mut UnsafeCell<Option<WindowedContext<PossiblyCurrent>>>);
+            *user_data = Rc::into_raw(refs) as *mut c_void;
+            0
+        }
+
+        let gl_version = GlVersionInfo::OpenGL(2, 1);
+        let gl_context = GLContext { gl_version, is_sdl: false, get_proc_address, swap_buffers, get_current_buffer, user_data, ctx };
 
         Ok(Box::new(OpenGLRenderer::new(gl_context, UnsafeCell::new(imgui))))
     }

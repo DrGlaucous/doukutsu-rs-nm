@@ -42,7 +42,7 @@ use crate::game::player::{ControlMode, Player, TargetPlayer};
 use crate::game::scripting::tsc::credit_script::CreditScriptVM;
 use crate::game::scripting::tsc::text_script::{ScriptMode, TextScriptExecutionState, TextScriptVM};
 use crate::game::settings::ControllerType;
-use crate::game::shared_game_state::{CutsceneSkipMode, PlayerCount, ReplayState, SharedGameState, TileSize, LIGHTMAP_SCALE};
+use crate::game::shared_game_state::{CutsceneSkipMode, PlayerCount, ReplayState, SharedGameState, TileSize};
 use crate::game::stage::{BackgroundType, Stage, StageTexturePaths};
 use crate::game::weapon::bullet::BulletManager;
 use crate::game::weapon::{Weapon, WeaponType};
@@ -521,7 +521,6 @@ impl GameScene {
 
     fn draw_light_raycast_temp(
         &self,
-        frame_time: f64,
         tile_size: TileSize,
         world_point_x: i32,
         world_point_y: i32,
@@ -529,7 +528,12 @@ impl GameScene {
         att: f32,
         angle: Range<i32>,
         batch: &mut Box<dyn SpriteBatch>,
-        canvas_scale: f32,
+
+        //new variables (all of these come from state, but I can't pass state into this function because it's already been borrowed)
+        canvas_scale: f32, //size of the 
+        lightmap_scale: f32,
+        game_scale_lighting: bool,
+        frame_time: f64,
     ) {
         let px = world_point_x as f32 / 512.0;
         let py = world_point_y as f32 / 512.0;
@@ -538,9 +542,15 @@ impl GameScene {
         //let fx2 = self.frame.x as f32 / 512.0;
         //let fy2 = self.frame.y as f32 / 512.0;
 
-        //extra offsets with screen jittering
-        let frame_x = -(fx2 * LIGHTMAP_SCALE).fract() / LIGHTMAP_SCALE;// - (0.5 / LIGHTMAP_SCALE);
-        let frame_y = -(fy2 * LIGHTMAP_SCALE).fract() / LIGHTMAP_SCALE;// - (0.5 / LIGHTMAP_SCALE);
+        //extra offsets with screen jittering to "snap" the lightmap to the correct spot
+        let (frame_x, frame_y) = if game_scale_lighting {
+            (
+                -(fx2 * lightmap_scale).fract() / lightmap_scale, // - (0.5 / lightmap_scale);
+                -(fy2 * lightmap_scale).fract() / lightmap_scale, // - (0.5 / lightmap_scale);
+            )
+        } else {
+            (0.0,0.0)
+        };
 
         let ti = tile_size.as_int();
         let tf = tile_size.as_float();
@@ -660,14 +670,7 @@ impl GameScene {
 
         //when drawing is complete, the lightmap needs to be scaled by this before being applied to the screen
         //additionally, draw coordinates need to be divided by this
-        let canvas_scale = if true {state.scale / LIGHTMAP_SCALE} else {1.0};
-
-        let (frame_x, frame_y) = self.frame.xy_interpolated(state.frame_time);
-        let frame_x = -(frame_x * LIGHTMAP_SCALE).fract() / LIGHTMAP_SCALE;// - (0.5 / LIGHTMAP_SCALE); //offset thingy, not really needed unless you're doing tile-res lighting
-        let frame_y = -(frame_y * LIGHTMAP_SCALE).fract() / LIGHTMAP_SCALE;// - (0.5 / LIGHTMAP_SCALE);
-
-        //frame_y = 0.0;
-        //frame_x = 0.0;
+        let canvas_scale = if state.settings.game_scale_lighting {state.scale / state.constants.lightmap_scale} else {1.0};
 
 
         graphics::set_blend_mode(ctx, BlendMode::Add)?;
@@ -718,11 +721,6 @@ impl GameScene {
 
                         let (_, gun_off_y) = player.skin.get_gun_offset();
 
-                        // interpolate_fix9_scale(
-                        //     self.prev_x - self.display_bounds.left as i32,
-                        //     self.x - self.display_bounds.left as i32,
-                        //     state.frame_time,
-                        // ) - frame_x,
                         let plx = (interpolate_fix9_scale(
                             player.prev_x,
                             player.x,
@@ -736,15 +734,7 @@ impl GameScene {
                             state.frame_time,
                         )) * 512.0;
 
-
-                        unsafe{
-                            ffx = plx;
-                            ffy = frame_x;
-                        }
-
-
                         self.draw_light_raycast_temp(
-                            state.frame_time,
                             state.tile_size,
                             plx as i32,
                             ply as i32 + gun_off_y * 0x200 + 0x400,
@@ -752,7 +742,11 @@ impl GameScene {
                             att,
                             range,
                             batch,
+
                             canvas_scale,
+                            state.constants.lightmap_scale,
+                            state.settings.game_scale_lighting,
+                            state.frame_time,
                         );
                     } else {
                         self.draw_light(
@@ -1303,10 +1297,10 @@ impl GameScene {
             //let rect = Rect { left: 0.0, top: 0.0, right: state.screen_size.0, bottom: state.screen_size.1 };
             let rect = Rect { left: 0.0, top: 0.0, right: width as f32, bottom: height as f32};
 
-            //canvas.clear(); //clear drawing commands
-            //canvas.add(SpriteBatchCommand::DrawRect(rect, rect));
-            //canvas.draw()?;
-
+            //doesn't seem to be needed now that we're using a SpriteBatch instead of a BackendTexture directly           
+            // canvas.clear(); //clear drawing commands
+            // canvas.add(SpriteBatchCommand::DrawRect(rect, rect));
+            // canvas.draw()?;            
             // graphics::set_render_target(ctx, Some(canvas))?;
             // graphics::draw_rect(
             //     ctx,
@@ -1319,16 +1313,32 @@ impl GameScene {
             //     Color { r: 0.15, g: 0.12, b: 0.12, a: 1.0 },
             // )?;
             // graphics::set_render_target(ctx, None)?;
-            // graphics::set_blend_mode(ctx, BlendMode::Add)?;
+            // graphics::set_blend_mode(ctx, BlendMode::None)?;
 
             //x and y are on a per-ingame-pixel basis (with 1x scale)
-            
+            //extra offsets with screen jittering to "snap" the lightmap to the correct spot
+            let (frame_x, frame_y, scale) = if state.settings.game_scale_lighting {
+                let (fx2, fy2) = self.frame.xy_interpolated(state.frame_time);
+                
+                (
+                    -(fx2 * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale, // - (0.5 / state.constatnts.lightmap_scale); //offset thingy, not really needed unless you're doing tile-res lighting
+                    -(fy2 * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale, // - (0.5 / state.constatnts.lightmap_scale);
+                    state.scale,
+                )
+            } else {
+                (
+                    0.0,
+                    0.0,
+                    1.0 / state.scale,
+                )
+            };
+
             let canvas = state.lightmap_canvas.as_mut().unwrap();
             let rect = Rect { left: 0, top: 0, right: width as u16, bottom: height as u16};
             canvas.add_rect_scaled(
                 frame_x,
                 frame_y,
-                state.scale, state.scale, &rect);
+                scale, scale, &rect);
             canvas.draw(ctx)?;
 
             graphics::set_blend_mode(ctx, BlendMode::Alpha)?;
@@ -2523,18 +2533,6 @@ impl Scene for GameScene {
                 .y(56.0)
                 .shadow(true)
                 .draw(debug_name, ctx, &state.constants, &mut state.texture_set)?;
-        }
-
-        //test: print screen scale
-        if true {
-            let debug_name = format!("S:{}, FX: {} FY: {}", state.scale, unsafe{ffx}, unsafe{ffy});
-            state
-                .font
-                .builder()
-                .x(state.canvas_size.0 - state.font.builder().compute_width(&debug_name) - 10.0)
-                .y(56.0)
-                .shadow(true)
-                .draw(&debug_name, ctx, &state.constants, &mut state.texture_set)?;
         }
 
         self.replay.draw(state, ctx, &self.frame)?;

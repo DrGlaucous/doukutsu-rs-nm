@@ -1621,6 +1621,9 @@ impl EngineConstants {
                 holder
             },
             stage_encoding: None,
+
+            //todo: determine intended game scale automatically (for now, manually change this to the intended game's scale)
+            //1 for freeware, 2 for CS+, 0.5 for some evil downscale thing, 0.0625 for full tiles, etc.
             lightmap_scale: 1.0,
         }
     }
