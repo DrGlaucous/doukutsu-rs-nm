@@ -23,7 +23,6 @@ use crate::components::tilemap::{TileLayer, Tilemap};
 use crate::components::water_renderer::{WaterLayer, WaterRenderer};
 use crate::components::whimsical_star::WhimsicalStar;
 use crate::entity::GameEntity;
-use crate::framework::backend::SpriteBatchCommand;
 use crate::framework::context::Context;
 use crate::framework::error::GameResult;
 use crate::framework::graphics::{draw_rect, BlendMode, FilterMode};
@@ -92,10 +91,6 @@ pub struct GameScene {
     skip_counter: u16,
     inventory_dim: f32,
 }
-
-
-static mut ffx: f32 = 0.0;
-static mut ffy: f32 = 0.0;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum LightingMode {
@@ -1209,11 +1204,10 @@ impl GameScene {
             let width = state.lightmap_canvas.as_ref().unwrap().width();
             let height = state.lightmap_canvas.as_ref().unwrap().height();
 
-            let canvas = state.lightmap_canvas.as_ref().unwrap().get_texture().unwrap();
+            //this doesn't seem to be needed now that we're using a SpriteBatch instead of a BackendTexture directly 
+            //let canvas = state.lightmap_canvas.as_ref().unwrap().get_texture().unwrap();
             //let rect = Rect { left: 0.0, top: 0.0, right: state.screen_size.0, bottom: state.screen_size.1 };
-            let rect = Rect { left: 0.0, top: 0.0, right: width as f32, bottom: height as f32};
-
-            //this doesn't seem to be needed now that we're using a SpriteBatch instead of a BackendTexture directly           
+            //let rect = Rect { left: 0.0, top: 0.0, right: width as f32, bottom: height as f32};          
             // canvas.clear(); //clear drawing commands
             // canvas.add(SpriteBatchCommand::DrawRect(rect, rect));
             // canvas.draw()?;            
