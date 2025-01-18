@@ -40,7 +40,7 @@ category = "Game"
 osx_minimum_system_version = "10.12"
 
 [features]
-default = ["default-base", "backend-sdl", "render-opengl", "audio-cpal", "exe", "webbrowser", "discord-rpc", "tracker-playback"]
+default = ["default-base", "backend-glutin", "render-opengl", "audio-cpal", "exe", "webbrowser", "discord-rpc", "tracker-playback", "gameres-lighting"]
 #default = ["default-base", "backend-glutin", "render-opengl", "exe", "webbrowser", "discord-rpc"]
 
 default-base = ["ogg-playback"]
@@ -60,6 +60,13 @@ android = []
 audio-cpal = ["cpal"]
 backend-libretro = ["render-opengl"]
 
+fixed-aspect = [] #fixed aspect ratio (makes menu that can be used in game to change this)
+gameres-lighting = [] #makes lighting conform to game resolution, not screen resolution
+#potential methods of application: special RGB tiles used to determine what palette/image to use,
+#do we do this on a per-image basis, or a per-palette basis?
+#with openGL, we can do this via custom shaders, feeding the palettes into the shader and using whichever one,
+#with SDL, we can do this by generating several images internally
+palette-filters = []
 
 [dependencies]
 #glutin = { path = "./3rdparty/glutin/glutin", optional = true }

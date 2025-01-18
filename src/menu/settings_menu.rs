@@ -54,6 +54,7 @@ enum GraphicsMenuEntry {
     VSyncMode,
     WindowMode,
     LightingEffects,
+    LightingEffectsGameScale,
     WeaponLightCone,
     ScreenShake,
     MotionInterpolation,
@@ -264,6 +265,13 @@ impl SettingsMenu {
             MenuEntry::Toggle(
                 state.loc.t("menus.options_menu.graphics_menu.lighting_effects").to_owned(),
                 state.settings.shader_effects,
+            ),
+        );
+        self.graphics.push_entry(
+            GraphicsMenuEntry::LightingEffectsGameScale,
+            MenuEntry::Toggle(
+                state.loc.t("menus.options_menu.graphics_menu.lighting_effects_game_scale").to_owned(),
+                state.settings.game_scale_lighting,
             ),
         );
         self.graphics.push_entry(
@@ -744,6 +752,17 @@ impl SettingsMenu {
                         let _ = state.settings.save(ctx);
 
                         *value = state.settings.shader_effects;
+                    }
+                }
+                MenuSelectionResult::Selected(GraphicsMenuEntry::LightingEffectsGameScale, toggle) => {
+                    if let MenuEntry::Toggle(_, value) = toggle {
+                        state.settings.game_scale_lighting = !state.settings.game_scale_lighting;
+                        let _ = state.settings.save(ctx);
+
+                        *value = state.settings.game_scale_lighting;
+
+                        //refresh the lighting canvas
+                        state.handle_resize(ctx)?;
                     }
                 }
                 MenuSelectionResult::Selected(GraphicsMenuEntry::WeaponLightCone, toggle) => {

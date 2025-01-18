@@ -93,6 +93,10 @@ pub struct GameScene {
     inventory_dim: f32,
 }
 
+
+static mut ffx: f32 = 0.0;
+static mut ffy: f32 = 0.0;
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum LightingMode {
     None,
@@ -383,18 +387,18 @@ impl GameScene {
         Ok(())
     }
 
-    fn draw_light(&self, x: f32, y: f32, size: f32, color: (u8, u8, u8), batch: &mut Box<dyn SpriteBatch>) {
+    fn draw_light(&self, x: f32, y: f32, size: f32, color: (u8, u8, u8), batch: &mut Box<dyn SpriteBatch>, canvas_scale: f32) {
         batch.add_rect_scaled_tinted(
-            x - size * 32.0,
-            y - size * 32.0,
+            (x - size * 32.0) * canvas_scale, //this is an inverse so it can be calculated faster
+            (y - size * 32.0) * canvas_scale,
             (color.0, color.1, color.2, 255),
-            size,
-            size,
+            size * canvas_scale,
+            size * canvas_scale,
             &Rect::new(0, 0, 64, 64),
         )
     }
 
-    fn draw_light_raycast(
+   fn draw_light_raycast(
         &self,
         tile_size: TileSize,
         world_point_x: i32,
@@ -403,12 +407,29 @@ impl GameScene {
         att: f32,
         angle: Range<i32>,
         batch: &mut Box<dyn SpriteBatch>,
+
+        //new variables (all of these come from state, but I can't pass state into this function because it's already been borrowed)
+        frame_time: f64, //for interpolation
+        canvas_scale_inverse: f32, //pixel size of the lightmap canvas 
+        lightmap_scale: f32, //scale of the canvas relative to the game (1.0 for freeware, 2 for +, etc)
+        game_scale_lighting: bool,
     ) {
         let px = world_point_x as f32 / 512.0;
         let py = world_point_y as f32 / 512.0;
 
-        let fx2 = self.frame.x as f32 / 512.0;
-        let fy2 = self.frame.y as f32 / 512.0;
+        let (fx2, fy2) = self.frame.xy_interpolated(frame_time);
+        //let fx2 = self.frame.x as f32 / 512.0;
+        //let fy2 = self.frame.y as f32 / 512.0;
+
+        //extra offsets with screen jittering to "snap" the lightmap to the correct spot
+        let (frame_x, frame_y) = if game_scale_lighting {
+            (
+                -(fx2 * lightmap_scale).fract() / lightmap_scale, // - (0.5 / lightmap_scale);
+                -(fy2 * lightmap_scale).fract() / lightmap_scale, // - (0.5 / lightmap_scale);
+            )
+        } else {
+            (0.0,0.0)
+        };
 
         let ti = tile_size.as_int();
         let tf = tile_size.as_float();
@@ -502,26 +523,34 @@ impl GameScene {
                 }
 
                 self.draw_light(
-                    x - fx2,
-                    y - fy2,
+                    x - fx2 - frame_x,
+                    y - fy2 - frame_y,
                     0.15 + i as f32 / 75.0,
                     ((r * m) as u8, (g * m) as u8, (b * m) as u8),
                     batch,
+                    canvas_scale_inverse,
                 );
             }
         }
     }
 
+
+
     fn draw_light_map(&self, state: &mut SharedGameState, ctx: &mut Context) -> GameResult {
         {
             let maybe_canvas = state.lightmap_canvas.as_ref();
 
-            if maybe_canvas.is_some() {
-                graphics::set_render_target(ctx, maybe_canvas)?;
+            if let Some(maybe_canvas) = maybe_canvas {
+                graphics::set_render_target(ctx, maybe_canvas.get_texture())?;
             } else {
                 return Ok(());
             }
         }
+
+        //when drawing is complete, the lightmap needs to be scaled by this before being applied to the screen (normally scale/lightmap_scale, but is an inverse)
+        //additionally, draw coordinates need to be divided by this
+        let canvas_scale_inverse = if state.settings.game_scale_lighting {state.constants.lightmap_scale / state.scale} else {1.0};
+
 
         graphics::set_blend_mode(ctx, BlendMode::Add)?;
 
@@ -573,12 +602,25 @@ impl GameScene {
 
                         self.draw_light_raycast(
                             state.tile_size,
-                            player.x + player.direction.vector_x() * 0x800,
-                            player.y + gun_off_y * 0x200 + 0x400,
+                            ((interpolate_fix9_scale(
+                                player.prev_x,
+                                player.x,
+                                state.frame_time,
+                            )) * 512.0) as i32,
+                            ((interpolate_fix9_scale(
+                                player.prev_y,
+                                player.y,
+                                state.frame_time,
+                            )) * 512.0) as i32 + gun_off_y * 0x200 + 0x400,
                             color,
                             att,
                             range,
                             batch,
+                            
+                            state.frame_time,
+                            canvas_scale_inverse,
+                            state.constants.lightmap_scale,
+                            state.settings.game_scale_lighting,
                         );
                     } else {
                         self.draw_light(
@@ -595,6 +637,7 @@ impl GameScene {
                             5.0,
                             (150, 150, 150),
                             batch,
+                            canvas_scale_inverse,
                         );
                     }
                 }
@@ -615,6 +658,7 @@ impl GameScene {
                     0.3,
                     (200, 200, 200),
                     batch,
+                    canvas_scale_inverse,
                 );
             }
 
@@ -635,6 +679,7 @@ impl GameScene {
                             0.5,
                             (150, 150, 150),
                             batch,
+                            canvas_scale_inverse,
                         );
                     }
                     _ => {}
@@ -674,6 +719,7 @@ impl GameScene {
                             0.33,
                             (255, 255, 50),
                             batch,
+                            canvas_scale_inverse,
                         );
                     }
                     4 if npc.direction == Direction::Up => self.draw_light(
@@ -682,6 +728,7 @@ impl GameScene {
                         1.0,
                         (200, 100, 0),
                         batch,
+                        canvas_scale_inverse,
                     ),
                     7 => self.draw_light(
                         interpolate_fix9_scale(npc.prev_x - self.frame.prev_x, npc.x - self.frame.x, state.frame_time),
@@ -689,6 +736,7 @@ impl GameScene {
                         1.0,
                         (100, 100, 100),
                         batch,
+                        canvas_scale_inverse,
                     ),
                     17 if npc.anim_num == 0 => {
                         self.draw_light(
@@ -705,6 +753,7 @@ impl GameScene {
                             1.25,
                             (100, 0, 0),
                             batch,
+                            canvas_scale_inverse,
                         );
                         self.draw_light(
                             interpolate_fix9_scale(
@@ -720,6 +769,7 @@ impl GameScene {
                             0.5,
                             (255, 10, 10),
                             batch,
+                            canvas_scale_inverse,
                         );
                     }
                     20 if npc.direction == Direction::Right => {
@@ -737,6 +787,7 @@ impl GameScene {
                             1.5,
                             (30, 30, 130),
                             batch,
+                            canvas_scale_inverse,
                         );
 
                         if npc.anim_num < 2 {
@@ -754,6 +805,7 @@ impl GameScene {
                                 1.0,
                                 (0, 0, 20),
                                 batch,
+                                canvas_scale_inverse,
                             );
                         }
                     }
@@ -763,6 +815,7 @@ impl GameScene {
                         3.0,
                         (0, 0, 255),
                         batch,
+                        canvas_scale_inverse,
                     ),
                     32 | 87 => {
                         self.draw_light(
@@ -779,6 +832,7 @@ impl GameScene {
                             0.75,
                             (255, 30, 30),
                             batch,
+                            canvas_scale_inverse,
                         );
                     }
                     211 => {
@@ -796,6 +850,7 @@ impl GameScene {
                             1.0,
                             (90, 0, 0),
                             batch,
+                            canvas_scale_inverse,
                         );
                     }
                     27 => {
@@ -813,6 +868,7 @@ impl GameScene {
                             3.0,
                             (96, 0, 0),
                             batch,
+                            canvas_scale_inverse,
                         );
                     }
                     38 => {
@@ -831,6 +887,7 @@ impl GameScene {
                             3.5,
                             (150 + flicker, 60 + flicker, 0),
                             batch,
+                            canvas_scale_inverse,
                         );
                     }
                     69 | 81 => {
@@ -848,6 +905,7 @@ impl GameScene {
                             if npc.npc_type == 69 { 0.5 } else { 1.0 },
                             (200, 200, 200),
                             batch,
+                            canvas_scale_inverse,
                         );
                     }
                     70 => {
@@ -866,6 +924,7 @@ impl GameScene {
                             2.0,
                             (flicker, flicker, flicker),
                             batch,
+                            canvas_scale_inverse,
                         );
                     }
                     85 if npc.action_num == 1 => {
@@ -893,6 +952,7 @@ impl GameScene {
                             0.75,
                             color,
                             batch,
+                            canvas_scale_inverse,
                         );
 
                         if npc.anim_num < 2 && npc.direction == Direction::Right {
@@ -910,6 +970,7 @@ impl GameScene {
                                 2.1,
                                 color2,
                                 batch,
+                                canvas_scale_inverse,
                             );
                         }
                     }
@@ -919,6 +980,7 @@ impl GameScene {
                         1.0,
                         (100, 100, 200),
                         batch,
+                        canvas_scale_inverse,
                     ),
                     175 if npc.action_num < 10 => {
                         self.draw_light(
@@ -935,6 +997,7 @@ impl GameScene {
                             1.0,
                             (128, 175, 200),
                             batch,
+                            canvas_scale_inverse,
                         );
                     }
                     189 => self.draw_light(
@@ -943,6 +1006,7 @@ impl GameScene {
                         1.0,
                         (10, 50, 255),
                         batch,
+                        canvas_scale_inverse,
                     ),
                     270 => self.draw_light(
                         interpolate_fix9_scale(npc.prev_x - self.frame.prev_x, npc.x - self.frame.x, state.frame_time),
@@ -950,6 +1014,7 @@ impl GameScene {
                         0.4,
                         (192, 0, 0),
                         batch,
+                        canvas_scale_inverse,
                     ),
                     285 | 287 => self.draw_light(
                         interpolate_fix9_scale(npc.prev_x - self.frame.prev_x, npc.x - self.frame.x, state.frame_time),
@@ -957,6 +1022,7 @@ impl GameScene {
                         1.0,
                         (150, 90, 0),
                         batch,
+                        canvas_scale_inverse,
                     ),
                     293 => self.draw_light(
                         interpolate_fix9_scale(npc.prev_x - self.frame.prev_x, npc.x - self.frame.x, state.frame_time),
@@ -964,6 +1030,7 @@ impl GameScene {
                         4.0,
                         (255, 255, 255),
                         batch,
+                        canvas_scale_inverse,
                     ),
                     311 => {
                         let size = if npc.anim_num % 7 == 2 || npc.anim_num % 7 == 5 { 1.0 } else { 0.0 };
@@ -982,6 +1049,7 @@ impl GameScene {
                             size,
                             (255, 255, 255),
                             batch,
+                            canvas_scale_inverse,
                         )
                     }
                     312 => self.draw_light(
@@ -990,6 +1058,7 @@ impl GameScene {
                         0.5,
                         (255, 255, 255),
                         batch,
+                        canvas_scale_inverse,
                     ),
                     319 => {
                         let color = if npc.anim_num == 2 { (255, 29, 0) } else { (234, 157, 68) };
@@ -1008,6 +1077,7 @@ impl GameScene {
                             1.0,
                             color,
                             batch,
+                            canvas_scale_inverse,
                         )
                     }
                     180 => {
@@ -1027,12 +1097,24 @@ impl GameScene {
 
                             self.draw_light_raycast(
                                 state.tile_size,
-                                npc.x + npc.direction.opposite().vector_x() * 0x800,
-                                npc.y + 2 * 0x200,
+                                ((interpolate_fix9_scale(
+                                    npc.prev_x,
+                                    npc.x,
+                                    state.frame_time,
+                                )) * 512.0) as i32 + npc.direction.opposite().vector_x() * 0x800,
+                                ((interpolate_fix9_scale(
+                                    npc.prev_y,
+                                    npc.y,
+                                    state.frame_time,
+                                )) * 512.0) as i32 + 2 * 0x200,
                                 (19u8, 34u8, 117u8),
                                 0.95,
                                 range,
                                 batch,
+                                state.frame_time,
+                                canvas_scale_inverse,
+                                state.constants.lightmap_scale,
+                                state.settings.game_scale_lighting,
                             );
                         }
                     }
@@ -1048,19 +1130,51 @@ impl GameScene {
 
                             self.draw_light_raycast(
                                 state.tile_size,
-                                npc.x + npc.direction.opposite().vector_x() * 0x800,
-                                npc.y + 2 * 0x200,
+                                ((interpolate_fix9_scale(
+                                    npc.prev_x,
+                                    npc.x,
+                                    state.frame_time,
+                                )) * 512.0) as i32 + npc.direction.opposite().vector_x() * 0x800,
+                                ((interpolate_fix9_scale(
+                                    npc.prev_y,
+                                    npc.y,
+                                    state.frame_time,
+                                )) * 512.0) as i32 + 2 * 0x200,
                                 (19u8, 34u8, 117u8),
                                 0.95,
                                 range,
                                 batch,
+                                state.frame_time,
+                                canvas_scale_inverse,
+                                state.constants.lightmap_scale,
+                                state.settings.game_scale_lighting,
                             );
                         }
                     }
                     322 => {
                         let scale = 0.004 * (npc.action_counter as f32);
 
-                        self.draw_light_raycast(state.tile_size, npc.x, npc.y, (255, 0, 0), scale, 0..360, batch)
+                        self.draw_light_raycast(
+                            state.tile_size, 
+                            ((interpolate_fix9_scale(
+                                npc.prev_x,
+                                npc.x,
+                                state.frame_time,
+                            )) * 512.0) as i32,
+                            ((interpolate_fix9_scale(
+                                npc.prev_y,
+                                npc.y,
+                                state.frame_time,
+                            )) * 512.0) as i32,
+                            (255, 0, 0), 
+                            scale, 
+                            0..360, 
+                            batch, 
+                            state.frame_time,
+                            canvas_scale_inverse,
+                            state.constants.lightmap_scale,
+                            state.settings.game_scale_lighting,
+                        )
                     }
                     325 => {
                         let size = 0.5 * (npc.anim_num as f32 + 1.0);
@@ -1078,6 +1192,7 @@ impl GameScene {
                             size,
                             (255, 255, 255),
                             batch,
+                            canvas_scale_inverse,
                         )
                     }
                     _ => {}
@@ -1091,27 +1206,56 @@ impl GameScene {
         graphics::set_render_target(ctx, None)?;
 
         {
+            let width = state.lightmap_canvas.as_ref().unwrap().width();
+            let height = state.lightmap_canvas.as_ref().unwrap().height();
+
+            let canvas = state.lightmap_canvas.as_ref().unwrap().get_texture().unwrap();
+            //let rect = Rect { left: 0.0, top: 0.0, right: state.screen_size.0, bottom: state.screen_size.1 };
+            let rect = Rect { left: 0.0, top: 0.0, right: width as f32, bottom: height as f32};
+
+            //this doesn't seem to be needed now that we're using a SpriteBatch instead of a BackendTexture directly           
+            // canvas.clear(); //clear drawing commands
+            // canvas.add(SpriteBatchCommand::DrawRect(rect, rect));
+            // canvas.draw()?;            
+            // graphics::set_render_target(ctx, Some(canvas))?;
+            // graphics::draw_rect(
+            //     ctx,
+            //     Rect {
+            //         left: 0,
+            //         top: 0,
+            //         right: (width as f32 + 1.0) as isize,
+            //         bottom: (height as f32 + 1.0) as isize,
+            //     },
+            //     Color { r: 0.15, g: 0.12, b: 0.12, a: 1.0 },
+            // )?;
+            // graphics::set_render_target(ctx, None)?;
+            // graphics::set_blend_mode(ctx, BlendMode::None)?;
+
+            //x and y are on a per-ingame-pixel basis (with 1x scale)
+            //extra offsets with screen jittering to "snap" the lightmap to the correct spot
+            let (frame_x, frame_y, scale) = if state.settings.game_scale_lighting {
+                let (fx2, fy2) = self.frame.xy_interpolated(state.frame_time);
+                
+                (
+                    -(fx2 * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale, // - (0.5 / state.constatnts.lightmap_scale); //offset thingy, not really needed unless you're doing tile-res lighting
+                    -(fy2 * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale, // - (0.5 / state.constatnts.lightmap_scale);
+                    state.scale,
+                )
+            } else {
+                (
+                    0.0,
+                    0.0,
+                    1.0 / state.scale,
+                )
+            };
+
             let canvas = state.lightmap_canvas.as_mut().unwrap();
-            let rect = Rect { left: 0.0, top: 0.0, right: state.screen_size.0, bottom: state.screen_size.1 };
-
-            canvas.clear();
-            canvas.add(SpriteBatchCommand::DrawRect(rect, rect));
-            canvas.draw()?;
-
-            graphics::set_render_target(ctx, Some(canvas))?;
-            graphics::draw_rect(
-                ctx,
-                Rect {
-                    left: 0,
-                    top: 0,
-                    right: (state.screen_size.0 + 1.0) as isize,
-                    bottom: (state.screen_size.1 + 1.0) as isize,
-                },
-                Color { r: 0.15, g: 0.12, b: 0.12, a: 1.0 },
-            )?;
-            graphics::set_render_target(ctx, None)?;
-            graphics::set_blend_mode(ctx, BlendMode::Add)?;
-            canvas.draw()?;
+            let rect = Rect { left: 0, top: 0, right: width as u16, bottom: height as u16};
+            canvas.add_rect_scaled(
+                frame_x,
+                frame_y,
+                scale, scale, &rect);
+            canvas.draw(ctx)?;
 
             graphics::set_blend_mode(ctx, BlendMode::Alpha)?;
         }

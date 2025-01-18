@@ -69,6 +69,7 @@
           "fullscreen": "フルスクリーン"
         },
         "lighting_effects": "ライティング効果：",
+        "lighting_effects_game_scale": "ゲーム スケール ライティングを使用する:",
         "weapon_light_cone": "兵器のライトコーン：",
         "screen_shake": {
           "entry": "画面の揺れ：",

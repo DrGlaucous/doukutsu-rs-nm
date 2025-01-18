@@ -192,13 +192,13 @@ impl SpriteBatch for DummyBatch {
 }
 
 pub struct SubBatch {
-    batch: Box<dyn BackendTexture>,
-    width: u16,
-    height: u16,
-    real_width: u16,
-    real_height: u16,
-    scale_x: f32,
-    scale_y: f32,
+    pub batch: Box<dyn BackendTexture>,
+    pub width: u16,
+    pub height: u16,
+    pub real_width: u16,
+    pub real_height: u16,
+    pub scale_x: f32,
+    pub scale_y: f32,
 }
 
 pub struct CombinedBatch {
