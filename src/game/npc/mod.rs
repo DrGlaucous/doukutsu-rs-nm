@@ -211,13 +211,35 @@ impl NPC {
 
             let (frame_x, frame_y) = frame.xy_interpolated(state.frame_time);
 
-            batch.add_rect(
-                interpolate_fix9_scale(self.prev_x - off_x, self.x - off_x, state.frame_time) + shock - frame_x,
-                interpolate_fix9_scale(
-                    self.prev_y - self.display_bounds.top as i32,
-                    self.y - self.display_bounds.top as i32,
-                    state.frame_time,
-                ) - frame_y,
+
+
+            let (ofx, ofy, scale) = if state.settings.game_scale_lighting {
+                (
+                    (frame_x * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale,
+                    (frame_y * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale,
+                    (state.constants.lightmap_scale / state.scale)
+                )
+            } else {
+                (0.0,0.0,1.0)
+            };
+
+            let x = (interpolate_fix9_scale(
+                self.prev_x - off_x, 
+                self.x - off_x, 
+                state.frame_time
+            ) + shock - frame_x + ofx) * scale;
+
+            let y = (interpolate_fix9_scale(
+                self.prev_y - self.display_bounds.top as i32,
+                self.y - self.display_bounds.top as i32,
+                state.frame_time,
+            ) - frame_y + ofy) * scale;
+
+            batch.add_rect_scaled(
+                x,
+                y,
+                scale,
+                scale,
                 &self.anim_rect,
             );
 
