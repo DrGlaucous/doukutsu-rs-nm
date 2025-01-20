@@ -227,12 +227,19 @@ pub trait PhysicalEntity {
     }
 
     fn test_platform_hit(&mut self, state: &mut SharedGameState, x: i32, y: i32) {
+        
         let half_tile_size = state.tile_size.as_int() * 0x100;
+
+        //calculate previous Y using velocity
+        let prev_y = self.y() - self.vel_y();
 
         if ((self.x() - self.hit_bounds().right as i32) < (x * 2 + 1) * half_tile_size)
             && ((self.x() + self.hit_bounds().right as i32) > (x * 2 - 1) * half_tile_size)
-            && ((self.y() + self.hit_bounds().bottom as i32) > ((y * 2 - 1) * half_tile_size))
-            && ((self.y() + self.hit_bounds().bottom as i32) < (y * 2 - 1) * half_tile_size + 0x400)
+            //better Y checks
+            && (prev_y + self.hit_bounds().bottom as i32) < y * 2 * half_tile_size - half_tile_size + (1 * 0x200) //last bottom of PC was higher than the top of the block + 1px (just below)
+            && ((self.y() + self.hit_bounds().bottom as i32) > y * half_tile_size) //player's feet are below the top of the block
+            && ((self.y() + self.hit_bounds().bottom as i32) < y * 2 * half_tile_size) //and above the center of the block
+
         {
             self.set_y(((y * 2 - 1) * half_tile_size) - self.hit_bounds().bottom as i32);
 

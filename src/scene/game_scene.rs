@@ -1760,6 +1760,39 @@ impl GameScene {
             batch.draw(ctx)?;
         }
 
+        //draw hit rect and display rect
+
+        //x and y relative to frame (screen coords)
+        let x = ((entity.x() + entity.offset_x()) - self.frame.x) as isize / 0x200;
+        let y = ((entity.y() + entity.offset_y()) - self.frame.y) as isize / 0x200;
+        let hit_bounds = entity.hit_bounds();
+        let disp_bounds = entity.display_bounds();
+
+        let scale = state.scale as isize;
+
+        //rect in the globalspace
+        let rel_hit_rc = Rect {
+            left: (x - (hit_bounds.left / 0x200) as isize) * scale,
+            right: (x + (hit_bounds.right / 0x200) as isize) * scale,
+            top: (y - (hit_bounds.top / 0x200) as isize) * scale,
+            bottom: (y + (hit_bounds.bottom / 0x200) as isize)* scale,
+        };
+
+        let rel_disp_rc = Rect {
+            left: (x - (disp_bounds.left / 0x200) as isize) * scale,
+            right: (x + (disp_bounds.right / 0x200) as isize) * scale,
+            top: (y - (disp_bounds.top / 0x200) as isize) * scale,
+            bottom: (y + (disp_bounds.bottom / 0x200) as isize)* scale,
+        };
+
+
+        graphics::draw_outline_rect(ctx, rel_hit_rc, 1, Color::from_rgb(255, 255, 0))?;
+        graphics::draw_outline_rect(ctx, rel_disp_rc, 1, Color::from_rgb(0, 255, 255))?;
+
+
+
+
+
         Ok(())
     }
 

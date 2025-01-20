@@ -1420,7 +1420,22 @@ impl BackendRenderer for OpenGLRenderer {
         }
     }
 
-    fn draw_outline_rect(&mut self, _rect: Rect<isize>, _line_width: usize, _color: Color) -> GameResult {
+    fn draw_outline_rect(&mut self, rect: Rect<isize>, line_width: usize, color: Color) -> GameResult {
+
+        //line_width is size of line in pixels
+        let line_width = line_width as isize;
+
+        let edge_left = Rect::new(rect.left, rect.top, rect.left + line_width, rect.bottom);
+        let edge_top = Rect::new(rect.left, rect.top, rect.right, rect.top + line_width);
+        let edge_right = Rect::new(rect.right - line_width, rect.top, rect.right, rect.bottom);
+        let edge_bottom = Rect::new(rect.left, rect.bottom - line_width, rect.right, rect.bottom);
+
+        self.draw_rect(edge_left, color)?;
+        self.draw_rect(edge_top, color)?;
+        self.draw_rect(edge_right, color)?;
+        self.draw_rect(edge_bottom, color)?;
+
+
         Ok(())
     }
 
