@@ -253,7 +253,12 @@ impl WaterRenderer {
         graphics::clear(ctx, Color::from_rgba(0, 0, 0, 0));
         graphics::set_blend_mode(ctx, BlendMode::None)?;
 
-        let (o_x, o_y) = frame.xy_interpolated(state.frame_time);
+        let (mut o_x, mut o_y) = frame.xy_interpolated(state.frame_time);
+
+        o_x += state.constants.lightmap_scale / 2.0;
+        o_y += state.constants.lightmap_scale / 2.0;
+
+
         let uv = (0.0, 0.0);
         let t = *self.t.borrow_mut() as f32 + state.frame_time as f32;
         let shader = BackendShader::WaterFill(scale, t, (o_x, o_y));
@@ -362,10 +367,34 @@ impl WaterRenderer {
             //canvas.add(SpriteBatchCommand::DrawRect(rect, rect));
             //canvas.draw()?;
 
+            // let (frame_x, frame_y) = if state.settings.game_scale_lighting {
+            //     //let (fx2, fy2) = self.frame.xy_interpolated(state.frame_time);
+            //     (
+            //         (o_x * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale, // - (0.5 / state.constants.lightmap_scale); //offset thingy, not really needed unless you're doing tile-res lighting
+            //         (o_y * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale, // - (0.5 / state.constants.lightmap_scale);
+            //     )
+            // } else {
+            //     (
+            //         0.0,
+            //         0.0,
+            //     )
+            // };
+            let (frame_x, frame_y) = (0.0,0.0);
+
+            // let (frame_x, frame_y) = (
+            //     -(o_x * state.constants.lightmap_scale + 0.5).fract() / state.constants.lightmap_scale + (0.5 / state.constants.lightmap_scale), //offset thingy, not really needed unless you're doing tile-res lighting
+            //     -(o_y * state.constants.lightmap_scale + 0.5).fract() / state.constants.lightmap_scale + (0.5 / state.constants.lightmap_scale),
+            // );
+            let (frame_x, frame_y) = (
+                -(o_x * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale,
+                -(o_y * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale,
+            );
+
+
             canvas.clear();
             canvas.add_rect_scaled(
-                0.0,
-                0.0,
+                frame_x + 16.0,
+                frame_y + 16.0,
                 draw_scale, draw_scale, &rect);
             canvas.draw(ctx)?;
         }

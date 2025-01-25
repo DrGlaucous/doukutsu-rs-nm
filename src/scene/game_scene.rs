@@ -1231,8 +1231,8 @@ impl GameScene {
                 let (fx2, fy2) = self.frame.xy_interpolated(state.frame_time);
                 
                 (
-                    -(fx2 * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale, // - (0.5 / state.constatnts.lightmap_scale); //offset thingy, not really needed unless you're doing tile-res lighting
-                    -(fy2 * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale, // - (0.5 / state.constatnts.lightmap_scale);
+                    -(fx2 * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale, // - (0.5 / state.constants.lightmap_scale); //offset thingy, not really needed unless you're doing tile-res lighting
+                    -(fy2 * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale, // - (0.5 / state.constants.lightmap_scale);
                     state.scale,
                 )
             } else {

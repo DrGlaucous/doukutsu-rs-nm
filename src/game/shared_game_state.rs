@@ -738,11 +738,25 @@ impl SharedGameState {
 
 
         self.screen_size = graphics::screen_size(ctx);
-        let scale_x = self.screen_size.1.div(self.preferred_viewport_size.1).floor().max(1.0);
-        let scale_y = self.screen_size.0.div(self.preferred_viewport_size.0).floor().max(1.0);
 
+        //let scalar = 240;
+        let ratio = self.preferred_viewport_size;
+
+        let ratio = (16.0, 12.0);
+        let ref_height = 240.0;
+        let height = ref_height;
+        let width = height * ratio.0 / ratio.1;
+        let ratio = (width, height);
+
+
+        //determine what integer scale to use
+        let scale_x = self.screen_size.1.div(ratio.1).floor().max(1.0);
+        let scale_y = self.screen_size.0.div(ratio.0).floor().max(1.0);
         self.scale = f32::min(scale_x, scale_y);
+
+
         self.canvas_size = (self.screen_size.0 / self.scale, self.screen_size.1 / self.scale);
+        //self.canvas_size = (ratio.0, ratio.1);
 
         let (width, height) = (self.screen_size.0 as u16, self.screen_size.1 as u16);
 
