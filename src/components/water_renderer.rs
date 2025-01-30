@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 
+use crate::common::fix9_scale;
 use crate::common::{Color, Rect};
 use crate::framework::backend::{BackendShader, SpriteBatchCommand, VertexData};
 use crate::framework::context::Context;
@@ -253,17 +254,25 @@ impl WaterRenderer {
         graphics::clear(ctx, Color::from_rgba(0, 0, 0, 0));
         graphics::set_blend_mode(ctx, BlendMode::None)?;
 
-        let (mut o_x, mut o_y) = frame.xy_interpolated(state.frame_time);
+        let (o_x, o_y) = frame.xy_interpolated(state.frame_time);
 
-        o_x += state.constants.lightmap_scale / 2.0;
-        o_y += state.constants.lightmap_scale / 2.0;
+        //units: ingame pixels
+        let (o_x2, o_y2) = (
+            o_x - (o_x * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale - (0.5 / state.constants.lightmap_scale), //offset thingy, not really needed unless you're doing tile-res lighting
+            o_y - (o_y * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale - (0.5 / state.constants.lightmap_scale),
+        );
 
-
-        let uv = (0.0, 0.0);
+        //Hack: this variable is passed into the shader, but is unused by it. We're re-using it here to do some frame offsetting stuff (we could also do this in a uniform, but...)
+        //note: Y is inverted inside the shader, so this would be -x, -y
+        let uv = (
+            -(o_x * state.constants.lightmap_scale).fract(),
+            (o_y * state.constants.lightmap_scale).fract(),
+        );
         let t = *self.t.borrow_mut() as f32 + state.frame_time as f32;
-        let shader = BackendShader::WaterFill(scale, t, (o_x, o_y));
+        let shader = BackendShader::WaterFill(scale, t, (o_x, o_y)); //frame offset (oxoy) determines the offset in the sine cycle, not the offset of the surface underneath...
         let mut vertices = Vec::new();
 
+        //draw lower, non-surface waters
         {
             let mut draw_region = |region: &DepthRegion| -> GameResult {
                 let color_mid_rgba = region.color.color_middle.to_rgba();
@@ -271,10 +280,10 @@ impl WaterRenderer {
                 vertices.clear();
                 vertices.reserve(6);
 
-                let left = (region.rect.left - o_x - 8.0) * scale;
-                let top = (region.rect.top - o_y - 8.0) * scale;
-                let right = (region.rect.right - o_x + 8.0) * scale;
-                let bottom = (region.rect.bottom - o_y + 8.0) * scale;
+                let left = (region.rect.left - o_x2 - 8.0) * scale;
+                let top = (region.rect.top - o_y2 - 8.0) * scale;
+                let right = (region.rect.right - o_x2 + 8.0) * scale;
+                let bottom = (region.rect.bottom - o_y2 + 8.0) * scale;
 
                 vertices.push(VertexData { position: (left, bottom), uv, color: color_btm_rgba });
                 vertices.push(VertexData { position: (left, top), uv, color: color_mid_rgba });
@@ -296,6 +305,7 @@ impl WaterRenderer {
             }
         }
 
+        //draw surface waters
         {
             let mut draw_region = |surf: &DynamicWater| -> GameResult {
                 let pos_x = surf.x;
@@ -304,10 +314,10 @@ impl WaterRenderer {
                 let color_mid_rgba = surf.color.color_middle.to_rgba();
                 let color_btm_rgba = surf.color.color_bottom.to_rgba();
 
-                if (pos_x - o_x - 16.0) > state.canvas_size.0
-                    || (pos_x - o_x + 16.0 + surf.end_x) < 0.0
-                    || (pos_y - o_y - 16.0) > state.canvas_size.1
-                    || (pos_y - o_y + 16.0) < 0.0
+                if (pos_x - o_x2 - 16.0) > state.canvas_size.0
+                    || (pos_x - o_x2 + 16.0 + surf.end_x) < 0.0
+                    || (pos_y - o_y2 - 16.0) > state.canvas_size.1
+                    || (pos_y - o_y2 + 16.0) < 0.0
                 {
                     return Ok(());
                 }
@@ -315,12 +325,12 @@ impl WaterRenderer {
                 vertices.clear();
                 vertices.reserve(12 * surf.columns.len());
 
-                let bottom = (pos_y - o_y + 8.0) * scale;
+                let bottom = (pos_y - o_y2 + 8.0) * scale;
                 for i in 1..surf.columns.len() {
-                    let x_right = (pos_x - 8.0 - o_x + i as f32 * 2.0) * scale;
+                    let x_right = (pos_x - 8.0 - o_x2 + i as f32 * 2.0) * scale;
                     let x_left = x_right - 2.0 * scale;
-                    let top_left = (pos_y - o_y - 13.0 + surf.columns[i - 1].height) * scale;
-                    let top_right = (pos_y - o_y - 13.0 + surf.columns[i].height) * scale;
+                    let top_left = (pos_y - o_y2 - 13.0 + surf.columns[i - 1].height) * scale;
+                    let top_right = (pos_y - o_y2 - 13.0 + surf.columns[i].height) * scale;
                     let middle_left = top_left + 6.0 * scale;
                     let middle_right = top_left + 6.0 * scale;
 
@@ -363,38 +373,16 @@ impl WaterRenderer {
             let canvas = state.lightmap_canvas.as_mut().unwrap();
             let rect = Rect { left: 0, top: 0, right: width as u16, bottom: height as u16};
 
-            //canvas.clear();
-            //canvas.add(SpriteBatchCommand::DrawRect(rect, rect));
-            //canvas.draw()?;
-
-            // let (frame_x, frame_y) = if state.settings.game_scale_lighting {
-            //     //let (fx2, fy2) = self.frame.xy_interpolated(state.frame_time);
-            //     (
-            //         (o_x * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale, // - (0.5 / state.constants.lightmap_scale); //offset thingy, not really needed unless you're doing tile-res lighting
-            //         (o_y * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale, // - (0.5 / state.constants.lightmap_scale);
-            //     )
-            // } else {
-            //     (
-            //         0.0,
-            //         0.0,
-            //     )
-            // };
-            let (frame_x, frame_y) = (0.0,0.0);
-
-            // let (frame_x, frame_y) = (
-            //     -(o_x * state.constants.lightmap_scale + 0.5).fract() / state.constants.lightmap_scale + (0.5 / state.constants.lightmap_scale), //offset thingy, not really needed unless you're doing tile-res lighting
-            //     -(o_y * state.constants.lightmap_scale + 0.5).fract() / state.constants.lightmap_scale + (0.5 / state.constants.lightmap_scale),
-            // );
+            //offset between 0 and 1 lightmap pixels' worth in the screenspace
             let (frame_x, frame_y) = (
                 -(o_x * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale,
                 -(o_y * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale,
             );
 
-
             canvas.clear();
             canvas.add_rect_scaled(
-                frame_x + 16.0,
-                frame_y + 16.0,
+                frame_x,
+                frame_y,
                 draw_scale, draw_scale, &rect);
             canvas.draw(ctx)?;
         }

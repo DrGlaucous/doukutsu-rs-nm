@@ -6,17 +6,19 @@ uniform float Time;
 uniform float Scale;
 uniform vec2 FrameOffset;
 in vec4 Frag_Color;
-
+in vec2 Frag_UV;
 out vec4 outColor;
 
 void main()
 {
     vec2 resolution_inv = vec2(ProjMtx[0][0], -ProjMtx[1][1]) * 0.5;
     vec2 uv = gl_FragCoord.xy * resolution_inv;
+    vec2 image_pick_offset = Frag_UV.xy * resolution_inv;
+
     uv.y += 1.0;
     vec2 wave = uv;
-    wave.x += sin((-FrameOffset.y * resolution_inv.y + uv.x * 16.0) + Time / 20.0) * Scale * resolution_inv.x;
-    wave.y -= cos((-FrameOffset.x * resolution_inv.x + uv.y * 16.0) + Time / 5.0) * Scale * resolution_inv.y;
+    wave.x += sin((-FrameOffset.y * resolution_inv.y + uv.x * 16.0) + Time / 20.0) * Scale * resolution_inv.x + image_pick_offset.x;
+    wave.y -= cos((-FrameOffset.x * resolution_inv.x + uv.y * 16.0) + Time / 5.0) * Scale * resolution_inv.y + image_pick_offset.y;
     float off = 0.35 * Scale * resolution_inv.y;
     float off2 = 2.0 * off;
 
