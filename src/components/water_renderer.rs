@@ -244,30 +244,40 @@ impl WaterRenderer {
             return Ok(());
         }
 
-        let (scale, draw_scale) = if state.settings.game_scale_lighting {
-            (state.constants.lightmap_scale, state.scale)
-        } else {
-            (state.scale, 1.0 / state.scale)
-        };
-
         graphics::set_render_target(ctx, state.lightmap_canvas.as_ref().unwrap().get_texture())?;
         graphics::clear(ctx, Color::from_rgba(0, 0, 0, 0));
         graphics::set_blend_mode(ctx, BlendMode::None)?;
 
         let (o_x, o_y) = frame.xy_interpolated(state.frame_time);
 
-        //units: ingame pixels
-        let (o_x2, o_y2) = (
-            o_x - (o_x * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale - (0.5 / state.constants.lightmap_scale), //offset thingy, not really needed unless you're doing tile-res lighting
-            o_y - (o_y * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale - (0.5 / state.constants.lightmap_scale),
-        );
+        //variables that change depending on lighting mode
+        let(
+            (o_x2, o_y2),
+            uv,
+            (scale, draw_scale),
+        ) = if state.settings.game_scale_lighting {
+            (
+                (
+                    //units: ingame pixels
+                    o_x - (o_x * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale - (0.5 / state.constants.lightmap_scale),
+                    o_y - (o_y * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale - (0.5 / state.constants.lightmap_scale),
+                ),
+                (
+                    //Hack: this variable is passed into the shader, but is unused by it. We're re-using it here to do some frame offsetting stuff (we could also do this in a uniform, but...)
+                    //note: Y is inverted inside the shader, so this would be -x, -y
+                    -(o_x * state.constants.lightmap_scale).fract(),
+                    (o_y * state.constants.lightmap_scale).fract(),
+                ),
+                (state.constants.lightmap_scale, state.scale),
+            )
+        } else {
+            (
+                (o_x, o_y),
+                (0.0,0.0),
+                (state.scale, 1.0 / state.scale),
+            )
+        };
 
-        //Hack: this variable is passed into the shader, but is unused by it. We're re-using it here to do some frame offsetting stuff (we could also do this in a uniform, but...)
-        //note: Y is inverted inside the shader, so this would be -x, -y
-        let uv = (
-            -(o_x * state.constants.lightmap_scale).fract(),
-            (o_y * state.constants.lightmap_scale).fract(),
-        );
         let t = *self.t.borrow_mut() as f32 + state.frame_time as f32;
         let shader = BackendShader::WaterFill(scale, t, (o_x, o_y)); //frame offset (oxoy) determines the offset in the sine cycle, not the offset of the surface underneath...
         let mut vertices = Vec::new();
@@ -374,10 +384,14 @@ impl WaterRenderer {
             let rect = Rect { left: 0, top: 0, right: width as u16, bottom: height as u16};
 
             //offset between 0 and 1 lightmap pixels' worth in the screenspace
-            let (frame_x, frame_y) = (
-                -(o_x * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale,
-                -(o_y * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale,
-            );
+            let (frame_x, frame_y) = if state.settings.game_scale_lighting {
+                (
+                    -(o_x * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale,
+                    -(o_y * state.constants.lightmap_scale).fract() / state.constants.lightmap_scale,
+                )
+            } else {
+                (0.0,0.0)
+            };
 
             canvas.clear();
             canvas.add_rect_scaled(
