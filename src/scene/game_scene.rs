@@ -1763,12 +1763,18 @@ impl GameScene {
         //draw hit rect and display rect
 
         //x and y relative to frame (screen coords)
-        let x = ((entity.x() + entity.offset_x()) - self.frame.x) as isize / 0x200;
-        let y = ((entity.y() + entity.offset_y()) - self.frame.y) as isize / 0x200;
+        let x = ((entity.x()) - self.frame.x) as isize / 0x200;
+        let y = ((entity.y()) - self.frame.y) as isize / 0x200;
         let hit_bounds = entity.hit_bounds();
         let disp_bounds = entity.display_bounds();
 
         let scale = state.scale as isize;
+
+        let (db_l,db_r) = if entity.direction() == Direction::Left {
+            (disp_bounds.left, disp_bounds.right)
+        } else {
+            (disp_bounds.right, disp_bounds.left)
+        };
 
         //rect in the globalspace
         let rel_hit_rc = Rect {
@@ -1779,8 +1785,8 @@ impl GameScene {
         };
 
         let rel_disp_rc = Rect {
-            left: (x - (disp_bounds.left / 0x200) as isize) * scale,
-            right: (x + (disp_bounds.right / 0x200) as isize) * scale,
+            left: (x - (db_l / 0x200) as isize) * scale,
+            right: (x + (db_r / 0x200) as isize) * scale,
             top: (y - (disp_bounds.top / 0x200) as isize) * scale,
             bottom: (y + (disp_bounds.bottom / 0x200) as isize)* scale,
         };
