@@ -125,7 +125,7 @@ impl GameScene {
         GameScene::from_stage(state, ctx, stage, id)
     }
 
-    pub fn from_stage(state: &mut SharedGameState, ctx: &mut Context, stage: Stage, id: usize) -> GameResult<Self> {
+    pub fn from_stage(state: &mut SharedGameState, ctx: &mut Context, mut stage: Stage, id: usize) -> GameResult<Self> {
         let mut water_params = WaterParams::new();
         let mut water_renderer = WaterRenderer::new();
         let mut tilemap = Tilemap::new();
@@ -159,6 +159,16 @@ impl GameScene {
             player2.load_skin(skinsheet_name.to_owned(), state, ctx);
         }
 
+        let mut lighting_mode = LightingMode::None;
+
+        //try to load custom background if BKG type is 10
+        let mut background = Background::new();
+        if stage.data.background_type == BackgroundType::Custom {
+            let path = String::from(stage.data.background.name());
+            let textures = &mut stage_textures.deref().borrow_mut();
+            background.load_bkg_custom(state, ctx, textures, &mut stage, &mut lighting_mode, &path)?;
+        }
+
         Ok(Self {
             tick: 0,
             stage,
@@ -179,7 +189,7 @@ impl GameScene {
             hud_player2: HUD::new(Alignment::Right),
             nikumaru: NikumaruCounter::new(),
             whimsical_star: WhimsicalStar::new(),
-            background: Background::new(),
+            background,
             tilemap,
             text_boxes: TextBoxes::new(),
             fade: Fade::new(),
@@ -188,7 +198,7 @@ impl GameScene {
             npc_list: NPCList::new(),
             boss: BossNPC::new(),
             bullet_manager: BulletManager::new(),
-            lighting_mode: LightingMode::None,
+            lighting_mode,
             intro_mode: false,
             pause_menu: PauseMenu::new(),
             stage_textures,
@@ -329,9 +339,105 @@ impl GameScene {
         Ok(())
     }
 
+    //return a rect containing bar locations relative to the top left corner
+    pub fn get_black_bar_size(state: &mut SharedGameState, stage: &Stage, frame: &Frame,) -> Rect<isize> {
+
+
+        //x, y are the pixel coordinates of the top left corner of the frame
+        //ingame-pixel coordiantes of the frame relative to screen
+        let (x, y) = frame.xy_interpolated(state.frame_time);
+        let (x, y) = ((x) * state.scale, y * state.scale);
+
+        //size from the true window edge to where it should be on a single side
+        let canvas_offset_x = (state.canvas_size.0 - state.ratioed_size.0) * 0.5 * state.scale;
+        let canvas_offset_y = (state.canvas_size.1 - state.ratioed_size.1) * 0.5 * state.scale;
+
+        //size of drawable area
+        let canvas_w_scaled = state.canvas_size.0 as f32 * state.scale;
+        let canvas_h_scaled = state.canvas_size.1 as f32 * state.scale;
+
+        //size of a tile
+        let half_block = stage.map.tile_size.as_float() * 0.5 * state.scale;
+
+        //size of the level in pixels
+        let level_width = (stage.map.width as f32) * stage.map.tile_size.as_float();
+        let level_height = (stage.map.height as f32) * stage.map.tile_size.as_float();
+
+        //edge of map relative to screen size
+        let left_side = -x - half_block;
+        let right_side = left_side + level_width * state.scale;
+        let upper_side = -y - half_block;
+        let lower_side = upper_side + level_height * state.scale;
+
+
+        let mut b_rect = Rect::new(0,0,canvas_w_scaled as isize,canvas_h_scaled as isize);
+
+
+        //figure out forced-ratio offset
+        if canvas_offset_x > 0.0 {
+            b_rect.left = canvas_offset_x as isize;
+            b_rect.right = (canvas_offset_x + state.ratioed_size.0 * state.scale) as isize;
+        }
+        if canvas_offset_y > 0.0 {
+            b_rect.top = canvas_offset_y as isize;
+            b_rect.bottom = (canvas_offset_y + state.ratioed_size.1 * state.scale) as isize;
+        }
+
+        //optionally add the small-map offset
+
+        //choose greatest width between screen ratio and map ratio
+        if left_side > b_rect.left as f32 {
+            b_rect.left = left_side as isize;
+        }
+        if right_side < b_rect.right as f32 {
+            b_rect.right = right_side as isize;
+        }
+        if upper_side > b_rect.top as f32 {
+            b_rect.top = upper_side as isize;
+        }
+        if lower_side < b_rect.bottom as f32 {
+            b_rect.bottom = lower_side as isize;
+        }
+
+
+        return b_rect;
+
+    }
+
     fn draw_black_bars(&self, state: &mut SharedGameState, ctx: &mut Context) -> GameResult {
 
 
+        
+        //size of drawable area
+        let canvas_w_scaled = (state.canvas_size.0 as f32 * state.scale) as isize;
+        let canvas_h_scaled = (state.canvas_size.1 as f32 * state.scale) as isize;
+
+        let bar_size = Self::get_black_bar_size(state, &self.stage, &self.frame);
+
+        let rect_left = Rect::new(0,0,bar_size.left,canvas_h_scaled);
+        let rect_right = Rect::new(bar_size.right,0,canvas_w_scaled,canvas_h_scaled);
+
+        let rect_top = Rect::new(0, bar_size.top, canvas_w_scaled, 0);
+        let rect_bottom = Rect::new(0, bar_size.bottom, canvas_w_scaled, canvas_h_scaled);
+
+
+        //draw letter/pillarboxes if they have width
+        if rect_left.width() > 0 {
+            graphics::draw_rect(ctx, rect_left, Color::from_rgb(255, 0, 0))?;
+        }
+        if rect_right.width() > 0 {
+            graphics::draw_rect(ctx, rect_right, Color::from_rgb(0, 255, 0))?;
+        }
+        if rect_top.height() > 0 {
+            graphics::draw_rect(ctx, rect_top, Color::from_rgb(0, 0, 255))?;
+        }
+        if rect_bottom.height() > 0 {
+            graphics::draw_rect(ctx, rect_bottom, Color::from_rgb(255, 255, 0))?;
+        }
+        
+
+
+        /*
         //size from the true window edge to where it should be on a single side
         let canvas_offset_x = (state.canvas_size.0 - state.ratioed_size.0) * 0.5 * state.scale;
         let canvas_offset_y = (state.canvas_size.1 - state.ratioed_size.1) * 0.5 * state.scale;
@@ -361,65 +467,56 @@ impl GameScene {
         let upper_side = -y - half_block;
         let lower_side = upper_side + level_height * state.scale;
 
-        //test hacky stuff
-        {
-            if canvas_offset_x > 0.0 {
-                let rect = Rect::new(0, 0, canvas_offset_x as isize, canvas_h_scaled as isize);
-                graphics::draw_rect(ctx, rect, Color::from_rgb(255, 128, 0))?;
 
+        let mut rect_left = Rect::new(0,0,0,canvas_h_scaled as isize);
+        let mut rect_right = Rect::new(canvas_w_scaled as isize,0,canvas_w_scaled as isize,canvas_h_scaled as isize);
 
-                let rect = Rect::new(
-                    (canvas_offset_x + state.ratioed_size.0 * state.scale) as isize,
-                    0,
-                    (state.canvas_size.0 * state.scale) as isize,
-                    (state.canvas_size.1 * state.scale) as isize,
-                );
-                graphics::draw_rect(ctx, rect, Color::from_rgb(0, 255, 128))?;
-            }
+        let mut rect_top = Rect::new(0, 0, canvas_w_scaled as isize, 0);
+        let mut rect_bottom = Rect::new(0, canvas_h_scaled as isize, canvas_w_scaled as isize, canvas_h_scaled as isize);
 
-            if canvas_offset_y > 0.0 {
-                let rect = Rect::new(0, 0, canvas_w_scaled as isize, canvas_offset_y as isize);
-                graphics::draw_rect(ctx, rect, Color::from_rgb(128, 128, 255))?;
+        if canvas_offset_x > 0.0 {
+            rect_left.right = canvas_offset_x as isize;
 
-                let rect = Rect::new(
-                    0,
-                    (canvas_offset_y + state.ratioed_size.1 * state.scale) as isize,
-                    (state.canvas_size.0 * state.scale) as isize,
-                    (state.canvas_size.1 * state.scale) as isize,
-                );
-                graphics::draw_rect(ctx, rect, Color::from_rgb(128, 255, 255))?;
-            }
+            rect_right.left = (canvas_offset_x + state.ratioed_size.0 * state.scale) as isize;
+        }
+        if canvas_offset_y > 0.0 {
 
+            rect_top.bottom = canvas_offset_y as isize;
 
-            
+            rect_bottom.top = (canvas_offset_y + state.ratioed_size.1 * state.scale) as isize;
         }
 
-
-        //draw bars for each side
-        if left_side > 0.0 {
-            let rect = Rect::new(0, 0, left_side as isize, canvas_h_scaled as isize);
-            graphics::draw_rect(ctx, rect, Color::from_rgb(255, 0, 0))?;
+        //choose greatest width between screen ratio and map ratio
+        if left_side > rect_left.right as f32 {
+            rect_left.right = left_side as isize;
+        }
+        if right_side < rect_right.left as f32 {
+            rect_right.left = right_side as isize;
+        }
+        if upper_side > rect_top.bottom as f32 {
+            rect_top.bottom = upper_side as isize;
+        }
+        if lower_side < rect_bottom.top as f32 {
+            rect_bottom.top = lower_side as isize;
         }
 
-        if right_side < canvas_w_scaled {
-            let rect = Rect::new(
-                right_side as isize,
-                0,
-                (state.canvas_size.0 * state.scale) as isize,
-                (state.canvas_size.1 * state.scale) as isize,
-            );
-            graphics::draw_rect(ctx, rect, Color::from_rgb(0, 255, 0))?;
+        //draw letter/pillarboxes if they have width
+        if rect_left.width() > 0 {
+            graphics::draw_rect(ctx, rect_left, Color::from_rgb(255, 0, 0))?;
         }
+        if rect_right.width() > 0 {
+            graphics::draw_rect(ctx, rect_right, Color::from_rgb(0, 255, 0))?;
+        }
+        if rect_top.height() > 0 {
+            graphics::draw_rect(ctx, rect_top, Color::from_rgb(0, 0, 255))?;
+        }
+        if rect_bottom.height() > 0 {
+            graphics::draw_rect(ctx, rect_bottom, Color::from_rgb(255, 255, 0))?;
+        }
+        */
 
-        if upper_side > 0.0 {
-            let rect = Rect::new(0, 0, canvas_w_scaled as isize, upper_side as isize);
-            graphics::draw_rect(ctx, rect, Color::from_rgb(0, 0, 255))?;
-        }
+        
 
-        if lower_side < canvas_h_scaled {
-            let rect = Rect::new(0, lower_side as isize, canvas_w_scaled as isize, canvas_h_scaled as isize);
-            graphics::draw_rect(ctx, rect, Color::from_rgb(255, 255, 0))?;
-        }
 
         Ok(())
     }

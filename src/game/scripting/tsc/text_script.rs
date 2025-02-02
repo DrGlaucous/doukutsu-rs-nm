@@ -2028,7 +2028,7 @@ impl TextScriptVM {
                 //get path
                 let len = read_cur_varint(&mut cursor)? as usize;
                 let filepath = read_string_tsc(&mut cursor, len).unwrap();
-                game_scene.background.load_bkg_custom(ctx, textures, &mut game_scene.stage, &mut game_scene.lighting_mode, &mut &filepath)?;
+                game_scene.background.load_bkg_custom(state, ctx, textures, &mut game_scene.stage, &mut game_scene.lighting_mode, &mut &filepath)?;
                 exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
             }
             TSCOpCode::BKD | TSCOpCode::BKE => {

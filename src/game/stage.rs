@@ -106,6 +106,7 @@ impl From<u8> for BackgroundType {
             7 => Self::Outside,
             8 => Self::OutsideUnknown,
             9 => Self::Waterway,
+            10 => Self::Custom,
             _ => {
                 // log::warn!("Unknown background type: {}", val);
                 Self::Black

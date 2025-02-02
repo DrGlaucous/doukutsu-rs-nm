@@ -6,6 +6,7 @@
 
 The BKG or "Background" mod allows backgrounds to be modularly configured using json files without needing to recompile the source.
 
+If a .json file with the same name is paired with a background file, it will be loaded automatically with the background if BKG Scroll type is set to `10` in the stage table or mrmap.bin.
 
 Please see [this page](https://wiki.doukutsu.club/bkg-hack) for more info on BKG in general, as well as other implementations for other Cave Story engines.
 
@@ -13,7 +14,7 @@ Please see [this page](https://wiki.doukutsu.club/bkg-hack) for more info on BKG
 The BKG mod adds the following commands to TSC:
 
 
-- `<BKGname_of_config$` - Loads the BKG config file from `./data/bkg` with `name_of_config`. (`$` is string delimiter)
+- `<BKGname_of_config$` - Loads the BKG config file from `./data/` with `name_of_config`. (`$` is string delimiter)
 - `<BKDwwww` - Disable the background layer `wwww`. (out-of-range layers will be set to the last layer)
 - `<BKEwwww` - Enable background layer. (similar to `BKD`)
 - `<BKPwwww:xxxx:yyyy` - Set `BKG` parameter `xxxx` for layer `wwww` to value `yyyy`. *(TODO: negatives and floating points)*
@@ -24,7 +25,7 @@ The BKG mod adds the following commands to TSC:
 
 ### BKP assignment table
 This table is lifted from `components/background.rs`
-```
+```Rust
 //parameter is xxxx
 //value is yyyy
 
@@ -141,7 +142,7 @@ These files can have any name, and the bitmap they load is determined by the fie
 - `relative_to_pillarbox` / `relative_to_letterbox` - Changes what is regarded as an "edge" to the background layer. For small maps or wide screens, there may be black "strips" along the sides or bottom of the viewing window. If these settings are enabled, the background will align itself with the edge of this black strip instead of the actual edge of the window. Typically, these should be `true` if there is detail on a background layer that is only repeated a few times, or is at risk of being covered by the black "strips". *If you're unsure on how to use these, it's safer to set them to `true`.*
 
 Here's an example of a file:
-```
+```Json
 {
   "version": 3,
   "bmp_filename": "bkBlue",
@@ -180,7 +181,7 @@ Here's an example of a file:
           "random_offset_y": false,
           "lock_to_x_axis": false,
           "lock_to_y_axis": false,
-          "randomize_all_parameters": false
+          "randomize_all_parameters": false,
           "add_screen_width": false,
           "add_screen_height": false,
           "relative_to_pillarbox": false,
@@ -221,7 +222,7 @@ Here's an example of a file:
           "random_offset_y": false,
           "lock_to_x_axis": false,
           "lock_to_y_axis": false,
-          "randomize_all_parameters": false
+          "randomize_all_parameters": false,
           "add_screen_width": false,
           "add_screen_height": false,
           "relative_to_pillarbox": false,
@@ -271,7 +272,7 @@ Here are the fields for the animated tile config file:
 - `frame` - list of tile RECTs to render in sequence, selected in the same manner as the `tile_id`. *(Note: this affects what the tile **looks like** only. It does not affect collision, which is still that of `tile_id`.)*
  
 Here's an example of a file:
-```
+```Json
 {
   "version": 1,
   "tiles": [
@@ -317,7 +318,7 @@ Here's an example of a file:
 The internal code now has ready-support for sprite rotation. *(which should work with all backends, but is untested on the `horizon` backend because I don't own a nintendo switch)*
 
 The SpriteBatch struct now has the following method:
-```
+```Rust
 fn add_rect_flip_scaled_tinted_rotated(
     &mut self,
     x: f32,

@@ -8,7 +8,7 @@ use crate::framework::{filesystem, graphics};
 use crate::game::frame::Frame;
 use crate::game::shared_game_state::{SharedGameState, TileSize};
 use crate::game::stage::{BackgroundType, Stage, StageTexturePaths};
-use crate::scene::game_scene::LightingMode;
+use crate::scene::game_scene::{GameScene, LightingMode};
 use crate::framework::error::GameError;
 use crate::util::rng::{Xoroshiro32PlusPlus, RNG};
 
@@ -199,8 +199,8 @@ fn default_add_height_percent() -> f32 {
 impl BkgConfig {
 
     pub fn load(ctx: &Context, path: &String) -> GameResult<BkgConfig> {
-        //open from ./data/bkg/ folder
-        match filesystem::open(ctx, String::from("/bkg/") + path + ".json") {
+        //open from ./data/bkg/ folder, originally String::from("/bkg/"), but was changed to be more generic
+        match filesystem::open(ctx, String::from("/") + path + ".json") {
             Ok(file) => {
                 match serde_json::from_reader::<_, BkgConfig>(file) {
                     Ok(bkg_config) => return Ok(bkg_config.upgrade(path)),
@@ -378,6 +378,7 @@ impl Background {
 
     pub fn load_bkg_custom(
         &mut self,
+        state: &mut SharedGameState,
         ctx: &mut Context,
         textures: &mut StageTexturePaths,
         stage: &mut Stage,
@@ -392,10 +393,16 @@ impl Background {
 
         //if the config file is valid, load it in
         if let Ok(config) = BkgConfig::load(ctx, path) {
-            textures.background = config.bmp_filename.clone(); //we need to check the validity of the filename here to stop the program from crashing, but this not essential for function
-            self.bk_config = config;
-            stage.data.background_type = BackgroundType::Custom;
-            *lighting_mode = LightingMode::from(self.bk_config.lighting_mode);
+            
+            if state.texture_set.find_texture(ctx, &state.constants.base_paths, &textures.background).is_some() {
+                textures.background = config.bmp_filename.clone(); //we need to check the validity of the filename here to stop the program from crashing, but this not essential for function
+                self.bk_config = config;
+                stage.data.background_type = BackgroundType::Custom;
+                *lighting_mode = LightingMode::from(self.bk_config.lighting_mode);
+            } else {
+                log::warn!("BKG Texture file does not exist!");
+                return Ok(());
+            }
         }
 
         //init random parameters if configured
@@ -432,28 +439,43 @@ impl Background {
         let map_pxl_width = (stage.map.width * tile_size) as f32;
         let map_pxl_height = (stage.map.height * tile_size) as f32;
 
+        let (frame_x, frame_y) = frame.xy_interpolated(state.frame_time);
+
         //this works well, but it works differently than the tiles below it, so it doesn't always line up.
         //actual size of a single letterbox (left or right)/(top or bottom)
         //let floored_canvas_size = (state.canvas_size.0 as i32, state.canvas_size.1 as i32);
         //let pilrbox_width = if floored_canvas_size.0 > map_pxl_width {(floored_canvas_size.0 - map_pxl_width) / 2} else {0};
         //let ltrbox_height = if floored_canvas_size.1 > map_pxl_height {(floored_canvas_size.1 - map_pxl_height) / 2} else {0};
 
-        //different way to calculate the same thing because we need the front layer to align with the letter/pillarboxes (and this occasionally differs by 1)
-        let (frame_x, frame_y) = frame.xy_interpolated(state.frame_time);
-        let pilrbox_width = - (frame_x + state.tile_size.as_float() / 2.0);
-        let ltrbox_height = - (frame_y + state.tile_size.as_float() / 2.0);
-        //only use these width/heights if our screen is bigger than the level
-        let pilrbox_width = if canvas_size.0 > map_pxl_width {pilrbox_width} else {0.0};
-        let ltrbox_height = if canvas_size.1 > map_pxl_height {ltrbox_height} else {0.0};
+        // //different way to calculate the same thing because we need the front layer to align with the letter/pillarboxes (and this occasionally differs by 1)
+        // let pilrbox_width = - (frame_x + state.tile_size.as_float() / 2.0);
+        // let ltrbox_height = - (frame_y + state.tile_size.as_float() / 2.0);
 
-        //the new offsets that should be used (if canvas is larger than map size, use map size offset over by width of pillarbox)
-        let pb_canvas_width = if canvas_size.0 > map_pxl_width {pilrbox_width + map_pxl_width} else {canvas_size.0};
-        let lb_canvas_height = if canvas_size.1 > map_pxl_height {ltrbox_height + map_pxl_height} else {canvas_size.1};
+        // let bar_size = GameScene::get_black_bar_size(state, stage, frame);
+        // //only use these width/heights if our screen is bigger than the level
+        // let pilrbox_width = if canvas_size.0 > map_pxl_width {pilrbox_width} else {0.0};
+        // let ltrbox_height = if canvas_size.1 > map_pxl_height {ltrbox_height} else {0.0};
 
+        // //the new offsets that should be used (if canvas is larger than map size, use map size offset over by width of pillarbox)
+        // let pb_canvas_width = if canvas_size.0 > map_pxl_width {pilrbox_width + map_pxl_width} else {canvas_size.0};
+        // let lb_canvas_height = if canvas_size.1 > map_pxl_height {ltrbox_height + map_pxl_height} else {canvas_size.1};
+
+        // let boxed_lim = Rect::new(
+        //     pilrbox_width as f32, 
+        //     ltrbox_height as f32, 
+        //     pb_canvas_width as f32, 
+        //     lb_canvas_height as f32);
+
+        let bar_size = GameScene::get_black_bar_size(state, stage, frame);
 
         //map edges if letterboxes are taken into account
-        let boxed_lim = Rect::new(pilrbox_width as f32, ltrbox_height as f32, pb_canvas_width as f32, lb_canvas_height as f32);
-        
+        let boxed_lim = Rect::new(
+            bar_size.left as f32 / state.scale, 
+            bar_size.top as f32 / state.scale, 
+            bar_size.right as f32 / state.scale, 
+            bar_size.bottom as f32 / state.scale
+        );
+
         //map edges relative to actual window size
         let windowed_lim = Rect::new(0.0, 0.0, canvas_size.0 as f32, canvas_size.1 as f32);
 
