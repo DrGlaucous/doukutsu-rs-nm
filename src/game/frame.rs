@@ -90,7 +90,15 @@ impl Frame {
     }
 
     pub fn update(&mut self, state: &mut SharedGameState, stage: &Stage) {
-        let mut screen_width = state.canvas_size.0;
+
+
+        let mut screen_width = state.ratioed_size.0;
+        let screen_height = state.ratioed_size.1;
+        let canvas_offset_x = (state.canvas_size.0 - screen_width) / 2.0;
+        let canvas_offset_y = (state.canvas_size.1 - screen_height) / 2.0;
+
+        //extra conditional if this is the switch version
+        //let mut screen_width = state.canvas_size.0;
         if state.constants.is_switch && stage.map.width <= 54 {
             screen_width += 10.0;
         }
@@ -102,31 +110,39 @@ impl Frame {
 
         let tile_size = state.tile_size.as_int();
 
+        //if the map is smaller than the screen width
         if (stage.map.width as usize).saturating_sub(1) * (tile_size as usize) < screen_width as usize {
-            self.x = -(((screen_width as i32 - (stage.map.width as i32 - 1) * tile_size) * 0x200) / 2);
-        } else {
-            self.x += (self.target_x - (screen_width as i32 * 0x200 / 2) - self.x) / self.wait;
+            //snap frame to a negative coordinate so the map is centered
+            //self.x = -(((screen_width as i32 - (stage.map.width as i32 - 1) * tile_size) * 0x200) / 2);
 
-            if self.x < 0 {
-                self.x = 0;
+            //(total screen width - total stage width) / 2
+            self.x = -(((screen_width as i32 - (stage.map.width as i32 - 1) * tile_size) * 0x200) / 2 + (canvas_offset_x as i32 * 0x200));
+
+        } else {
+            self.x += (self.target_x - (screen_width as i32 * 0x200 / 2) - (canvas_offset_x as i32 * 0x200) - self.x) / self.wait;
+
+            if self.x < 0 - (canvas_offset_x as i32) * 0x200 {
+                self.x = 0 - canvas_offset_x as i32 * 0x200;
             }
 
-            let max_x = (((stage.map.width as i32 - 1) * tile_size) - screen_width as i32) * 0x200;
+            //total width - screen width
+            let max_x = (((stage.map.width as i32 - 1) * tile_size) - (canvas_offset_x + screen_width) as i32) * 0x200;
             if self.x > max_x {
                 self.x = max_x;
             }
         }
 
-        if (stage.map.height as usize).saturating_sub(1) * (tile_size as usize) < state.canvas_size.1 as usize {
-            self.y = -(((state.canvas_size.1 as i32 - (stage.map.height as i32 - 1) * tile_size) * 0x200) / 2);
-        } else {
-            self.y += (self.target_y - (state.canvas_size.1 as i32 * 0x200 / 2) - self.y) / self.wait;
 
-            if self.y < 0 {
-                self.y = 0;
+        if (stage.map.height as usize).saturating_sub(1) * (tile_size as usize) < screen_height as usize {
+            self.y = -(((screen_height as i32 - (stage.map.height as i32 - 1) * tile_size) * 0x200) / 2 + (canvas_offset_y as i32 * 0x200));
+        } else {
+            self.y += (self.target_y - (screen_height as i32 * 0x200 / 2) - (canvas_offset_y as i32 * 0x200) - self.y) / self.wait;
+
+            if self.y < - (canvas_offset_y as i32) * 0x200 {
+                self.y = - (canvas_offset_y as i32) * 0x200;
             }
 
-            let max_y = (((stage.map.height as i32 - 1) * tile_size) - state.canvas_size.1 as i32) * 0x200;
+            let max_y = (((stage.map.height as i32 - 1) * tile_size) - (canvas_offset_y + screen_height) as i32) * 0x200;
             if self.y > max_y {
                 self.y = max_y;
             }

@@ -323,6 +323,7 @@ pub struct SharedGameState {
     pub scale: f32,
     pub canvas_size: (f32, f32),
     pub screen_size: (f32, f32),
+    pub ratioed_size: (f32, f32),
     pub preferred_viewport_size: (f32, f32),
     pub next_scene: Option<Box<dyn Scene>>,
     pub textscript_vm: TextScriptVM,
@@ -480,6 +481,7 @@ impl SharedGameState {
             scale: 2.0,
             screen_size: (640.0, 480.0),
             canvas_size: (320.0, 240.0),
+            ratioed_size: (320.0, 240.0),
             preferred_viewport_size: (320.0, 240.0),
             next_scene: None,
             textscript_vm: TextScriptVM::new(),
@@ -742,12 +744,12 @@ impl SharedGameState {
         //let scalar = 240;
         let ratio = self.preferred_viewport_size;
 
-        let ratio = (16.0, 12.0);
+        let ratio = (16.0, 9.0);
         let ref_height = 240.0;
         let height = ref_height;
         let width = height * ratio.0 / ratio.1;
         let ratio = (width, height);
-
+        self.preferred_viewport_size = ratio;
 
         //determine what integer scale to use
         let scale_x = self.screen_size.1.div(ratio.1).floor().max(1.0);
@@ -756,7 +758,7 @@ impl SharedGameState {
 
 
         self.canvas_size = (self.screen_size.0 / self.scale, self.screen_size.1 / self.scale);
-        //self.canvas_size = (ratio.0, ratio.1);
+        self.ratioed_size = (ratio.0, ratio.1);
 
         let (width, height) = (self.screen_size.0 as u16, self.screen_size.1 as u16);
 

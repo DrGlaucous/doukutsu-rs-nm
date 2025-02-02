@@ -330,21 +330,75 @@ impl GameScene {
     }
 
     fn draw_black_bars(&self, state: &mut SharedGameState, ctx: &mut Context) -> GameResult {
+
+
+        //size from the true window edge to where it should be on a single side
+        let canvas_offset_x = (state.canvas_size.0 - state.ratioed_size.0) * 0.5 * state.scale;
+        let canvas_offset_y = (state.canvas_size.1 - state.ratioed_size.1) * 0.5 * state.scale;
+
+
+        //x, y are the pixel coordinates of the top left corner of the frame
+        //ingame-pixel coordiantes of the frame relative to screen
         let (x, y) = self.frame.xy_interpolated(state.frame_time);
-        let (x, y) = (x * state.scale, y * state.scale);
+        let (x, y) = ((x) * state.scale, y * state.scale);
+
+    
+
+        //size of drawable area
         let canvas_w_scaled = state.canvas_size.0 as f32 * state.scale;
         let canvas_h_scaled = state.canvas_size.1 as f32 * state.scale;
+
+        //size of a tile
         let half_block = self.stage.map.tile_size.as_float() * 0.5 * state.scale;
+        
+        //size of the level in pixels
         let level_width = (self.stage.map.width as f32) * self.stage.map.tile_size.as_float();
         let level_height = (self.stage.map.height as f32) * self.stage.map.tile_size.as_float();
+
+        //edge of map relative to screen size
         let left_side = -x - half_block;
         let right_side = left_side + level_width * state.scale;
         let upper_side = -y - half_block;
         let lower_side = upper_side + level_height * state.scale;
 
+        //test hacky stuff
+        {
+            if canvas_offset_x > 0.0 {
+                let rect = Rect::new(0, 0, canvas_offset_x as isize, canvas_h_scaled as isize);
+                graphics::draw_rect(ctx, rect, Color::from_rgb(255, 128, 0))?;
+
+
+                let rect = Rect::new(
+                    (canvas_offset_x + state.ratioed_size.0 * state.scale) as isize,
+                    0,
+                    (state.canvas_size.0 * state.scale) as isize,
+                    (state.canvas_size.1 * state.scale) as isize,
+                );
+                graphics::draw_rect(ctx, rect, Color::from_rgb(0, 255, 128))?;
+            }
+
+            if canvas_offset_y > 0.0 {
+                let rect = Rect::new(0, 0, canvas_w_scaled as isize, canvas_offset_y as isize);
+                graphics::draw_rect(ctx, rect, Color::from_rgb(128, 128, 255))?;
+
+                let rect = Rect::new(
+                    0,
+                    (canvas_offset_y + state.ratioed_size.1 * state.scale) as isize,
+                    (state.canvas_size.0 * state.scale) as isize,
+                    (state.canvas_size.1 * state.scale) as isize,
+                );
+                graphics::draw_rect(ctx, rect, Color::from_rgb(128, 255, 255))?;
+            }
+
+
+            
+        }
+
+
+        //draw bars for each side
         if left_side > 0.0 {
             let rect = Rect::new(0, 0, left_side as isize, canvas_h_scaled as isize);
-            graphics::draw_rect(ctx, rect, Color::from_rgb(0, 0, 0))?;
+            graphics::draw_rect(ctx, rect, Color::from_rgb(255, 0, 0))?;
         }
 
         if right_side < canvas_w_scaled {
@@ -354,17 +408,17 @@ impl GameScene {
                 (state.canvas_size.0 * state.scale) as isize,
                 (state.canvas_size.1 * state.scale) as isize,
             );
-            graphics::draw_rect(ctx, rect, Color::from_rgb(0, 0, 0))?;
+            graphics::draw_rect(ctx, rect, Color::from_rgb(0, 255, 0))?;
         }
 
         if upper_side > 0.0 {
             let rect = Rect::new(0, 0, canvas_w_scaled as isize, upper_side as isize);
-            graphics::draw_rect(ctx, rect, Color::from_rgb(0, 0, 0))?;
+            graphics::draw_rect(ctx, rect, Color::from_rgb(0, 0, 255))?;
         }
 
         if lower_side < canvas_h_scaled {
             let rect = Rect::new(0, lower_side as isize, canvas_w_scaled as isize, canvas_h_scaled as isize);
-            graphics::draw_rect(ctx, rect, Color::from_rgb(0, 0, 0))?;
+            graphics::draw_rect(ctx, rect, Color::from_rgb(255, 255, 0))?;
         }
 
         Ok(())
