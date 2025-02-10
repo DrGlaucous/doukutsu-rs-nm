@@ -109,30 +109,44 @@ impl Tilemap {
 
         let batch = state.texture_set.get_or_load_batch(ctx, &state.constants, tex)?;
         let mut rect = Rect::new(0, 0, tile_size as u16, tile_size as u16);
-        let (mut frame_x, mut frame_y) = frame.xy_interpolated(state.frame_time);
+
+        //variables that relate to fixed ratios
+        let mut screen_width = state.ratioed_size.0;
+        let screen_height = state.ratioed_size.1;
+        let canvas_offset_x = (state.canvas_size.0 - screen_width) / 2.0;
+        let canvas_offset_y = (state.canvas_size.1 - screen_height) / 2.0;
+        
+        let (mut frame_x_r, mut frame_y_r) = frame.xy_interpolated(state.frame_time);
 
         if let Some(pxpack_data) = &stage.data.pxpack_data {
             let (fx, fy) = match layer {
-                TileLayer::Background => pxpack_data.scroll_bg.transform_camera_pos(frame_x, frame_y),
-                TileLayer::Middleground => pxpack_data.scroll_mg.transform_camera_pos(frame_x, frame_y),
-                _ => pxpack_data.scroll_fg.transform_camera_pos(frame_x, frame_y),
+                TileLayer::Background => pxpack_data.scroll_bg.transform_camera_pos(frame_x_r, frame_y_r),
+                TileLayer::Middleground => pxpack_data.scroll_mg.transform_camera_pos(frame_x_r, frame_y_r),
+                _ => pxpack_data.scroll_fg.transform_camera_pos(frame_x_r, frame_y_r),
             };
 
-            frame_x = fx;
-            frame_y = fy;
+            frame_x_r = fx;
+            frame_y_r = fy;
         }
 
+        let frame_x = frame_x_r + canvas_offset_x;
+        let frame_y = frame_y_r + canvas_offset_y;
+
+        //where in the tileset array we should start drawing from
         let tile_start_x = (frame_x as i32 / tile_size).clamp(0, layer_width as i32) as usize;
         let tile_start_y = (frame_y as i32 / tile_size).clamp(0, layer_height as i32) as usize;
+
+        //where to stop getting tiles
         let tile_end_x =
-            ((frame_x as i32 + 8 + state.canvas_size.0 as i32) / tile_size + 1).clamp(0, layer_width as i32) as usize;
-        let tile_end_y = ((frame_y as i32 + halft + state.canvas_size.1 as i32) / tile_size + 1)
+            ((frame_x as i32 + 8 + screen_width as i32) / tile_size + 1).clamp(0, layer_width as i32) as usize;
+        let tile_end_y = ((frame_y as i32 + halft + screen_height as i32) / tile_size + 1)
             .clamp(0, layer_height as i32) as usize;
 
         if layer == TileLayer::Snack {
             rect = state.constants.world.snack_rect;
         }
 
+        //draw main tiles
         for y in tile_start_y..tile_end_y {
             for x in tile_start_x..tile_end_x {
                 let tile = *stage.map.tiles.get((y * layer_width as usize) + x + layer_offset).unwrap();
@@ -196,8 +210,8 @@ impl Tilemap {
                 }
 
                 batch.add_rect(
-                    (x as f32 * tile_sizef - halftf) - frame_x,
-                    (y as f32 * tile_sizef - halftf) - frame_y,
+                    (x as f32 * tile_sizef - halftf) - frame_x_r,
+                    (y as f32 * tile_sizef - halftf) - frame_y_r,
                     &rect,
                 );
             }
@@ -205,27 +219,37 @@ impl Tilemap {
 
         batch.draw(ctx)?;
 
+        //draw foreground water
         if !self.no_water && layer == TileLayer::Foreground && stage.data.background_type == BackgroundType::Water {
             let batch = state.texture_set.get_or_load_batch(ctx, &state.constants, &textures.background)?;
             let rect_top = Rect { left: 0, top: 0, right: 32, bottom: 16 };
             let rect_middle = Rect { left: 0, top: 16, right: 32, bottom: 48 };
 
             let tile_start_x = frame_x as i32 / 32;
-            let tile_end_x = (frame_x + 16.0 + state.canvas_size.0) as i32 / 32 + 1;
+            let tile_end_x = (frame_x + 16.0 + screen_width) as i32 / 32 + 1;
             let water_y = state.water_level as f32 / 512.0;
-            let tile_count_y = (frame_y + 16.0 + state.canvas_size.1 - water_y) as i32 / 32 + 1;
+            let tile_count_y = (frame_y + 16.0 + screen_height - water_y) as i32 / 32 + 1;
 
             for x in tile_start_x..tile_end_x {
-                batch.add_rect((x as f32 * 32.0) - frame_x, water_y - frame_y, &rect_top);
+                batch.add_rect(
+                    (x as f32 * 32.0) - frame_x_r,
+                    water_y - frame_y_r,
+                    &rect_top
+                );
 
                 for y in 0..tile_count_y {
-                    batch.add_rect((x as f32 * 32.0) - frame_x, (y as f32 * 32.0) + water_y - frame_y, &rect_middle);
+                    batch.add_rect(
+                        (x as f32 * 32.0) - frame_x_r,
+                        (y as f32 * 32.0) + water_y - frame_y_r,
+                        &rect_middle
+                    );
                 }
             }
 
             batch.draw(ctx)?;
         }
 
+        //draw wind
         if layer == TileLayer::Foreground {
             let batch = state.texture_set.get_or_load_batch(ctx, &state.constants, "Caret")?;
 
@@ -263,8 +287,8 @@ impl Tilemap {
                     }
 
                     batch.add_rect(
-                        (x as f32 * tile_sizef - halftf) - frame_x,
-                        (y as f32 * tile_sizef - halftf) - frame_y,
+                        (x as f32 * tile_sizef - halftf) - frame_x_r,
+                        (y as f32 * tile_sizef - halftf) - frame_y_r,
                         &push_rect,
                     );
                 }

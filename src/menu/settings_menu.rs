@@ -14,6 +14,7 @@ use crate::sound::backend::InterpolationMode;
 use crate::util::browser;
 
 use super::controls_menu::ControlsMenu;
+use super::display_menu::{self, DisplayMenu};
 
 #[derive(PartialEq, Eq, Copy, Clone)]
 #[repr(u8)]
@@ -21,6 +22,7 @@ use super::controls_menu::ControlsMenu;
 enum CurrentMenu {
     MainMenu,
     GraphicsMenu,
+    DisplayMenu,
     SoundMenu,
     ControlsMenu,
     SoundtrackMenu,
@@ -185,6 +187,7 @@ pub struct SettingsMenu {
     advanced: Menu<AdvancedMenuEntry>,
     portable: Menu<PortableMenuEntry>,
     controls_menu: ControlsMenu,
+    display_menu: DisplayMenu,
     pub on_title: bool,
 }
 
@@ -208,6 +211,7 @@ impl SettingsMenu {
         let advanced = Menu::new(0, 0, 220, 0);
         let portable = Menu::new(0, 0, 220, 0);
 
+        let display_menu = DisplayMenu::new();
         let controls_menu = ControlsMenu::new();
 
         SettingsMenu {
@@ -220,6 +224,7 @@ impl SettingsMenu {
             behavior,
             links,
             advanced,
+            display_menu,
             controls_menu,
             portable,
             on_title: false,
@@ -251,14 +256,15 @@ impl SettingsMenu {
         #[cfg(not(any(target_os = "android", target_os = "horizon", feature = "backend-libretro")))]
         self.graphics.push_entry(
             GraphicsMenuEntry::WindowMode,
-            MenuEntry::Options(
-                state.loc.t("menus.options_menu.graphics_menu.window_mode.entry").to_owned(),
-                state.settings.window_mode as usize,
-                vec![
-                    state.loc.t("menus.options_menu.graphics_menu.window_mode.windowed").to_owned(),
-                    state.loc.t("menus.options_menu.graphics_menu.window_mode.fullscreen").to_owned(),
-                ],
-            ),
+            MenuEntry::Active(format!("WINDOW MODE"))
+            // MenuEntry::Options(
+            //     state.loc.t("menus.options_menu.graphics_menu.window_mode.entry").to_owned(),
+            //     state.settings.window_mode as usize,
+            //     vec![
+            //         state.loc.t("menus.options_menu.graphics_menu.window_mode.windowed").to_owned(),
+            //         state.loc.t("menus.options_menu.graphics_menu.window_mode.fullscreen").to_owned(),
+            //     ],
+            // ),
         );
         self.graphics.push_entry(
             GraphicsMenuEntry::LightingEffects,
@@ -607,6 +613,8 @@ impl SettingsMenu {
 
         self.controls_menu.init(state, ctx)?;
 
+        self.display_menu.init(state, ctx)?;
+
         self.update_sizes(state);
 
         Ok(())
@@ -695,21 +703,8 @@ impl SettingsMenu {
                 _ => (),
             },
             CurrentMenu::GraphicsMenu => match self.graphics.tick(controller, state) {
-                MenuSelectionResult::Selected(GraphicsMenuEntry::WindowMode, toggle)
-                | MenuSelectionResult::Right(GraphicsMenuEntry::WindowMode, toggle, _)
-                | MenuSelectionResult::Left(GraphicsMenuEntry::WindowMode, toggle, _) => {
-                    if let MenuEntry::Options(_, value, _) = toggle {
-                        let (new_mode, new_value) = match *value {
-                            0 => (WindowMode::Fullscreen, 1),
-                            1 => (WindowMode::Windowed, 0),
-                            _ => unreachable!(),
-                        };
-
-                        *value = new_value;
-                        state.settings.window_mode = new_mode;
-
-                        let _ = state.settings.save(ctx);
-                    }
+                MenuSelectionResult::Selected(GraphicsMenuEntry::WindowMode, _) => {
+                    self.current = CurrentMenu::DisplayMenu
                 }
                 MenuSelectionResult::Selected(GraphicsMenuEntry::VSyncMode, toggle)
                 | MenuSelectionResult::Right(GraphicsMenuEntry::VSyncMode, toggle, _) => {
@@ -921,6 +916,18 @@ impl SettingsMenu {
                 }
                 _ => (),
             },
+            CurrentMenu::DisplayMenu => {
+                let cm = &mut self.current;
+                self.display_menu.tick(
+                    &mut || {
+                        *cm = CurrentMenu::GraphicsMenu;
+                    },
+                    controller,
+                    state,
+                    ctx,
+                )?;
+            }
+
             CurrentMenu::ControlsMenu => {
                 let cm = &mut self.current;
                 self.controls_menu.tick(
@@ -1131,6 +1138,7 @@ impl SettingsMenu {
             CurrentMenu::GraphicsMenu => self.graphics.draw(state, ctx)?,
             CurrentMenu::SoundMenu => self.sound.draw(state, ctx)?,
             CurrentMenu::SoundtrackMenu => self.soundtrack.draw(state, ctx)?,
+            CurrentMenu::DisplayMenu => self.display_menu.draw(state, ctx)?,
             CurrentMenu::ControlsMenu => self.controls_menu.draw(state, ctx)?,
             CurrentMenu::LanguageMenu => self.language.draw(state, ctx)?,
             CurrentMenu::BehaviorMenu => self.behavior.draw(state, ctx)?,

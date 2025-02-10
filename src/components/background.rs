@@ -1,7 +1,7 @@
 use std::borrow::BorrowMut;
 use std::path::PathBuf;
 
-use crate::common::{Color, Rect};
+use crate::common::{fix9_scale, interp_x_descale, interpolate_fix9_scale, Color, Rect};
 use crate::framework::context::Context;
 use crate::framework::error::GameResult;
 use crate::framework::{filesystem, graphics};
@@ -64,6 +64,33 @@ pub struct AnimationStyle {
 
 }
 
+
+//variables that are skipped when saving or loading to and from a config file
+#[derive(Clone)]
+pub struct DynamicLayerVars {
+        //starting positions for each bitmap when drawn onscreen (values that are animated): 
+        pub layer_x_value: f32, //I think these are the starting positions for each bitmap when drawn on the screen
+        pub layer_y_value: f32,
+    
+        //calculate additional frame-realtive offsets (like distant scrolling) and place them here so the other offset functions can get at them
+        pub frame_x_offset: f32,
+        pub frame_y_offset: f32,
+    
+        //coordinates to use for refrencing the screen edge, can be unique for each layer
+        pub edge_coords: Rect<f32>,
+}
+impl Default for DynamicLayerVars {
+    fn default() -> Self {
+        DynamicLayerVars {
+            layer_x_value: 0.0, //current location of the layer on the window
+            layer_y_value: 0.0,
+            frame_x_offset: 0.0, //extra offsets to apply from the camera
+            frame_y_offset: 0.0,
+            edge_coords: Rect::new(0.0, 0.0, 0.0, 0.0),
+        }
+    }
+}
+
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct LayerConfig {
     
@@ -86,21 +113,11 @@ pub struct LayerConfig {
     //internal only: do not save to or load from JSON
 
 
-    //starting positions for each bitmap when drawn onscreen: 
+    //starting positions for each bitmap when drawn onscreen (values that are animated): 
     #[serde(skip)]
-    pub layer_x_value: f32, //I think these are the starting positions for each bitmap when drawn on the screen
+    pub dynamics: DynamicLayerVars,
     #[serde(skip)]
-    pub layer_y_value: f32,
-
-    //calculate additional frame-realtive offsets (like distant scrolling) and place them here so the other offset functions can get at them
-    #[serde(skip)]
-    pub frame_x_offset: f32,
-    #[serde(skip)]
-    pub frame_y_offset: f32,
-
-    //coordinates to use for refrencing the screen edge, can be unique for each layer
-    #[serde(skip)]
-    pub edge_coords: Rect<f32>,
+    pub prev_dynamics: DynamicLayerVars, //used for interpolation
 
 }
 
@@ -147,13 +164,9 @@ impl LayerConfig {
                     relative_to_letterbox: true,
                 }
             },
-
             //non-config items
-            layer_x_value: 0.0, //current location of the layer on the window
-            layer_y_value: 0.0,
-            frame_x_offset: 0.0, //extra offsets to apply from the camera
-            frame_y_offset: 0.0,
-            edge_coords: Rect::new(0.0, 0.0, 0.0, 0.0),
+            dynamics: DynamicLayerVars::default(),
+            prev_dynamics: DynamicLayerVars::default(),
 
         }
     }
@@ -439,7 +452,8 @@ impl Background {
         let map_pxl_width = (stage.map.width * tile_size) as f32;
         let map_pxl_height = (stage.map.height * tile_size) as f32;
 
-        let (frame_x, frame_y) = frame.xy_interpolated(state.frame_time);
+        //let (frame_x, frame_y) = frame.xy_interpolated(state.frame_time);
+        let (frame_x, frame_y) = (fix9_scale(frame.x), fix9_scale(frame.y));
 
         //this works well, but it works differently than the tiles below it, so it doesn't always line up.
         //actual size of a single letterbox (left or right)/(top or bottom)
@@ -512,42 +526,42 @@ impl Background {
 
             //handle edge relativity
             if scroll_flags.relative_to_pillarbox {
-                (layer.edge_coords.left, layer.edge_coords.right) = (boxed_lim.left, boxed_lim.right);
+                (layer.dynamics.edge_coords.left, layer.dynamics.edge_coords.right) = (boxed_lim.left, boxed_lim.right);
             } else {
-                (layer.edge_coords.left, layer.edge_coords.right) = (windowed_lim.left, windowed_lim.right);
+                (layer.dynamics.edge_coords.left, layer.dynamics.edge_coords.right) = (windowed_lim.left, windowed_lim.right);
             }
 
             if scroll_flags.relative_to_letterbox {
-                (layer.edge_coords.top, layer.edge_coords.bottom) = (boxed_lim.top, boxed_lim.bottom);
+                (layer.dynamics.edge_coords.top, layer.dynamics.edge_coords.bottom) = (boxed_lim.top, boxed_lim.bottom);
             } else {
-                (layer.edge_coords.top, layer.edge_coords.bottom) = (windowed_lim.top, windowed_lim.bottom);
+                (layer.dynamics.edge_coords.top, layer.dynamics.edge_coords.bottom) = (windowed_lim.top, windowed_lim.bottom);
             }
 
 
-            layer.frame_x_offset = layer.edge_coords.left;
-            layer.frame_y_offset = layer.edge_coords.top;
+            layer.dynamics.frame_x_offset = layer.dynamics.edge_coords.left;
+            layer.dynamics.frame_y_offset = layer.dynamics.edge_coords.top;
 
             if scroll_flags.follow_pc_x {
-                layer.frame_x_offset -= (frame_x as f32 * layer.animation_style.follow_speed_x * scale).floor() / scale;
+                layer.dynamics.frame_x_offset -= (frame_x as f32 * layer.animation_style.follow_speed_x * scale).floor() / scale;
             }
             if scroll_flags.lock_to_y_axis {
-                layer.frame_x_offset -= frame_x as f32;
+                layer.dynamics.frame_x_offset -= frame_x as f32;
             }
             if scroll_flags.add_screen_width {
-                layer.frame_x_offset += layer.edge_coords.width() * layer.animation_style.screen_width_add_percent;
+                layer.dynamics.frame_x_offset += layer.dynamics.edge_coords.width() * layer.animation_style.screen_width_add_percent;
             }
 
             if scroll_flags.align_with_water_lvl {
-                layer.frame_y_offset += (state.water_level / 0x200) as f32 - frame_y;
+                layer.dynamics.frame_y_offset += (state.water_level / 0x200) as f32 - frame_y;
             }
             if scroll_flags.follow_pc_y {
-                layer.frame_y_offset -= (frame_y as f32 * layer.animation_style.follow_speed_y * scale).floor() / scale;
+                layer.dynamics.frame_y_offset -= (frame_y as f32 * layer.animation_style.follow_speed_y * scale).floor() / scale;
             }
             if scroll_flags.lock_to_x_axis {
-                layer.frame_y_offset -= frame_y as f32;
+                layer.dynamics.frame_y_offset -= frame_y as f32;
             }
             if scroll_flags.add_screen_height {
-                layer.frame_y_offset += layer.edge_coords.height() * layer.animation_style.screen_height_add_percent;
+                layer.dynamics.frame_y_offset += layer.dynamics.edge_coords.height() * layer.animation_style.screen_height_add_percent;
             }
 
 
@@ -555,8 +569,8 @@ impl Background {
             //if-chain for each flag type:
 
             //animate autoscrolling (looping is handled in the conditions below)
-            if scroll_flags.autoscroll_x {layer.layer_x_value -= layer.animation_style.autoscroll_speed_x;}
-            if scroll_flags.autoscroll_y {layer.layer_y_value -= layer.animation_style.autoscroll_speed_y;}
+            if scroll_flags.autoscroll_x {layer.dynamics.layer_x_value -= layer.animation_style.autoscroll_speed_x;}
+            if scroll_flags.autoscroll_y {layer.dynamics.layer_y_value -= layer.animation_style.autoscroll_speed_y;}
 
             let full_width = (layer.bmp_width + layer.draw_repeat_gap_x) as f32;
             let full_height = (layer.bmp_height + layer.draw_repeat_gap_y) as f32;
@@ -580,11 +594,11 @@ impl Background {
             //looping for infinite-width tilesets: (note: it takes several cycles to get this within range if corner offsets are massve: that's what the code above tried to solve, but it introduces other problems I don't want to deal with)
             if layer.draw_repeat_x == 0 {
                 //offset just behind left wall, and shift in
-                if layer.layer_x_value + layer.frame_x_offset + layer.draw_corner_offset_x > layer.edge_coords.left { //0.0 {                    
-                    layer.layer_x_value -= full_width;
+                if layer.dynamics.layer_x_value + layer.dynamics.frame_x_offset + layer.draw_corner_offset_x > layer.dynamics.edge_coords.left { //0.0 {                    
+                    layer.dynamics.layer_x_value -= full_width;
                 }
-                else if layer.layer_x_value + layer.frame_x_offset + layer.draw_corner_offset_x < layer.edge_coords.left - full_width {
-                    layer.layer_x_value += full_width;
+                else if layer.dynamics.layer_x_value + layer.dynamics.frame_x_offset + layer.draw_corner_offset_x < layer.dynamics.edge_coords.left - full_width {
+                    layer.dynamics.layer_x_value += full_width;
                 }
             }
             //if the bitmap is set to repeat and the bitmap count is finite, handle looping it
@@ -592,28 +606,28 @@ impl Background {
                 //layer.layer_x_value -= layer.animation_style.scroll_speed_x;
 
                 //if layer's right corner offset by the times it should be drawn is less than 0, shift it over by one bitmap width and window width
-                if layer.layer_x_value + layer.draw_corner_offset_x +
+                if layer.dynamics.layer_x_value + layer.draw_corner_offset_x +
                 (full_width * layer.draw_repeat_x as f32) +
-                layer.frame_x_offset < layer.edge_coords.left {
+                layer.dynamics.frame_x_offset < layer.dynamics.edge_coords.left {
 
                     //move whole layerset to the right side of the viewspace
-                    layer.layer_x_value += (full_width * layer.draw_repeat_x as f32) + layer.edge_coords.width();
+                    layer.dynamics.layer_x_value += (full_width * layer.draw_repeat_x as f32) + layer.dynamics.edge_coords.width();
 
                     //if y movement is randomized, add a random value +- animation speed to the y position
                     if scroll_flags.random_offset_y {
-                        layer.layer_y_value += self.rng.range(-(layer.animation_style.animation_speed as i32)..(layer.animation_style.animation_speed as i32)) as f32;
+                        layer.dynamics.layer_y_value += self.rng.range(-(layer.animation_style.animation_speed as i32)..(layer.animation_style.animation_speed as i32)) as f32;
                     }
                 }
 
                 //if layer's left corner is beyond the window width
-                else if layer.layer_x_value + layer.draw_corner_offset_x +
-                layer.frame_x_offset > layer.edge_coords.right {
+                else if layer.dynamics.layer_x_value + layer.draw_corner_offset_x +
+                layer.dynamics.frame_x_offset > layer.dynamics.edge_coords.right {
 
                     //move whole layer set to the left side of the viewspace
-                    layer.layer_x_value -= (full_width * layer.draw_repeat_x as f32) + layer.edge_coords.width();
+                    layer.dynamics.layer_x_value -= (full_width * layer.draw_repeat_x as f32) + layer.dynamics.edge_coords.width();
 
                     if scroll_flags.random_offset_y {
-                        layer.layer_y_value += self.rng.range(-(layer.animation_style.animation_speed as i32)..(layer.animation_style.animation_speed as i32)) as f32;
+                        layer.dynamics.layer_y_value += self.rng.range(-(layer.animation_style.animation_speed as i32)..(layer.animation_style.animation_speed as i32)) as f32;
                     }
 
                 }
@@ -623,39 +637,39 @@ impl Background {
             //same as above but for y
             if layer.draw_repeat_y == 0 {
                 //offset just behind left wall, and shift in
-                if layer.layer_y_value + layer.frame_y_offset + layer.draw_corner_offset_y >  layer.edge_coords.top { //0.0 {
-                    layer.layer_y_value -= full_height;
+                if layer.dynamics.layer_y_value + layer.dynamics.frame_y_offset + layer.draw_corner_offset_y >  layer.dynamics.edge_coords.top { //0.0 {
+                    layer.dynamics.layer_y_value -= full_height;
                 }
-                else if layer.layer_y_value + layer.frame_y_offset + layer.draw_corner_offset_y < layer.edge_coords.top - full_height {
-                    layer.layer_y_value += full_height;
+                else if layer.dynamics.layer_y_value + layer.dynamics.frame_y_offset + layer.draw_corner_offset_y < layer.dynamics.edge_coords.top - full_height {
+                    layer.dynamics.layer_y_value += full_height;
                 }
             }
             else if scroll_flags.autoscroll_y {
                 //layer.layer_y_value -= layer.animation_style.scroll_speed_y;
 
                 //if layer's top corner offset by the times it should be draw is less than 0, shift it down by one bitmap height and window height
-                if layer.layer_y_value + layer.draw_corner_offset_y +
+                if layer.dynamics.layer_y_value + layer.draw_corner_offset_y +
                 (full_height * layer.draw_repeat_y as f32) +
-                layer.frame_y_offset < layer.edge_coords.top {
+                layer.dynamics.frame_y_offset < layer.dynamics.edge_coords.top {
 
                     //move whole layerset to the bottom of the viewspace
-                    layer.layer_y_value += (full_height * layer.draw_repeat_y as f32) + layer.edge_coords.height();
+                    layer.dynamics.layer_y_value += (full_height * layer.draw_repeat_y as f32) + layer.dynamics.edge_coords.height();
 
                     //if y movement is randomized, add a random value +- animation speed to the x position
                     if scroll_flags.random_offset_x {
-                        layer.layer_x_value += self.rng.range(-(layer.animation_style.animation_speed as i32)..(layer.animation_style.animation_speed as i32)) as f32;
+                        layer.dynamics.layer_x_value += self.rng.range(-(layer.animation_style.animation_speed as i32)..(layer.animation_style.animation_speed as i32)) as f32;
                     }
                 }
 
                 //if layer's bottom corner is beyond the window height
-                else if layer.layer_y_value + layer.draw_corner_offset_y +
-                layer.frame_y_offset > layer.edge_coords.bottom {
+                else if layer.dynamics.layer_y_value + layer.draw_corner_offset_y +
+                layer.dynamics.frame_y_offset > layer.dynamics.edge_coords.bottom {
 
-                    //move whole layer set to the bottom of the viewspace
-                    layer.layer_y_value -= (full_height * layer.draw_repeat_y as f32) + layer.edge_coords.height();
+                    //move whole layerset to the bottom of the viewspace
+                    layer.dynamics.layer_y_value -= (full_height * layer.draw_repeat_y as f32) + layer.dynamics.edge_coords.height();
 
                     if scroll_flags.random_offset_x {
-                        layer.layer_x_value += self.rng.range(-(layer.animation_style.animation_speed as i32)..(layer.animation_style.animation_speed as i32)) as f32;
+                        layer.dynamics.layer_x_value += self.rng.range(-(layer.animation_style.animation_speed as i32)..(layer.animation_style.animation_speed as i32)) as f32;
                     }
 
                 }
@@ -680,7 +694,12 @@ impl Background {
 
         //update locations in tick()
 
+        for layer in self.bk_config.layers.as_mut_slice() {
+            if !layer.layer_enabled {continue;}
 
+            //for interpolation
+            layer.prev_dynamics = layer.dynamics.clone();
+        }
 
 
 
@@ -863,30 +882,31 @@ impl Background {
                     let (rep_x, rep_y) = (layer.draw_repeat_x, layer.draw_repeat_y);
 
                     //start here and draw bitmap, stepping each time by these coords
-                    let mut y_off = layer.layer_y_value as f32;
+                    let mut y_off = layer.dynamics.layer_y_value as f32;
 
                     //apply misc. camera/water offsets
-                    y_off += layer.frame_y_offset;
+                    y_off += layer.dynamics.frame_y_offset;
 
                     //apply map corner offset
                     y_off += layer.draw_corner_offset_y;
 
                     let mut y = 0;
-                    while (y < rep_y || rep_y == 0) && y_off < layer.edge_coords.bottom {
+                    while (y < rep_y || rep_y == 0) && y_off < layer.dynamics.edge_coords.bottom {
                         
                         //need this to reset for each layer
-                        let mut x_off = layer.layer_x_value as f32;
+                        let mut x_off = layer.dynamics.layer_x_value as f32;
 
                         //apply map corner offset
                         x_off += layer.draw_corner_offset_x;
 
                         //apply camera offset
-                        x_off += layer.frame_x_offset;
+                        //x_off += interp_x_descale(layer.prev_dynamics.frame_x_offset, layer.dynamics.frame_x_offset, state.frame_time);
+                        x_off += layer.dynamics.frame_x_offset;
 
 
                         //while loop (x-axis)
                         let mut x = 0;
-                        while (x < rep_x || rep_x == 0) && x_off < layer.edge_coords.right {
+                        while (x < rep_x || rep_x == 0) && x_off < layer.dynamics.edge_coords.right {
 
                             //condition taken care of earler in the draw process
                             //if scroll_flags.draw_above_foreground {}

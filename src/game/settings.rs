@@ -92,10 +92,20 @@ pub struct Settings {
     //new
     #[serde(default = "default_true")]
     pub game_scale_lighting: bool,
+    #[serde(default = "default_false")]
+    pub fixed_ratio: bool,
+    #[serde(default = "default_ratio")]
+    pub viewport_ratio: (f32, f32),
 }
 
+fn default_ratio() -> (f32, f32) {
+    (4.0, 3.0)
+}
 fn default_true() -> bool {
     true
+}
+fn default_false() -> bool {
+    false
 }
 
 #[inline(always)]
@@ -485,6 +495,8 @@ impl Default for Settings {
             discord_rpc: true,
             allow_strafe: true,
             game_scale_lighting: true,
+            fixed_ratio: false,
+            viewport_ratio: default_ratio(),
         }
     }
 }

@@ -321,10 +321,10 @@ pub struct SharedGameState {
     pub debugger: bool,
     pub command_line: bool,
     pub scale: f32,
-    pub canvas_size: (f32, f32),
-    pub screen_size: (f32, f32),
-    pub ratioed_size: (f32, f32),
-    pub preferred_viewport_size: (f32, f32),
+    pub canvas_size: (f32, f32), //pre-scaled screen size
+    pub screen_size: (f32, f32), //real screen size
+    pub ratioed_size: (f32, f32), //game window size (not including menus and HUD)
+    pub preferred_viewport_size: (f32, f32), //size to use as refrenche when snapping between scales
     pub next_scene: Option<Box<dyn Scene>>,
     pub textscript_vm: TextScriptVM,
     pub creditscript_vm: CreditScriptVM,
@@ -740,6 +740,9 @@ impl SharedGameState {
 
 
         self.screen_size = graphics::screen_size(ctx);
+
+        //replaces preferred_viewport_size
+        //self.settings.viewport_ratio;
 
         //let scalar = 240;
         let ratio = self.preferred_viewport_size;

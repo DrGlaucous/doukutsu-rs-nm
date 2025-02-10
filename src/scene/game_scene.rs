@@ -406,8 +406,11 @@ impl GameScene {
 
     fn draw_black_bars(&self, state: &mut SharedGameState, ctx: &mut Context) -> GameResult {
 
+        //light clip bug: we call fract(), which doesn't work so well with negative numbers
+        //the black bars should hide the problem though.
 
-        
+        //return Ok(());
+
         //size of drawable area
         let canvas_w_scaled = (state.canvas_size.0 as f32 * state.scale) as isize;
         let canvas_h_scaled = (state.canvas_size.1 as f32 * state.scale) as isize;
@@ -1378,6 +1381,8 @@ impl GameScene {
 
             //x and y are on a per-ingame-pixel basis (with 1x scale)
             //extra offsets with screen jittering to "snap" the lightmap to the correct spot
+            //known bug: when fame_x or frame_y is negative, we have a gap along the top left side of the screen due to rounding in the wrong direction
+            //I'm leaving it for now because it should never be seen as it's behind the letter/pillarboxes
             let (frame_x, frame_y, scale) = if state.settings.game_scale_lighting {
                 let (fx2, fy2) = self.frame.xy_interpolated(state.frame_time);
                 

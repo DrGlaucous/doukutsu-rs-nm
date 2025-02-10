@@ -381,6 +381,15 @@ fn lerp_f64(v1: f64, v2: f64, t: f64) -> f64 {
     v1 * (1.0 - t) + v2 * t
 }
 
+//test this
+pub fn interp_x_descale(old_val: f32, val: f32, frame_delta: f64) -> f32 {
+    unsafe {
+        let interpolated = lerp_f64(old_val as f64, val as f64, frame_delta) as f32;
+        let mag = G_MAG as f32;
+        (interpolated * mag).floor() / mag
+    }
+}
+
 pub fn interpolate_fix9_scale(old_val: i32, val: i32, frame_delta: f64) -> f32 {
     if abs(old_val - val) > 0x1800 {
         return val as f32 / 512.0;

@@ -15,6 +15,7 @@ pub mod coop_menu;
 pub mod pause_menu;
 pub mod save_select_menu;
 pub mod settings_menu;
+pub mod display_menu;
 
 const MENU_MIN_PADDING: f32 = 30.0;
 

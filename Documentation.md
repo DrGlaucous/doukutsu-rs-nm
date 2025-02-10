@@ -6,7 +6,7 @@
 
 The BKG or "Background" mod allows backgrounds to be modularly configured using json files without needing to recompile the source.
 
-If a .json file with the same name is paired with a background file, it will be loaded automatically with the background if BKG Scroll type is set to `10` in the stage table or mrmap.bin.
+If a .json file with the same name is paired with a background file, it will be loaded automatically with the background if BKG Scroll type is set to `10` in the stage table.
 
 Please see [this page](https://wiki.doukutsu.club/bkg-hack) for more info on BKG in general, as well as other implementations for other Cave Story engines.
 
@@ -117,6 +117,8 @@ These files can have any name, and the bitmap they load is determined by the fie
     - Ambient (2),
 ---
 - `layers` - a list of each layer to be drawn on the background, the first entry in the list will be drawn at the back, and the other entries will work their way up from there.
+- `name` - This field is *optional* and is not actually processed by the parser, but it helps make layers easier to identify. The .json will load just fine if it is not included.
+- `layer_enabled` - if `false`, this layer will not be processed or drawn.
 - `bmp_x_offset` /  `bmp_y_offset` - the top left corner on the background image where the rect to draw for this layer is
 - `bmp_width` / `bmp_height` - how wide and tall the rect to draw should be
 - `draw_repeat_x` / `draw_repeat_y` - how many times to repeat the bitmap, starting from the top left corner and extending right and down. To repeat a definite count in the other direction, apply a negative value to the `draw_corner_offset` fields. If these are set to 0, they will repeat infinitely in both directions (left/right or up/down).
@@ -149,6 +151,7 @@ Here's an example of a file:
   "lighting_mode": 0,
   "layers": [
     {
+      "name": "Far back",
       "layer_enabled": true,
       "bmp_x_offset": 0,
       "bmp_y_offset": 0,
@@ -190,6 +193,7 @@ Here's an example of a file:
       }
     },
     {
+      "name": "Backwards Slide",
       "layer_enabled": true,
       "bmp_x_offset": 0,
       "bmp_y_offset": 0,
