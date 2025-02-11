@@ -1,3 +1,5 @@
+use std::cmp::{min, max};
+
 use crate::common::{Condition, Direction, Flag, Rect};
 use crate::game::caret::CaretType;
 use crate::game::npc::list::NPCList;
@@ -559,12 +561,14 @@ pub trait PhysicalEntity {
         let tile_size = state.tile_size.as_int() * 0x200;
         let half_tile_size = tile_size / 2;
 
-        if self.x() < (x * 2 + 1) * half_tile_size
-            && self.x() > (x * 2 - 1) * half_tile_size
+        if (self.x() - self.hit_bounds().left as i32) < (x * 2 + 1) * half_tile_size
+            && (self.x() + self.hit_bounds().right as i32) > (x * 2 - 1) * half_tile_size
             && (self.y() - self.hit_bounds().top as i32) < (y * tile_size) - (self.x() - x * tile_size)
             && (self.y() + self.hit_bounds().bottom as i32) > (y * 2 - 1) * half_tile_size
         {
-            self.set_y((y * tile_size) - (self.x() - x * tile_size) + self.hit_bounds().top as i32);
+            self.set_y(
+                min(y * tile_size + tile_size, (y * tile_size) - (self.x() - x * tile_size) + self.hit_bounds().top as i32)
+            );
 
             if self.is_player() && !self.cond().hidden() && self.vel_y() < -0x200 {
                 state.sound_manager.play_sfx(3);
@@ -595,12 +599,14 @@ pub trait PhysicalEntity {
         let tile_size = state.tile_size.as_int() * 0x200;
         let half_tile_size = tile_size / 2;
 
-        if self.x() < (x * 2 + 1) * half_tile_size
-            && self.x() > (x * 2 - 1) * half_tile_size
+        if (self.x() - self.hit_bounds().left as i32) < (x * 2 + 1) * half_tile_size
+            && (self.x() + self.hit_bounds().right as i32) > (x * 2 - 1) * half_tile_size
             && (self.y() - self.hit_bounds().top as i32) < (y * tile_size) + (self.x() - x * tile_size)
             && (self.y() + self.hit_bounds().bottom as i32) > (y * 2 - 1) * half_tile_size
         {
-            self.set_y((y * tile_size) + (self.x() - x * tile_size) + self.hit_bounds().top as i32);
+            self.set_y(
+                min(y * tile_size + tile_size,(y * tile_size) + (self.x() - x * tile_size) + self.hit_bounds().top as i32),
+            );
 
             if self.is_player() && !self.cond().hidden() && self.vel_y() < -0x200 {
                 state.sound_manager.play_sfx(3);
@@ -634,14 +640,14 @@ pub trait PhysicalEntity {
 
         self.flags().set_hit_left_higher_half(true);
 
-        if self.x() < (x * 2 + 1) * half_tile_size
-            && self.x() > (x * 2 - 1) * half_tile_size
+        if (self.x() - self.hit_bounds().left as i32) < (x * 2 + 1) * half_tile_size
+            && (self.x() + self.hit_bounds().right as i32) > (x * 2 - 1) * half_tile_size
             && (self.y() + self.hit_bounds().bottom as i32)
             > (y * tile_size) + (self.x() - x * tile_size) - quarter_tile_size
             && (self.y() - self.hit_bounds().top as i32) < (y * 2 + 1) * half_tile_size
         {
             self.set_y(
-                (y * tile_size) + (self.x() - x * tile_size) - quarter_tile_size - self.hit_bounds().bottom as i32,
+                max(y * tile_size - tile_size, (y * tile_size) + (self.x() - x * tile_size) - quarter_tile_size - self.hit_bounds().bottom as i32),
             );
 
             if self.is_player() && self.vel_y() > 0x400 {
@@ -665,14 +671,14 @@ pub trait PhysicalEntity {
 
         self.flags().set_hit_right_higher_half(true);
 
-        if (self.x() < (x * 2 + 1) * half_tile_size)
-            && (self.x() > (x * 2 - 1) * half_tile_size)
+        if (self.x() - self.hit_bounds().left as i32) < (x * 2 + 1) * half_tile_size
+            && (self.x() + self.hit_bounds().right as i32) > (x * 2 - 1) * half_tile_size
             && (self.y() + self.hit_bounds().bottom as i32)
             > (y * tile_size) - (self.x() - x * tile_size) - quarter_tile_size
             && (self.y() - self.hit_bounds().top as i32) < (y * 2 + 1) * half_tile_size
         {
             self.set_y(
-                (y * tile_size) - (self.x() - x * tile_size) - quarter_tile_size - self.hit_bounds().bottom as i32,
+                max(y * tile_size - tile_size, (y * tile_size) - (self.x() - x * tile_size) - quarter_tile_size - self.hit_bounds().bottom as i32),
             );
 
             if self.is_player() && self.vel_y() > 0x400 {
