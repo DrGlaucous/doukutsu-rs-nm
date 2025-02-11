@@ -63,11 +63,14 @@
     "options_menu": {
       "graphics": "グラフィック",
       "graphics_menu": {
+        "display": "表示",
         "window_mode": {
-          "entry": "画面表示：",
+          "entry": "ウィンドウモード:",
           "windowed": "ウィンドウ",
           "fullscreen": "フルスクリーン"
         },
+        "fixed_ratio": "固定比率:",
+        "ratio": "比率:",
         "lighting_effects": "ライティング効果：",
         "lighting_effects_game_scale": "ゲーム スケール ライティングを使用する:",
         "weapon_light_cone": "兵器のライトコーン：",

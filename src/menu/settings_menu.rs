@@ -256,15 +256,7 @@ impl SettingsMenu {
         #[cfg(not(any(target_os = "android", target_os = "horizon", feature = "backend-libretro")))]
         self.graphics.push_entry(
             GraphicsMenuEntry::WindowMode,
-            MenuEntry::Active(format!("WINDOW MODE"))
-            // MenuEntry::Options(
-            //     state.loc.t("menus.options_menu.graphics_menu.window_mode.entry").to_owned(),
-            //     state.settings.window_mode as usize,
-            //     vec![
-            //         state.loc.t("menus.options_menu.graphics_menu.window_mode.windowed").to_owned(),
-            //         state.loc.t("menus.options_menu.graphics_menu.window_mode.fullscreen").to_owned(),
-            //     ],
-            // ),
+            MenuEntry::Active(state.loc.t("menus.options_menu.graphics_menu.display").to_owned())
         );
         self.graphics.push_entry(
             GraphicsMenuEntry::LightingEffects,

@@ -63,11 +63,14 @@
     "options_menu": {
       "graphics": "Graphics...",
       "graphics_menu": {
+        "display": "Display...",
         "window_mode": {
-          "entry": "Display mode:",
+          "entry": "Window mode:",
           "windowed": "Windowed",
           "fullscreen": "Fullscreen"
         },
+        "fixed_ratio": "Fixed Ratio:",
+        "ratio": "Ratio:",
         "lighting_effects": "Lighting effects:",
         "lighting_effects_game_scale": "Use Game Scale Lighting:",
         "weapon_light_cone": "Weapon light cone:",

@@ -27,7 +27,6 @@ impl Default for MainMenuEntry {
 
 pub struct DisplayMenu {
     main: Menu<MainMenuEntry>,
-    ratio_count: i32,
 }
 
 
@@ -38,7 +37,6 @@ impl DisplayMenu {
 
         DisplayMenu {
             main,
-            ratio_count: 0,
         }
     }
 
@@ -61,21 +59,36 @@ impl DisplayMenu {
         self.main.push_entry(
             MainMenuEntry::FixedRatioMode,
             MenuEntry::Toggle(
-                format!("Fixed ratio:"),
+                state.loc.t("menus.options_menu.graphics_menu.fixed_ratio").to_owned(),
                 state.settings.fixed_ratio,
             ),
         );
 
-        self.ratio_count = 2;
+        
+
+        //generate a string list of ratios in engine_constants/mod.rs
+        //and determine what ratio we've currently got set
+        let mut ratio_list = Vec::new();
+        let mut ratio_index = 0; //by default, if nothing matches, we use the first index
+        for (idx, ratio) in (&state.constants.viewport_ratios.iter()).clone().enumerate() {
+
+            //check if current ratio and desired ratio are "equal"
+            if (state.settings.viewport_ratio.0 - ratio.0).abs() < f32::EPSILON
+            && (state.settings.viewport_ratio.1 - ratio.1).abs() < f32::EPSILON {
+                ratio_index = idx;
+            }
+            
+            ratio_list.push(format!("{}:{}", ratio.0, ratio.1));
+        }
+
+
+        
         self.main.push_entry(
             MainMenuEntry::Ratios,
             MenuEntry::Options(
-                format!("Ingame Ratio:"),
-                state.settings.window_mode as usize,
-                vec![
-                    format!("4:3"),
-                    format!("16:9"),
-                ],
+                state.loc.t("menus.options_menu.graphics_menu.ratio").to_owned(),
+                ratio_index,
+                ratio_list,
             ),
         );
 
@@ -105,7 +118,40 @@ impl DisplayMenu {
     ) -> GameResult {
         self.update_sizes(state);
 
-        match self.main.tick(controller, state) {
+        //re-use for each case
+        fn update_ratio(
+            state: &mut SharedGameState,
+            ctx: &mut Context,
+            toggle: &mut MenuEntry,
+            step: i32,
+        ) -> GameResult {
+            if let MenuEntry::Options(_name, value, _options) = toggle {
+
+                let ratio_count = state.constants.viewport_ratios.len() as i32;
+
+                //switch between ratio options with wrapping
+                let mut new_value= *value as i32 + step;
+                if new_value >= ratio_count {
+                    new_value -= ratio_count;
+                } else if new_value < 0 {
+                    new_value += ratio_count
+                }
+                *value = new_value as usize; //apply to menu
+
+                //set new ratio
+                state.settings.viewport_ratio = state.constants.viewport_ratios[*value];
+
+                //save new setting
+                let _ = state.settings.save(ctx);
+
+                state.handle_resize(ctx)?;
+            }
+
+            Ok(())
+        }
+
+        let menu_tick_result = self.main.tick(controller, state);
+        match menu_tick_result {
             MenuSelectionResult::Selected(MainMenuEntry::FullscreenMode, toggle)
             | MenuSelectionResult::Right(MainMenuEntry::FullscreenMode, toggle, _)
             | MenuSelectionResult::Left(MainMenuEntry::FullscreenMode, toggle, _) => {
@@ -122,48 +168,25 @@ impl DisplayMenu {
                     let _ = state.settings.save(ctx);
                 }
             }
-            MenuSelectionResult::Selected(MainMenuEntry::Ratios, toggle)
-            | MenuSelectionResult::Right(MainMenuEntry::Ratios, toggle, _)
-            | MenuSelectionResult::Left(MainMenuEntry::Ratios, toggle, _) => {
-                if let MenuEntry::Options(stringer, value, _) = toggle {
-                    
-                    //let stringer = format!("4:3");
-
-                    let current_ratio = state.settings.viewport_ratio;
-
-                    //parse string setting to get new ratio size (this allows new ratios to be set in the localization files without recompiling)
-                    let new_ratio = if let Some((x,y)) = stringer.split(":").map(|a| {a.parse::<f32>().unwrap_or(-1.0)}).collect_tuple() {
-                        if x > 0.0 && y > 0.0 {
-                            (x,y)
-                        } else {
-                            current_ratio
-                        }
-                    } else {
-                        current_ratio
-                    };
-                    state.settings.viewport_ratio = new_ratio;
-                    
-                    //switch between ratio options
-                    let mut new_value= *value as i32 + 1;
-                    if new_value >= self.ratio_count {
-                        new_value = 0;
-                    }
-                    *value = new_value as usize;
-
-                    let _ = state.settings.save(ctx);
-                }
-            }
-
+            
             MenuSelectionResult::Selected(MainMenuEntry::FixedRatioMode, toggle) => {
                 if let MenuEntry::Toggle(_, value) = toggle {
                     state.settings.fixed_ratio = !state.settings.fixed_ratio;
                     let _ = state.settings.save(ctx);
-
                     *value = state.settings.fixed_ratio;
-
+                    state.handle_resize(ctx)?;
+                    
+                    let _ = state.settings.save(ctx);
                 }
+            }            
+            
+            MenuSelectionResult::Selected(MainMenuEntry::Ratios, toggle)
+            | MenuSelectionResult::Right(MainMenuEntry::Ratios, toggle, _) => {
+                update_ratio(state, ctx, toggle, 1)?; //step right
             }
-
+            MenuSelectionResult::Left(MainMenuEntry::Ratios, toggle, _) => {
+                update_ratio(state, ctx, toggle, -1)?; //step left
+            }
             MenuSelectionResult::Selected(MainMenuEntry::Back, _) | MenuSelectionResult::Canceled => exit_action(),
             _ => (),
         }

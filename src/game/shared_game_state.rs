@@ -324,7 +324,7 @@ pub struct SharedGameState {
     pub canvas_size: (f32, f32), //pre-scaled screen size
     pub screen_size: (f32, f32), //real screen size
     pub ratioed_size: (f32, f32), //game window size (not including menus and HUD)
-    pub preferred_viewport_size: (f32, f32), //size to use as refrenche when snapping between scales
+    //pub preferred_viewport_size: (f32, f32), //size to use as refrence when snapping between scales
     pub next_scene: Option<Box<dyn Scene>>,
     pub textscript_vm: TextScriptVM,
     pub creditscript_vm: CreditScriptVM,
@@ -482,7 +482,7 @@ impl SharedGameState {
             screen_size: (640.0, 480.0),
             canvas_size: (320.0, 240.0),
             ratioed_size: (320.0, 240.0),
-            preferred_viewport_size: (320.0, 240.0),
+            //preferred_viewport_size: (320.0, 240.0),
             next_scene: None,
             textscript_vm: TextScriptVM::new(),
             creditscript_vm: CreditScriptVM::new(),
@@ -739,20 +739,23 @@ impl SharedGameState {
     pub fn handle_resize(&mut self, ctx: &mut Context) -> GameResult {
 
 
+        //handle potentially erronious settings: reset ratio to default if it is invalid
+        if self.settings.viewport_ratio.0 <= 0.0 && self.settings.viewport_ratio.1 <= 0.0 {
+            self.settings.viewport_ratio = self.constants.viewport_ratios[0];
+        }
+
         self.screen_size = graphics::screen_size(ctx);
 
         //replaces preferred_viewport_size
-        //self.settings.viewport_ratio;
+        self.settings.viewport_ratio;
 
-        //let scalar = 240;
-        let ratio = self.preferred_viewport_size;
 
-        let ratio = (16.0, 9.0);
+
+        let ratio = self.settings.viewport_ratio;
         let ref_height = 240.0;
         let height = ref_height;
         let width = height * ratio.0 / ratio.1;
         let ratio = (width, height);
-        self.preferred_viewport_size = ratio;
 
         //determine what integer scale to use
         let scale_x = self.screen_size.1.div(ratio.1).floor().max(1.0);
@@ -761,7 +764,13 @@ impl SharedGameState {
 
 
         self.canvas_size = (self.screen_size.0 / self.scale, self.screen_size.1 / self.scale);
-        self.ratioed_size = (ratio.0, ratio.1);
+
+        //determine use of fixed ratio or not
+        self.ratioed_size = if self.settings.fixed_ratio {
+            (ratio.0, ratio.1)
+        } else {
+            self.canvas_size
+        };
 
         let (width, height) = (self.screen_size.0 as u16, self.screen_size.1 as u16);
 

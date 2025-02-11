@@ -280,6 +280,7 @@ pub struct EngineConstants {
     pub gamepad: GamepadConsts,
     pub stage_encoding: Option<TextScriptEncoding>,
     pub lightmap_scale: f32,
+    pub viewport_ratios: Vec<(f32, f32)>
 }
 
 impl EngineConstants {
@@ -1625,6 +1626,13 @@ impl EngineConstants {
             //todo: determine intended game scale automatically (for now, manually change this to the intended game's scale)
             //1 for freeware, 2 for CS+, 0.5 for some evil downscale thing, 0.0625 for full tiles, etc.
             lightmap_scale: 1.0,
+            
+            //to add more ratios, put them in here
+            viewport_ratios: vec![
+                (4.0,3.0),
+                (16.0,9.0),
+                (1.0,1.0),
+            ]
         }
     }
 

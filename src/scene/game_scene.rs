@@ -339,7 +339,7 @@ impl GameScene {
         Ok(())
     }
 
-    //return a rect containing bar locations relative to the top left corner
+    //return a rect containing bar width/heights, screen scale
     pub fn get_black_bar_size(state: &mut SharedGameState, stage: &Stage, frame: &Frame,) -> Rect<isize> {
 
 
@@ -426,16 +426,16 @@ impl GameScene {
 
         //draw letter/pillarboxes if they have width
         if rect_left.width() > 0 {
-            graphics::draw_rect(ctx, rect_left, Color::from_rgb(255, 0, 0))?;
+            graphics::draw_rect(ctx, rect_left, Color::from_rgb(0, 0, 0))?;
         }
         if rect_right.width() > 0 {
-            graphics::draw_rect(ctx, rect_right, Color::from_rgb(0, 255, 0))?;
+            graphics::draw_rect(ctx, rect_right, Color::from_rgb(0, 0, 0))?;
         }
         if rect_top.height() > 0 {
-            graphics::draw_rect(ctx, rect_top, Color::from_rgb(0, 0, 255))?;
+            graphics::draw_rect(ctx, rect_top, Color::from_rgb(0, 0, 0))?;
         }
         if rect_bottom.height() > 0 {
-            graphics::draw_rect(ctx, rect_bottom, Color::from_rgb(255, 255, 0))?;
+            graphics::draw_rect(ctx, rect_bottom, Color::from_rgb(0, 0, 0))?;
         }
         
 
