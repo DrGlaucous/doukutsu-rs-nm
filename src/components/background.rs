@@ -212,8 +212,9 @@ fn default_add_height_percent() -> f32 {
 impl BkgConfig {
 
     pub fn load(ctx: &Context, path: &String) -> GameResult<BkgConfig> {
-        //open from ./data/bkg/ folder, originally String::from("/bkg/"), but was changed to be more generic
-        match filesystem::open(ctx, String::from("/") + path + ".json") {
+        //open from ./data/bkg/ folder, originally String::from("/bkg/"), but was changed to be more generic (this change was walked back)
+        //match filesystem::open(ctx, String::from("/") + path + ".json") {
+        match filesystem::open(ctx, String::from("/bkg/") + path + ".json") {
             Ok(file) => {
                 match serde_json::from_reader::<_, BkgConfig>(file) {
                     Ok(bkg_config) => return Ok(bkg_config.upgrade(path)),
