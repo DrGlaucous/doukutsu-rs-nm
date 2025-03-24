@@ -2008,11 +2008,21 @@ impl Scene for GameScene {
 
         self.npc_list.set_rng_seed(state.game_rng.next());
         self.boss.init_rng(state.game_rng.next());
-        state.textscript_vm.set_scene_script(self.stage.load_text_script(
+        //TODO: fix root unwraping so we can see all errors, not just the TSC ones
+        match self.stage.load_text_script(
             &state.constants.base_paths,
             &state.constants,
             ctx,
-        )?);
+        ) {
+            Ok(tsc) => {
+                state.textscript_vm.set_scene_script(tsc);
+            }
+            Err(e) => {
+                //log any potential broken TSC before panic (because the unwind doesn't tell us the error for some reason...)
+                log::error!("{}", e);
+                return Err(e);
+            }
+        }
         state.textscript_vm.suspend = false;
         state.tile_size = self.stage.map.tile_size;
 
@@ -2060,6 +2070,9 @@ impl Scene for GameScene {
         state.carets.clear();
 
         self.lighting_mode = match () {
+            //don't change the lighting mode if we have custom mode enabled
+            _ if self.stage.data.background_type == BackgroundType::Custom => self.lighting_mode,
+
             _ if self.intro_mode => LightingMode::None,
             _ if !state.constants.is_switch
                 && (self.stage.data.background_type == BackgroundType::Black
