@@ -243,21 +243,17 @@ pub trait PhysicalEntity {
             && ((self.y() + self.hit_bounds().bottom as i32) < y * 2 * half_tile_size) //and above the center of the block
 
         {
-            self.set_y(((y * 2 - 1) * half_tile_size) - self.hit_bounds().bottom as i32);
+            //only snap to floor if we're moving down
+            if self.vel_y() > 0 {
+                self.set_y(((y * 2 - 1) * half_tile_size) - self.hit_bounds().bottom as i32);
+                self.flags().set_hit_bottom_wall(true);
 
-            if self.is_player() {
-                if self.vel_y() > 0x400 {
+                if self.is_player() && self.vel_y() > 0x400{
                     state.sound_manager.play_sfx(23);
                 }
 
-                if self.vel_y() > 0 {
-                    self.set_vel_y(0);
-                }
-            } else {
                 self.set_vel_y(0);
             }
-
-            self.flags().set_hit_bottom_wall(true);
         }
     }
 
