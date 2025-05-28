@@ -416,7 +416,10 @@ impl BackendEventLoop for SDL2EventLoop {
                 game.scene.as_mut().unwrap().init(state, ctx).unwrap();
                 game.loops = 0;
                 state.frame_time = 0.0;
+                ctx.has_ticked_since_change = false;
             }
+
+            if !ctx.has_ticked_since_change {continue}
 
             imgui_sdl2.prepare_frame(
                 imgui.io_mut(),

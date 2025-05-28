@@ -91,6 +91,9 @@ pub enum BackgroundType {
     Waterway,
     /// Use custom rendering from the BKG mod
     Custom,
+
+    //temp. hold the old one while we make a new one
+    Custom2,
 }
 
 impl From<u8> for BackgroundType {

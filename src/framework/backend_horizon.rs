@@ -407,7 +407,10 @@ impl BackendEventLoop for HorizonEventLoop {
                 game.scene.as_mut().unwrap().init(state_ref, ctx).unwrap();
                 game.loops = 0;
                 state_ref.frame_time = 0.0;
+                ctx.has_ticked_since_change = false;
             }
+
+            if !ctx.has_ticked_since_change {continue}
 
             game.draw(ctx).unwrap();
         }

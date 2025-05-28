@@ -163,6 +163,7 @@ impl Game {
                     if self.loops != 0 {
                         scene.draw_tick(state_ref)?;
                         self.last_tick = last_tick;
+                        ctx.has_ticked_since_change = true;
                     }
 
                     for _ in 0..self.loops {
@@ -172,6 +173,7 @@ impl Game {
                 }
                 TimingMode::FrameSynchronized => {
                     scene.tick(state_ref, ctx)?;
+                    ctx.has_ticked_since_change = true;
                 }
             }
         }

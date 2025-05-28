@@ -340,7 +340,7 @@ impl GameScene {
     }
 
     //return a rect containing bar width/heights, screen scale
-    pub fn get_black_bar_size(state: &mut SharedGameState, stage: &Stage, frame: &Frame,) -> Rect<isize> {
+    pub fn get_black_bar_size(state: &SharedGameState, stage: &Stage, frame: &Frame,) -> Rect<isize> {
 
 
         //x, y are the pixel coordinates of the top left corner of the frame

@@ -552,10 +552,6 @@ impl BackendEventLoop for GlutinEventLoop {
                             }
                         }
                     }
-                    //should be run for all cases, not just Android
-                    if let Err(err) = game.draw(ctx) {
-                        log::error!("Failed to draw frame: {}", err);
-                    }
 
                     if state_ref.next_scene.is_some() {
                         mem::swap(&mut game.scene, &mut state_ref.next_scene);
@@ -563,7 +559,16 @@ impl BackendEventLoop for GlutinEventLoop {
                         game.scene.as_mut().unwrap().init(state_ref, ctx).unwrap();
                         game.loops = 0;
                         state_ref.frame_time = 0.0;
+                        ctx.has_ticked_since_change = false;
                     }
+                    
+                    if !ctx.has_ticked_since_change {continue}
+
+                    //should be run for all cases, not just Android
+                    if let Err(err) = game.draw(ctx) {
+                        log::error!("Failed to draw frame: {}", err);
+                    }
+
                 }
                 _ => (),
             }

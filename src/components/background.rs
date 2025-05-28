@@ -12,6 +12,7 @@ use crate::scene::game_scene::{GameScene, LightingMode};
 use crate::framework::error::GameError;
 use crate::util::rng::{Xoroshiro32PlusPlus, RNG};
 
+use crate::components::draw_common::{draw_number, Alignment};
 
 //this could (and probably should) be a bitfield, but I don't know how I'd serialize/deserialize that (inexperience shows)
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -56,7 +57,10 @@ pub struct AnimationStyle {
 
     //internal only: do not save to or load from JSON
     #[serde(skip)]
-    pub ani_wait: u32,
+    pub layer_tick: u32,
+
+    #[serde(skip)]
+    pub last_layer_tick: u32,
 
     //unneded: using frame_start diectly now
     // #[serde(skip)]
@@ -136,7 +140,8 @@ impl LayerConfig {
             draw_corner_offset_x: 0.0,
             draw_corner_offset_y: 0.0,
             animation_style: AnimationStyle{
-                ani_wait: 0,
+                layer_tick: 0,
+                last_layer_tick: 0,
                 frame_count: 0,
                 frame_start: 0,
                 animation_speed: 0,
@@ -381,7 +386,7 @@ impl Background {
             tick: 0,
             prev_tick: 0,
             bk_config: BkgConfig::default(),
-            rng: Xoroshiro32PlusPlus::new(4873), //rando-starting number
+            rng: Xoroshiro32PlusPlus::new(4873), //rando-starting number (todo: seed this on more entropy)
 
             cache_background_path: String::new(),
             cache_background_type: BackgroundType::Black,
@@ -425,7 +430,7 @@ impl Background {
                 layer.draw_corner_offset_x = self.rng.range(0..(layer.draw_corner_offset_x as i32)) as f32;
                 layer.draw_corner_offset_y = self.rng.range(0..(layer.draw_corner_offset_y as i32)) as f32;
                 layer.animation_style.animation_speed = self.rng.range((layer.animation_style.animation_speed as i32)..(layer.animation_style.animation_speed as i32 * 2)) as u32;
-                layer.animation_style.ani_wait = self.rng.range(0..layer.animation_style.animation_speed as i32) as u32;
+                layer.animation_style.layer_tick = self.rng.range(0..layer.animation_style.animation_speed as i32) as u32;
                 layer.animation_style.frame_start = self.rng.range(0..layer.animation_style.frame_count as i32) as u32;
             }
         }
@@ -441,6 +446,20 @@ impl Background {
         frame: &Frame,
     ) -> GameResult<()> {
         self.tick = self.tick.wrapping_add(1);
+
+
+        for layer in self.bk_config.layers.as_mut_slice() {
+            if !layer.layer_enabled {continue;}
+
+            //advance animation frames
+            layer.animation_style.layer_tick += 1;
+
+        }
+
+
+        return Ok(());
+
+
 
 
         //we need the map size so we can account for the letterboxing/pillarboxing
@@ -495,21 +514,20 @@ impl Background {
         let windowed_lim = Rect::new(0.0, 0.0, canvas_size.0 as f32, canvas_size.1 as f32);
 
 
-
-
+        //bypass this for now
         for layer in self.bk_config.layers.as_mut_slice() {
             if !layer.layer_enabled {continue;}
 
             //advance animation frames
             if layer.animation_style.frame_count > 1 {
 
-                layer.animation_style.ani_wait += 1;
-                if layer.animation_style.ani_wait >= layer.animation_style.animation_speed {
+                layer.animation_style.layer_tick += 1;
+                if layer.animation_style.layer_tick >= layer.animation_style.animation_speed {
                     //use frame_start to control frame count. If frame_start is out of bounds, make it 0, otherwise increment it by 1 (make it base-1)
                     layer.animation_style.frame_start =
                     if layer.animation_style.frame_start < layer.animation_style.frame_count - 1 {layer.animation_style.frame_start + 1} else {0};
 
-                    layer.animation_style.ani_wait = 0;
+                    layer.animation_style.layer_tick = 0;
                 }
 
             }
@@ -682,6 +700,8 @@ impl Background {
 
 
 
+
+
         Ok(())
     }
 
@@ -698,6 +718,7 @@ impl Background {
         for layer in self.bk_config.layers.as_mut_slice() {
             if !layer.layer_enabled {continue;}
 
+            layer.animation_style.last_layer_tick =  layer.animation_style.layer_tick;
             //for interpolation
             layer.prev_dynamics = layer.dynamics.clone();
         }
@@ -724,9 +745,15 @@ impl Background {
             return Ok(());
         }
 
+        //mut get before 'batch'
+        let bar_size = GameScene::get_black_bar_size(state, stage, frame);
+
         let batch = state.texture_set.get_or_load_batch(ctx, &state.constants, &textures.background)?;
         let scale = state.scale;
         let (frame_x, frame_y) = frame.xy_interpolated(state.frame_time);
+
+
+
 
         match stage.data.background_type {
             BackgroundType::TiledStatic => {
@@ -858,6 +885,241 @@ impl Background {
 
             BackgroundType::Custom => {
 
+                //Non-integer canvas size is not as important now becasue we use frame coordinates to find letterbox sizes
+                let canvas_size = (state.canvas_size.0, state.canvas_size.1);
+
+            
+                //map edges if letterboxes are taken into account
+                let boxed_lim = Rect::new(
+                    bar_size.left as f32 / state.scale, 
+                    bar_size.top as f32 / state.scale, 
+                    bar_size.right as f32 / state.scale, 
+                    bar_size.bottom as f32 / state.scale
+                );
+
+                //map edges relative to actual window size
+                let windowed_lim = Rect::new(0.0, 0.0, canvas_size.0 as f32, canvas_size.1 as f32);
+
+
+                //start with empty slate
+                if !is_front {graphics::clear(ctx, stage.data.background_color);}
+
+
+                //y values are reset with each layer, x values are reset with each row (think TV scanlines)
+                for layer in self.bk_config.layers.as_slice() {
+                    if !layer.layer_enabled ||
+                    (is_front && !layer.animation_style.scroll_flags.draw_above_foreground) || //layer is not flagged to draw above the foreground
+                    (!is_front && layer.animation_style.scroll_flags.draw_above_foreground) ||
+                    (layer.bmp_height == 0 || layer.bmp_width == 0) //skip 0-width rects
+                    {continue;}
+
+                    //get the in-between tick time
+                    let layer_interp_tick = 
+                        layer.animation_style.layer_tick as f32 + 
+                        ((layer.animation_style.layer_tick - layer.animation_style.last_layer_tick) as f32 * state.frame_time.clamp(0.0,1.0) as f32);
+
+
+                    //get animation frame number
+                    let ani_frame_number = if layer.animation_style.frame_count > 1 {
+                        let animation_speed = if layer.animation_style.animation_speed > 0 { layer.animation_style.animation_speed } else {1};
+                        (((layer.animation_style.layer_tick) / animation_speed) + layer.animation_style.frame_start) % layer.animation_style.frame_count
+                    } else { 0 };
+                    
+
+
+                     //for ease of refrence
+                    let scroll_flags = &layer.animation_style.scroll_flags;
+
+
+                    //handle edge relativity
+                    let (edge_left, edge_right) = if scroll_flags.relative_to_pillarbox {
+                        (boxed_lim.left, boxed_lim.right)
+                    } else {
+                        (windowed_lim.left, windowed_lim.right)
+                    };
+                    let (edge_top, edge_bottom) = if scroll_flags.relative_to_letterbox {
+                        (boxed_lim.top, boxed_lim.bottom)
+                    } else {
+                        (windowed_lim.top, windowed_lim.bottom)
+                    };
+
+                    let mut frame_x_offset = edge_left;
+                    let mut frame_y_offset = edge_top;
+
+                    if scroll_flags.follow_pc_x {
+                        frame_x_offset -= (frame_x as f32 * layer.animation_style.follow_speed_x * scale).floor() / scale;
+                    }
+                    if scroll_flags.lock_to_y_axis {
+                        frame_x_offset -= frame_x as f32;
+                    }
+                    if scroll_flags.add_screen_width {
+                        frame_x_offset += layer.dynamics.edge_coords.width() * layer.animation_style.screen_width_add_percent;
+                    }
+
+
+                    if scroll_flags.align_with_water_lvl {
+                        frame_y_offset += (state.water_level / 0x200) as f32 - frame_y;
+                    }
+                    if scroll_flags.follow_pc_y {
+                        frame_y_offset -= (frame_y as f32 * layer.animation_style.follow_speed_y * scale).floor() / scale;
+                    }
+                    if scroll_flags.lock_to_x_axis {
+                        frame_y_offset -= frame_y as f32;
+                    }
+                    if scroll_flags.add_screen_height {
+                        frame_y_offset += layer.dynamics.edge_coords.height() * layer.animation_style.screen_height_add_percent;
+                    }
+
+
+                    //animate autoscrolling (looping is handled in the conditions below)
+                    let mut x_value = if scroll_flags.autoscroll_x {layer.animation_style.autoscroll_speed_x * layer_interp_tick} else {0.0};
+                    let mut y_value = if scroll_flags.autoscroll_y {layer.animation_style.autoscroll_speed_y * layer_interp_tick} else {0.0};
+
+                    //the step value between drawing each tile
+                    let full_width = (layer.bmp_width + layer.draw_repeat_gap_x) as f32;
+                    let full_height = (layer.bmp_height + layer.draw_repeat_gap_y) as f32;
+
+                    //randomness state keepers
+                    let mut x_random_state: u32 = 0;
+                    let mut y_random_state: u32 = 0;
+
+
+                    //looping for infinite-width tilesets
+                    if layer.draw_repeat_x == 0 {
+
+                        let mut time_count = 0.0;
+
+                        //offset just behind left wall and shift in
+                        if x_value + frame_x_offset + layer.draw_corner_offset_x > edge_left {                            
+                            let offset_dist = (0.0 - layer.draw_corner_offset_x) - (x_value + frame_x_offset);
+                            time_count = (offset_dist / full_width).floor();
+                            x_value += time_count * full_width;
+                        }
+                        else if x_value + frame_x_offset + layer.draw_corner_offset_x < edge_left - full_width {                            
+                            let offset_dist = (0.0 - layer.draw_corner_offset_y) - (y_value + frame_y_offset);
+                            time_count = (offset_dist / full_height).floor();
+                            y_value += full_height * time_count;
+                        }
+                        x_random_state = time_count as i32 as u32;
+                    }
+
+                    //ditto for y
+                    if layer.draw_repeat_y == 0 {
+
+                        let mut time_count = 0.0;
+
+                        //offset just behind left wall and shift in (used when scrolling to the right) (-64 to 0)
+                        if y_value + frame_y_offset + layer.draw_corner_offset_y > edge_top {
+
+                            let offset_dist = (0.0 - layer.draw_corner_offset_y) - (y_value + frame_y_offset);
+                            time_count = (offset_dist / full_height).floor();
+                            y_value += time_count * full_height;
+                            //y_value -= full_height;
+                        }
+                        //when scrolling to the left (-64 to -128) should be (0 to -64)
+                        else if y_value + frame_y_offset + layer.draw_corner_offset_y < edge_top - full_height {
+
+                            let offset_dist = (0.0 - layer.draw_corner_offset_y) - (y_value + frame_y_offset);
+                            time_count = (offset_dist / full_height).floor();
+                            y_value += full_height * time_count;
+                            //y_value += full_height;
+                        }
+                        y_random_state = time_count as i32 as u32;
+                    }
+
+
+                    //original behavior: when the x location goes off to the right side, loop entire image rack back to the left
+                    //when the entire image goes off the left side, loop entire image back to the right
+                    //new (more predicable) behavior: just scroll without looping. If the corner goes offscreen, then so be it.
+
+                    //smooth close and distant scrolling
+                    // let (off_x, off_y) = (
+                    //     ((frame_x / 2.0 * scale).floor() / scale) % (batch.width() as f32),
+                    //     ((frame_y / 2.0 * scale).floor() / scale) % (batch.height() as f32),
+                    // );
+
+
+
+                    ////////////////////////////////old stuff
+                    //get rect to draw to screen
+                    let (xoff, yoff) = (layer.bmp_x_offset + layer.bmp_width * ani_frame_number, layer.bmp_y_offset);
+                    let layer_rc = Rect::new(
+                        xoff as u16,
+                        yoff as u16,
+                        (xoff + layer.bmp_width) as u16,
+                        (yoff + layer.bmp_height) as u16);
+                    
+
+
+                    //not sure if we need these to be descrete: repeat count
+                    let (rep_x, rep_y) = (layer.draw_repeat_x, layer.draw_repeat_y);
+
+                    //start here and draw bitmap, stepping each time by these coords
+                    let mut y_off = y_value as f32;
+
+                    //apply misc. camera/water offsets
+                    y_off += frame_y_offset;
+
+                    //apply map corner offset
+                    y_off += layer.draw_corner_offset_y;
+
+
+                    //half-implemented (will leave it unimpleted for now, since this is not commonly used, but the benefits of the rewrite are too large to sacrifice it for this feature)
+                    //let x_rng = Xoroshiro32PlusPlus::new(x_random_state);
+                    //let y_rng = Xoroshiro32PlusPlus::new(y_random_state);
+
+                    let mut y = 0;
+                    while (y < rep_y || rep_y == 0) && y_off < edge_bottom {
+                        
+                        //need this to reset for each layer
+                        let mut x_off = x_value as f32;
+
+                        //apply map corner offset
+                        x_off += layer.draw_corner_offset_x;
+
+                        //apply camera offset
+                        //x_off += interp_x_descale(layer.prev_dynamics.frame_x_offset, layer.dynamics.frame_x_offset, state.frame_time);
+                        x_off += frame_x_offset;
+
+
+                        //while loop (x-axis)
+                        let mut x = 0;
+                        while (x < rep_x || rep_x == 0) && x_off < edge_right {
+
+                            //condition taken care of earler in the draw process
+                            //if scroll_flags.draw_above_foreground {}
+
+                            batch.add_rect(x_off as f32, y_off as f32, &layer_rc);
+
+                            //draw bitmap here
+                            //x: xOff y: yOff
+                            // let repeat_gap_x = if layer.animation_style.scroll_flags.random_offset_x == true {
+                            //     y_rng.range(0..layer.draw_repeat_gap_x as i32) as u32
+                            // } else {
+                            //     layer.draw_repeat_gap_x
+                            // };
+                            let repeat_gap_x = layer.draw_repeat_gap_x;
+
+
+                            x_off += (layer.bmp_width + layer.draw_repeat_gap_x) as f32;
+                            x += 1;
+                        }
+
+                        // let repeat_gap_y = if layer.animation_style.scroll_flags.random_offset_y == true {
+                        //     y_rng.range(0..layer.draw_repeat_gap_y as i32) as u32
+                        // } else {
+                        //     layer.draw_repeat_gap_y
+                        // };
+                        let repeat_gap_y = layer.draw_repeat_gap_y;
+                        y_off += (layer.bmp_height + repeat_gap_y) as f32;
+                        
+                        y += 1;
+                    }
+                
+                }
+            }
+            BackgroundType::Custom2 => {
+
                 //start with empty slate
                 if !is_front {graphics::clear(ctx, stage.data.background_color);}
 
@@ -934,7 +1196,12 @@ impl Background {
             }
         }
 
+
+
+
         batch.draw(ctx)?;
+
+        //draw_number(16.0, 16.0, 69 as usize, Alignment::Right, state, ctx)?;
 
         Ok(())
     }
