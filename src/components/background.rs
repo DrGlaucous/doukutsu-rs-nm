@@ -116,13 +116,6 @@ pub struct LayerConfig {
     ///////////
     //internal only: do not save to or load from JSON
 
-
-    //starting positions for each bitmap when drawn onscreen (values that are animated): 
-    #[serde(skip)]
-    pub dynamics: DynamicLayerVars,
-    #[serde(skip)]
-    pub prev_dynamics: DynamicLayerVars, //used for interpolation
-
 }
 
 impl LayerConfig {
@@ -169,10 +162,6 @@ impl LayerConfig {
                     relative_to_letterbox: true,
                 }
             },
-            //non-config items
-            dynamics: DynamicLayerVars::default(),
-            prev_dynamics: DynamicLayerVars::default(),
-
         }
     }
 }
@@ -461,9 +450,7 @@ impl Background {
 
 
 
-
-        //we need the map size so we can account for the letterboxing/pillarboxing
-        let tile_size = state.tile_size.as_int() as u16;
+        /* 
 
         //Non-integer canvas size is not as important now becasue we use frame coordinates to find letterbox sizes
         let canvas_size = (state.canvas_size.0, state.canvas_size.1);
@@ -697,7 +684,7 @@ impl Background {
 
         }
 
-
+    */
 
 
 
@@ -715,13 +702,15 @@ impl Background {
 
         //update locations in tick()
 
+        
         for layer in self.bk_config.layers.as_mut_slice() {
             if !layer.layer_enabled {continue;}
 
             layer.animation_style.last_layer_tick =  layer.animation_style.layer_tick;
             //for interpolation
-            layer.prev_dynamics = layer.dynamics.clone();
+            //layer.prev_dynamics = layer.dynamics.clone();
         }
+        
 
 
 
@@ -953,7 +942,7 @@ impl Background {
                         frame_x_offset -= frame_x as f32;
                     }
                     if scroll_flags.add_screen_width {
-                        frame_x_offset += layer.dynamics.edge_coords.width() * layer.animation_style.screen_width_add_percent;
+                        frame_x_offset += edge_right - edge_left * layer.animation_style.screen_width_add_percent;
                     }
 
 
@@ -967,7 +956,7 @@ impl Background {
                         frame_y_offset -= frame_y as f32;
                     }
                     if scroll_flags.add_screen_height {
-                        frame_y_offset += layer.dynamics.edge_coords.height() * layer.animation_style.screen_height_add_percent;
+                        frame_y_offset += edge_bottom - edge_top * layer.animation_style.screen_height_add_percent;
                     }
 
 
@@ -1118,6 +1107,9 @@ impl Background {
                 
                 }
             }
+            
+            BackgroundType::Custom2 => {}
+            /* 
             BackgroundType::Custom2 => {
 
                 //start with empty slate
@@ -1194,6 +1186,9 @@ impl Background {
 
 
             }
+            */
+        
+        
         }
 
 
