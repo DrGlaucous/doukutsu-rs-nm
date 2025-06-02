@@ -2078,6 +2078,27 @@ impl TextScriptVM {
 
             }
 
+            TSCOpCode::CHp =>{
+
+                let key = read_cur_varint(&mut cursor)? as usize;
+                let k_event = read_cur_varint(&mut cursor)? as usize;
+                let len = read_cur_varint(&mut cursor)? as usize;
+                let text = read_string_tsc(&mut cursor, len).unwrap();
+
+                exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
+
+            }
+            TSCOpCode::CHm =>{
+
+                exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
+
+            }
+            TSCOpCode::CHO =>{
+
+                exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
+
+            }
+
         
         }
 

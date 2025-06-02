@@ -62,6 +62,7 @@ impl TextScript {
                         | TSCOpCode::FR2
                         | TSCOpCode::BKR
                         | TSCOpCode::MS4
+                        | TSCOpCode::CHO
                         => {
                             writeln!(&mut result, "{:?}()", op).unwrap();
                         }
@@ -108,6 +109,7 @@ impl TextScript {
                         | TSCOpCode::PSH
                         | TSCOpCode::BKD
                         | TSCOpCode::BKE
+                        | TSCOpCode::CHm
                         => {
                             let par_a = read_cur_varint(&mut cursor)?;
 
@@ -160,6 +162,7 @@ impl TextScript {
                         // String code
                         TSCOpCode::BKG
                         | TSCOpCode::CMF
+                        | TSCOpCode::CHp
                         => {
                             writeln!(&mut result, "{:?} (String-based code: Not trying to decompile...)", op).unwrap();
                         }

@@ -182,6 +182,7 @@ impl TextScript {
             | TSCOpCode::FR2
             | TSCOpCode::BKR
             | TSCOpCode::MS4
+            | TSCOpCode::CHO
             => {
                 put_varint(instr as i32, out);
             }
@@ -227,6 +228,7 @@ impl TextScript {
             | TSCOpCode::PSH
             | TSCOpCode::BKD
             | TSCOpCode::BKE
+            | TSCOpCode::CHm
             => {
                 let operand = read_number(iter)?;
                 put_varint(instr as i32, out);
@@ -337,7 +339,7 @@ impl TextScript {
             =>
             {
 
-                //get music type
+                //get op1 type
                 let operand_a = read_number(iter)?;
 
                 //colon delimiter
@@ -354,6 +356,37 @@ impl TextScript {
                 put_string_multi_tsc(iter, out, 1, strict)?;
 
             }
+
+            // parses 2 operands + string delimited by $.
+            TSCOpCode::CHp
+            =>
+            {
+
+                let operand_a = read_number(iter)?;
+
+                //colon delimiter
+                if strict {
+                    expect_char(b':', iter)?;
+                } else {
+                    iter.next().ok_or_else(|| ParseError("Script unexpectedly ended.".to_owned()))?;
+                }
+                let operand_b = read_number(iter)?;
+                if strict {
+                    expect_char(b':', iter)?;
+                } else {
+                    iter.next().ok_or_else(|| ParseError("Script unexpectedly ended.".to_owned()))?;
+                }
+
+                //stow opcode(s) + numeric arg
+                put_varint(instr as i32, out);
+                put_varint(operand_a as i32, out);
+                put_varint(operand_b as i32, out);
+
+
+                put_string_multi_tsc(iter, out, 1, strict)?;
+
+            }
+
         }
 
         Ok(())

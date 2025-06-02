@@ -289,6 +289,19 @@ pub enum TSCOpCode {
     /// <FNJxxxx:yyyy, Jumps to event yyyy if flag xxxx is *NOT* set
     FNJ,
 
+    //CHO implementation:
+    // <CH+wwww:xxxx:choice_text$ //add an event + option to the choice list to jump to: <CH+[index key (any number)]:[event number]:[txt]$
+    #[strum(serialize = "CH+")]
+    CHp,
+
+    // <CH-wwww //remove choice at index  key wwww
+    #[strum(serialize = "CH-")]
+    CHm,
+
+    // <CHO //show choice dialouge
+    CHO,
+
+
 
 }
 

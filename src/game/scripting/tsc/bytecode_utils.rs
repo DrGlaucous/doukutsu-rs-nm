@@ -121,7 +121,7 @@ pub fn put_string_tsc<I: Iterator<Item=u8>>(
 }
 
 /// parses n count of back-to-back string arguments for TSC, delimited by $:
-/// 
+/// Stores in consecutive [len][string][len][string] order
 /// `<EXPstring1$:string2$:string3$<END`
 #[allow(unused)]
 pub fn put_string_multi_tsc<I: Iterator<Item=u8>>(
