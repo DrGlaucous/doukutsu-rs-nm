@@ -288,6 +288,10 @@ pub enum TSCOpCode {
     CMF,
     /// <FNJxxxx:yyyy, Jumps to event yyyy if flag xxxx is *NOT* set
     FNJ,
+    /// <SASwwww:xxxx:yyyy, Set Any Sound: Make any sound with any frequency in any playtype: <SLS[Sound]:[Playtype]:[Frequency] (playtype 2 stops it)
+    /// Frequency is divided by 1000, so 1000 = 1.0, 500 = 0.5, etc.
+    /// Playtype: 0->Play, 1->Loop, 2->Stop
+    SAS,
 
     //CHO implementation:
     // <CH+wwww:xxxx:choice_text$ //add an event + option to the choice list to jump to: <CH+[index key (any number)]:[event number]:[txt]$

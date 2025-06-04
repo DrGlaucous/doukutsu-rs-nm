@@ -2078,6 +2078,28 @@ impl TextScriptVM {
 
             }
 
+            TSCOpCode::SAS => {
+
+                let id = read_cur_varint(&mut cursor)? as u8;
+                let playtype = read_cur_varint(&mut cursor)? as i32;
+                let freq = read_cur_varint(&mut cursor)? as f32 / 1000.0;
+
+                match playtype {
+                    0 => {
+                        state.sound_manager.play_sfx_freq(id, freq);
+                    }
+                    1 => {
+                        state.sound_manager.loop_sfx_freq(id, freq);
+                    }
+                    _ => {
+                        state.sound_manager.stop_sfx(id);
+                    }
+                }
+
+                exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
+            }
+
+
             TSCOpCode::CHp =>{
 
                 let key = read_cur_varint(&mut cursor)? as usize;

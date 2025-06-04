@@ -62,6 +62,8 @@ impl SoundManager for SoundManagerNull {
 
     fn play_sfx(&mut self, id: u8) {}
 
+    fn play_sfx_freq(&mut self, id: u8, freq: f32) {}
+
     fn loop_sfx(&self, id: u8) {}
 
     fn loop_sfx_freq(&mut self, id: u8, freq: f32) {}

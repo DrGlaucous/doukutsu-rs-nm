@@ -219,6 +219,11 @@ impl PixTonePlayback {
     }
 
     pub fn play_sfx(&mut self, id: u8) {
+        self.play_sfx_freq(id, 1.0);
+    }
+
+    //I personally think `loop_sfx_freq` and `play_sfx_freq` make the non-freq versions redundant, but I'll leave them in... for now
+    pub fn play_sfx_freq(&mut self, id: u8, freq: f32) {
         for state in &mut self.playback_state {
             if state.id == id && state.tag == 0 {
                 state.pos = 0.0;
@@ -227,18 +232,12 @@ impl PixTonePlayback {
             }
         }
 
-        self.playback_state.push(PlaybackState { id, pos: 0.0, tag: 0, looping: false, freq: 1.0 });
+        self.playback_state.push(PlaybackState { id, pos: 0.0, tag: 0, looping: false, freq });
     }
 
-    pub fn loop_sfx(&mut self, id: u8) {
-        for state in &mut self.playback_state {
-            if state.id == id && state.tag == 0 {
-                state.looping = true;
-                return;
-            }
-        }
 
-        self.playback_state.push(PlaybackState { id, pos: 0.0, tag: 0, looping: true, freq: 1.0 });
+    pub fn loop_sfx(&mut self, id: u8) {
+        self.loop_sfx_freq(id, 1.0);
     }
 
     pub fn loop_sfx_freq(&mut self, id: u8, freq: f32) {

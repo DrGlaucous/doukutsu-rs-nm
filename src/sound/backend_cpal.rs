@@ -184,6 +184,14 @@ impl SoundManager for SoundManagerCpal {
         self.send(PlaybackMessage::PlaySample(id)).unwrap();
     }
 
+    fn play_sfx_freq(&mut self, id: u8, freq: f32) {
+        if self.no_audio {
+            return;
+        }
+
+        self.send(PlaybackMessage::PlaySampleFreq(id, freq)).unwrap();
+    }
+
     fn loop_sfx(&self, id: u8) {
         if self.no_audio {
             return;
@@ -831,6 +839,7 @@ pub(in crate::sound) enum PlaybackMessage {
     #[cfg(feature = "tracker-playback")]
     PlayTrackerSong(Box<Vec<u8>>),
     PlaySample(u8),
+    PlaySampleFreq(u8, f32),
     LoopSample(u8),
     LoopSampleFreq(u8, f32),
     StopSample(u8),
@@ -1019,6 +1028,9 @@ where
 
                     Ok(PlaybackMessage::PlaySample(id)) => {
                         pixtone.play_sfx(id);
+                    }
+                    Ok(PlaybackMessage::PlaySampleFreq(id, freq)) => {
+                        pixtone.play_sfx_freq(id, freq);
                     }
 
                     Ok(PlaybackMessage::LoopSample(id)) => {

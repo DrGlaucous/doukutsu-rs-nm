@@ -317,6 +317,11 @@ Here's an example of a file:
 - `<CMFwwww:name_of_file$` - Cue Music File, loads and starts music from `./data` (subdirectories can be included) where `wwww` = `[0-organya, 1-multi-ogg, 2-single-ogg, 3-tracker]`, the string argument should not start with a leading `/`. Example: `<CMF0003:a_u.s3m$`. Because I want to preserve save file compatibility, setting songs this way are *not* saved in the `profile.dat`.
 - `<FNJxxxx:yyyy` - Jumps to event yyyy if flag xxxx is *NOT* set.
 
+- `<SASwwww:xxxx:yyyy` -  Set Any Sound: Make any sound with any frequency in any playtype: `<SLS[Sound]:[Playtype]:[Frequency]` (playtype 2 stops it)
+  - Frequency is divided by 1000, so 1000 = 1.0, 500 = 0.5, etc.
+  - Playtype: 0->Play, 1->Loop, 2->Stop
+
+
 ## Rotation Framework
 
 The internal code now has ready-support for sprite rotation. *(which should work with all backends, but is untested on the `horizon` backend because I don't own a nintendo switch)*
