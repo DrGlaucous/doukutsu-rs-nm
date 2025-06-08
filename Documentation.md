@@ -318,8 +318,8 @@ Here's an example of a file:
 - `<FNJxxxx:yyyy` - Jumps to event yyyy if flag xxxx is *NOT* set.
 
 - `<SASwwww:xxxx:yyyy` -  Set Any Sound: Make any sound with any frequency in any playtype: `<SLS[Sound]:[Playtype]:[Frequency]` (playtype 2 stops it)
-  - Frequency is divided by 1000, so 1000 = 1.0, 500 = 0.5, etc.
   - Playtype: 0->Play, 1->Loop, 2->Stop
+  - Frequency is divided by 1000, so 1000 = 1.0, 500 = 0.5, etc.
 
 
 ## Rotation Framework

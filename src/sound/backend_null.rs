@@ -70,6 +70,8 @@ impl SoundManager for SoundManagerNull {
 
     fn stop_sfx(&mut self, id: u8) {}
 
+    fn stop_sfx_loops(&mut self) {}
+
     fn set_org_interpolation(&mut self, interpolation: InterpolationMode) {}
 
     fn set_song_volume(&mut self, volume: f32) {}

@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::io;
 use std::io::Cursor;
@@ -224,6 +225,7 @@ pub enum TextScriptExecutionState {
     WaitInput(u16, u32, u16),
     WaitStanding(u16, u32),
     WaitConfirmation(u16, u32, u16, u8, ConfirmSelection),
+
     WaitFade(u16, u32),
     FallingIsland(u16, u32, i32, i32, u16, bool),
     MapSystem,
@@ -244,6 +246,7 @@ pub struct TextScriptVM {
     pub scripts: Rc<RefCell<Scripts>>,
     pub state: TextScriptExecutionState,
     pub stack: Vec<TextScriptExecutionState>,
+    
     pub flags: TextScriptFlags,
     pub mode: ScriptMode,
     /// The player who triggered the event.
@@ -694,6 +697,9 @@ impl TextScriptVM {
 
                     break;
                 }
+
+
+
                 TextScriptExecutionState::WaitStanding(event, ip) => {
                     if game_scene.player1.flags.hit_bottom_wall() || game_scene.player2.flags.hit_bottom_wall() {
                         state.textscript_vm.state = TextScriptExecutionState::Running(event, ip);
@@ -2112,6 +2118,7 @@ impl TextScriptVM {
             }
             TSCOpCode::CHm =>{
 
+                let key = read_cur_varint(&mut cursor)? as usize;
                 exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
 
             }

@@ -62,6 +62,8 @@ pub trait SoundManager {
 
     fn loop_sfx_freq(&mut self, id: u8, freq: f32);
 
+    fn stop_sfx_loops(&mut self);
+
     fn stop_sfx(&mut self, id: u8);
 
     fn set_org_interpolation(&mut self, interpolation: InterpolationMode);

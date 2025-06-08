@@ -185,7 +185,7 @@ impl LibretroEventLoop {
         }
         //std::thread::sleep(std::time::Duration::from_millis(10));
 
-        if !ctx.has_ticked_since_change {continue}
+        if !ctx.has_ticked_since_change {return}
         
         match game.draw(ctx)
         {

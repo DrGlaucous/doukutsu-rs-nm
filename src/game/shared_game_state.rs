@@ -844,6 +844,8 @@ impl SharedGameState {
         self.sound_manager.stop_sfx(40);
         self.sound_manager.stop_sfx(41);
         self.sound_manager.stop_sfx(58);
+        //new: halt any looping sounds
+        self.sound_manager.stop_sfx_loops();
     }
 
     pub fn set_flag(&mut self, id: usize, value: bool) {

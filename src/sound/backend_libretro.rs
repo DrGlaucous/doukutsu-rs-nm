@@ -241,6 +241,10 @@ impl SoundManager for SoundManagerLibretro {
         self.send(PlaybackMessage::StopSample(id)).unwrap();
     }
 
+    fn stop_sfx_loops(&mut self) {
+        self.send(PlaybackMessage::StopAllSampleLoops).unwrap();
+    }
+
     fn set_org_interpolation(&mut self, interpolation: InterpolationMode) {
         if self.no_audio {
             return;
@@ -874,6 +878,7 @@ pub(in crate::sound) enum PlaybackMessage {
     LoopSample(u8),
     LoopSampleFreq(u8, f32),
     StopSample(u8),
+    StopAllSampleLoops,
     SetSpeed(f32),
     SetSongVolume(f32),
     SetSampleVolume(f32),
@@ -1121,9 +1126,12 @@ impl Runner {
                     self.pixtone.play_sfx(id);
                 }
                 Ok(PlaybackMessage::PlaySampleFreq(id, freq)) => {
-                    pixtone.play_sfx_freq(id, freq);
+                    self.pixtone.play_sfx_freq(id, freq);
                 }
-
+                Ok(PlaybackMessage::StopAllSampleLoops) => {
+                    self.pixtone.stop_all_loops();
+                }
+                
                 Ok(PlaybackMessage::LoopSample(id)) => {
                     self.pixtone.loop_sfx(id);
                 }

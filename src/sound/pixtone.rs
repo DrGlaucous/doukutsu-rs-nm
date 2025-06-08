@@ -251,11 +251,24 @@ impl PixTonePlayback {
         self.playback_state.push(PlaybackState { id, pos: 0.0, tag: 0, looping: true, freq });
     }
 
+    //halt any sound that is looping
+    pub fn stop_all_loops(&mut self) {
+
+        let mut scan = VecMutScan::new(&mut self.playback_state);
+        while let Some(item) = scan.next() {
+            if item.looping == true {
+                item.remove();
+            }
+        }
+    }
+
     pub fn stop_sfx(&mut self, id: u8) {
         if let Some(pos) = self.playback_state.iter().position(|s| s.id == id && s.tag == 0) {
             self.playback_state.remove(pos);
         }
     }
+
+
 
     pub fn play_concurrent(&mut self, id: u8, tag: u32) {
         self.playback_state.push(PlaybackState { id, pos: 0.0, tag, looping: false, freq: 1.0 });
