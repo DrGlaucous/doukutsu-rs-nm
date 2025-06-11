@@ -151,7 +151,7 @@ impl GameEntity<()> for TextBoxes {
                 }
 
                 //todo: make this dynamic based on font (round by 8s so we get perfect wedge sizes)
-                let width = ((longest_string * 6 + 24 + 4) / 8 * 8) as f32 + 4.0;
+                let width = ((longest_string * 6 + 24 + 4) / 8 * 8) as f32;
                 let height = ((16 * state.textscript_vm.choice_list.len() + 16) / 8 * 8) as f32;
 
                 //positon
@@ -201,14 +201,14 @@ impl GameEntity<()> for TextBoxes {
                         let mid_left = Rect::new(0, 8, 8, 16);
                         let bottom_left_corner = Rect::new(0, 16, 8, 24);
 
-                        let top_middle = Rect::new( 8, 0, 240, 8 );
-                        let mid_middle = Rect::new( 8, 8, 240, 16 );
-                        let bottom_middle = Rect::new( 8, 16, 240, 24 );
+                        let top_middle = Rect::new( 8, 0, 236, 8 );
+                        let mid_middle = Rect::new( 8, 8, 236, 16 );
+                        let bottom_middle = Rect::new( 8, 16, 236, 24 );
 
                         //232/240 is on the grid, but 236 gives me an 8x8 piece
-                        let top_right_corner = Rect::new( 240 , 0, 244, 8);
-                        let mid_right = Rect::new(240, 8, 244, 16);                        
-                        let bottom_right_corner = Rect::new(240, 16, 244, 24);
+                        let top_right_corner = Rect::new( 236 , 0, 244, 8);
+                        let mid_right = Rect::new(236, 8, 244, 16);
+                        let bottom_right_corner = Rect::new(236, 16, 244, 24);
 
 
                         //-2 for the top and bottom if divisible by 8, -1 for just the top if not, so we can also cover the partial layer formed by an uneven division
@@ -248,18 +248,18 @@ impl GameEntity<()> for TextBoxes {
 
                         //draw left and right corners
                         batch.add_rect(x, y, &top_left_corner);
-                        batch.add_rect(x + width - 4.0, y, &top_right_corner);
+                        batch.add_rect(x + width - top_right_corner.width() as f32, y, &top_right_corner);
 
 
                         //draw left and right sides
                         for i in 0..range_height {
                             batch.add_rect(x, y + 8.0 + (i * 8) as f32, &mid_left);
-                            batch.add_rect(x + width - 4.0, y + 8.0 + (i * 8) as f32, &mid_right);
+                            batch.add_rect(x + width - top_right_corner.width() as f32, y + 8.0 + (i * 8) as f32, &mid_right);
                         }
 
                         //draw bottom corners
                         batch.add_rect(x, y + height - 8.0, &bottom_left_corner);
-                        batch.add_rect(x + width - 4.0, y + height - 8.0, &bottom_right_corner);
+                        batch.add_rect(x + width - top_right_corner.width() as f32, y + height - 8.0, &bottom_right_corner);
                     
                     }
 
