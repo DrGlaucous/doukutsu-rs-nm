@@ -249,8 +249,7 @@ impl<T: std::cmp::PartialEq + std::default::Default + Clone> Menu<T> {
         self.height = height.max(16.0) as u16;
     }
 
-    //currently a strange bug where this will align left for one frame... hmm...
-    pub fn draw_board(state: &mut SharedGameState, ctx: &mut Context, x: f32, y: f32, width: u16, height: u16) -> GameResult {
+    pub fn put_board(state: &mut SharedGameState, ctx: &mut Context, x: f32, y: f32, width: u16, height: u16) -> GameResult {
         let ui_texture = if state.constants.is_cs_plus { "ui" } else { "TextBox" };
         let batch = state.texture_set.get_or_load_batch(ctx, &state.constants, ui_texture)?;
 
@@ -357,11 +356,6 @@ impl<T: std::cmp::PartialEq + std::default::Default + Clone> Menu<T> {
     }
 
     pub fn draw(&self, state: &mut SharedGameState, ctx: &mut Context) -> GameResult {
-        let ui_texture = if state.constants.is_cs_plus { "ui" } else { "TextBox" };
-        let batch = state.texture_set.get_or_load_batch(ctx, &state.constants, ui_texture)?;
-
-        let mut rect;
-        let mut rect2;
 
         let selected_y = self.get_selected_entry_y() as f32;
 
@@ -371,94 +365,17 @@ impl<T: std::cmp::PartialEq + std::default::Default + Clone> Menu<T> {
             computed_y -= (selected_y + MENU_MIN_PADDING) - (state.canvas_size.1 - MENU_MIN_PADDING) + 4.0;
         }
 
-        let mut x = self.x as f32;
+
+        let x = self.x as f32;
         let mut y = computed_y;
-        let mut width = self.width;
-        let mut height = self.height;
+        let width = self.width;
+        let height = self.height;
 
-        rect = state.constants.title.menu_left_top;
-        batch.add_rect(self.x as f32 - rect.width() as f32, y - rect.height() as f32, &rect);
-        rect = state.constants.title.menu_right_top;
-        batch.add_rect(self.x as f32 + self.width as f32, y - rect.height() as f32, &rect);
-        rect = state.constants.title.menu_left_bottom;
-        batch.add_rect(self.x as f32 - rect.width() as f32, y + self.height as f32, &rect);
-        rect = state.constants.title.menu_right_bottom;
-        batch.add_rect(self.x as f32 + self.width as f32, y + self.height as f32, &rect);
+        let mut rect = state.constants.title.menu_left;
+        //let mut rect2 = state.constants.title.menu_right;
 
-        rect = state.constants.title.menu_top;
-        rect2 = state.constants.title.menu_bottom;
+        Self::put_board(state, ctx, x, y, width, height)?;
 
-        while width > 0 {
-            rect.right = if width >= rect.width() {
-                width = width.saturating_sub(rect.width());
-                rect.right
-            } else {
-                let old_width = width;
-                width = 0;
-                rect.left + old_width
-            };
-            rect2.right = rect.right;
-
-            batch.add_rect(x, y - rect.height() as f32, &rect);
-            batch.add_rect(x, y + self.height as f32, &rect2);
-            x += rect.width() as f32;
-        }
-
-        x = self.x as f32;
-        rect = state.constants.title.menu_left;
-        rect2 = state.constants.title.menu_right;
-        while height > 0 {
-            rect.bottom = if height >= rect.height() {
-                height = height.saturating_sub(rect.height());
-                rect.bottom
-            } else {
-                let old_height = height;
-                height = 0;
-                rect.top + old_height
-            };
-            rect2.bottom = rect.bottom;
-
-            batch.add_rect(x - rect.width() as f32, y, &rect);
-            batch.add_rect(x + self.width as f32, y, &rect2);
-            y += rect.height() as f32;
-        }
-
-        height = self.height;
-        y = computed_y;
-
-        while height > 0 {
-            rect = state.constants.title.menu_middle;
-            width = self.width;
-            x = self.x as f32;
-
-            rect.bottom = if height >= rect.height() {
-                height = height.saturating_sub(rect.height());
-                rect.bottom
-            } else {
-                let old_height = height;
-                height = 0;
-                rect.top + old_height
-            };
-
-            while width > 0 {
-                rect.right = if width >= rect.width() {
-                    width = width.saturating_sub(rect.width());
-                    rect.right
-                } else {
-                    let old_width = width;
-                    width = 0;
-                    rect.left + old_width
-                };
-
-                batch.add_rect(x, y, &rect);
-
-                x += rect.width() as f32;
-            }
-
-            y += rect.height() as f32;
-        }
-
-        batch.draw(ctx)?;
 
         let options_x = if self.center_options {
             let mut longest_option_width = 20.0;

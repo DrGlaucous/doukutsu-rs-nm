@@ -321,6 +321,11 @@ Here's an example of a file:
   - Playtype: 0->Play, 1->Loop, 2->Stop
   - Frequency is divided by 1000, so 1000 = 1.0, 500 = 0.5, etc.
 
+### Choice Dialogue
+- `<CH+wwww:xxxx:choice_text$` - Add an option to the choice list: `<CH+[index key (any number)]:[event number]:[txt]$` The order of choices depend on the value of `wwww`. Smaller `wwww` values will be placed higher in the index. Using the same `wwww` will replace the existing entry with that index if already populated.
+- `<CH-wwww` - Remove the choice with key value `wwww`. Does nothing if `wwww` does not exist.
+- `<CHC` - Clear all choices in the list
+- `<CHO` - Show the choice dialouge. Is invisible if there is no message box displayed, and will fallthrough to the next event if there are no choices in the list.
 
 ## Rotation Framework
 

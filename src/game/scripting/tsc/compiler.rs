@@ -182,6 +182,7 @@ impl TextScript {
             | TSCOpCode::FR2
             | TSCOpCode::BKR
             | TSCOpCode::MS4
+            | TSCOpCode::CHC
             | TSCOpCode::CHO
             => {
                 put_varint(instr as i32, out);

@@ -62,6 +62,7 @@ impl TextScript {
                         | TSCOpCode::FR2
                         | TSCOpCode::BKR
                         | TSCOpCode::MS4
+                        | TSCOpCode::CHC                        
                         | TSCOpCode::CHO
                         => {
                             writeln!(&mut result, "{:?}()", op).unwrap();

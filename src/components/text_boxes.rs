@@ -117,6 +117,7 @@ impl GameEntity<()> for TextBoxes {
                 );
             }
 
+            //YNJ dialouge
             if let TextScriptExecutionState::WaitConfirmation(_, _, _, wait, selection) = state.textscript_vm.state {
                 let pos_y = if wait > 14 {
                     state.canvas_size.1 - off_bottom - 96.0 + 4.0 * (17 - wait) as f32
@@ -137,7 +138,176 @@ impl GameEntity<()> for TextBoxes {
                 }
             }
 
-            batch.draw(ctx)?;
+            //MultiChoice dialouge
+            //arg: event, ip, wait, selection
+            if let TextScriptExecutionState::WaitMultiChoice(_, _, wait, selection, blink_tick) = state.textscript_vm.state {
+
+
+                let mut longest_string = 0;
+                for (_, _, strvec) in &mut state.textscript_vm.choice_list {
+                    if strvec.len() > longest_string {
+                        longest_string = strvec.len();
+                    }
+                }
+
+                //todo: make this dynamic based on font (round by 8s so we get perfect wedge sizes)
+                let width = ((longest_string * 6 + 24 + 4) / 8 * 8) as f32 + 4.0;
+                let height = ((16 * state.textscript_vm.choice_list.len() + 16) / 8 * 8) as f32;
+
+                //positon
+                let menu_x = state.canvas_size.0 / 2.0 - width / 2.0;
+                let menu_y = 0.0 - if wait > 14 {(17 - wait) as f32 * 4.0} else {0.0};
+
+                //todo: MS3 and MS2 position
+                let menu_y = if state.textscript_vm.flags.position_top() {
+                    //touching the bottom of the text box + 2
+                    menu_y + 32.0 + off_top + 64.0 + 2.0
+                } else {
+                    //not quite touching the top
+                    menu_y + 2.0
+                };
+
+                //draw the selection box
+                {
+                    //(blink_tick / 2) % 2
+                    let (
+                        s_box_left,
+                        s_box_mid,
+                        s_box_right,
+                    ) = if (blink_tick / 2) % 2 == 0 {
+                        (
+                            Rect::new(80, 88, 88, 104),
+                            Rect::new(88, 88, 96, 104),
+                            Rect::new(104, 88, 112, 104)
+                        )
+                    } else {
+                        (
+                            Rect::new(80, 104, 88, 120),
+                            Rect::new(88, 104, 96, 120),
+                            Rect::new(104, 104, 112, 120)
+                        )
+                    };
+
+
+                    //draw the background board
+                    {
+                        //re-define vars here (we may just break out this scope into its own function...)
+                        let x = menu_x;
+                        let y = menu_y;
+
+                        //delimited by the ravioli spikes on the text box
+
+                        let top_left_corner = Rect::new( 0, 0, 8, 8 );
+                        let mid_left = Rect::new(0, 8, 8, 16);
+                        let bottom_left_corner = Rect::new(0, 16, 8, 24);
+
+                        let top_middle = Rect::new( 8, 0, 240, 8 );
+                        let mid_middle = Rect::new( 8, 8, 240, 16 );
+                        let bottom_middle = Rect::new( 8, 16, 240, 24 );
+
+                        //232/240 is on the grid, but 236 gives me an 8x8 piece
+                        let top_right_corner = Rect::new( 240 , 0, 244, 8);
+                        let mid_right = Rect::new(240, 8, 244, 16);                        
+                        let bottom_right_corner = Rect::new(240, 16, 244, 24);
+
+
+                        //-2 for the top and bottom if divisible by 8, -1 for just the top if not, so we can also cover the partial layer formed by an uneven division
+                        let range_height = height as i32 / 8 - if height as i32 % 8 != 0 {1} else {2};
+
+
+                        //draw middle section
+                        let mut middle_width = width as u16 - (top_left_corner.width() + top_right_corner.width());
+                        let mut middle_x_pos = x + top_left_corner.width() as f32;
+                        while middle_width > 0 {
+                            //take care of remainder
+                            let (new_top_mid_width, new_mid_mid_width, new_bottom_mid_width) = if middle_width < top_middle.width() {
+                                (
+                                    Rect::new(top_middle.left, top_middle.top, top_middle.left + middle_width, top_middle.bottom),
+                                    Rect::new(mid_middle.left, mid_middle.top, mid_middle.left + middle_width, mid_middle.bottom),
+                                    Rect::new(bottom_middle.left, bottom_middle.top, bottom_middle.left + middle_width, bottom_middle.bottom)
+                                )
+                            } else {
+                                (
+                                    top_middle,
+                                    mid_middle,
+                                    bottom_middle
+                                )
+                            };
+
+                            for i in 0..range_height {
+                                batch.add_rect(middle_x_pos, y + 8.0 + (i * 8) as f32, &new_mid_mid_width);
+                            }
+
+                            //draw top and bottom middle sections
+                            batch.add_rect(middle_x_pos, y, &new_top_mid_width);
+                            batch.add_rect(middle_x_pos, y + height - 8.0, &new_bottom_mid_width);
+
+                            middle_x_pos += new_top_mid_width.width() as f32;
+                            middle_width -= new_top_mid_width.width();
+                        }
+
+                        //draw left and right corners
+                        batch.add_rect(x, y, &top_left_corner);
+                        batch.add_rect(x + width - 4.0, y, &top_right_corner);
+
+
+                        //draw left and right sides
+                        for i in 0..range_height {
+                            batch.add_rect(x, y + 8.0 + (i * 8) as f32, &mid_left);
+                            batch.add_rect(x + width - 4.0, y + 8.0 + (i * 8) as f32, &mid_right);
+                        }
+
+                        //draw bottom corners
+                        batch.add_rect(x, y + height - 8.0, &bottom_left_corner);
+                        batch.add_rect(x + width - 4.0, y + height - 8.0, &bottom_right_corner);
+                    
+                    }
+
+
+                    //draw selection box
+                    {
+                        let v_offset = (selection * 16) as f32 + menu_y + 8.0;
+                        batch.add_rect(menu_x + 8.0, v_offset, &s_box_left);
+
+                        //-2 for the left and right, as well as -2 for fitting inside the other box, with 1 potential extra for overlap
+                        let max_g = (width / 8.0 - if width % 8.0 != 0.0 {3.0} else {4.0}) as i32;
+                        for i in 0..max_g {
+                            batch.add_rect(menu_x + 16.0 + (i * 8) as f32, v_offset, &s_box_mid);
+                        }
+
+                        batch.add_rect(menu_x + width - 16.0, v_offset, &s_box_right);
+                    }
+
+                
+                }
+
+
+                batch.draw(ctx)?;
+
+                //draw the text
+                {
+                    for (e, (_, _, item)) in state.textscript_vm.choice_list.iter().enumerate() {
+
+                        state.font.builder().position(menu_x as f32 + 12.0, (menu_y + 11.0) + (16 * e) as f32).draw(
+                            item.as_str(),
+                            ctx,
+                            &state.constants,
+                            &mut state.texture_set,
+                        )?;
+                    }
+
+                }
+
+
+
+            } else {
+                batch.draw(ctx)?;
+            }
+
+            
+
+
+
         }
 
         if state.textscript_vm.face != 0 {

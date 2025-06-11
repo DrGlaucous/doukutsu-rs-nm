@@ -302,6 +302,9 @@ pub enum TSCOpCode {
     #[strum(serialize = "CH-")]
     CHm,
 
+    // <CHC //CHoice Clear, removes all entries from the choice dialouge
+    CHC,
+
     // <CHO //show choice dialouge
     CHO,
 

@@ -10,6 +10,7 @@ use std::ops::{Not, Deref};
 use std::rc::Rc;
 
 use num_traits::{clamp, FromPrimitive};
+use vec_mut_scan::VecMutScan;
 
 use crate::bitfield;
 use crate::common::Direction::{Left, Right};
@@ -226,6 +227,8 @@ pub enum TextScriptExecutionState {
     WaitStanding(u16, u32),
     WaitConfirmation(u16, u32, u16, u8, ConfirmSelection),
 
+    WaitMultiChoice(u16, u32, u8, usize, usize), //arg: event, ip, wait, selection, blink_tick
+
     WaitFade(u16, u32),
     FallingIsland(u16, u32, i32, i32, u16, bool),
     MapSystem,
@@ -246,6 +249,7 @@ pub struct TextScriptVM {
     pub scripts: Rc<RefCell<Scripts>>,
     pub state: TextScriptExecutionState,
     pub stack: Vec<TextScriptExecutionState>,
+    pub choice_list: Vec<(i32, u16, String)>,
     
     pub flags: TextScriptFlags,
     pub mode: ScriptMode,
@@ -328,6 +332,7 @@ impl TextScriptVM {
             })),
             state: TextScriptExecutionState::Ended,
             stack: Vec::with_capacity(6),
+            choice_list: Vec::new(),
             flags: TextScriptFlags(0),
             mode: ScriptMode::Map,
             executor_player: TargetPlayer::Player1,
@@ -396,6 +401,7 @@ impl TextScriptVM {
         self.illustration_state = IllustrationState::Hidden;
         self.face = 0;
         self.clear_text_box();
+        self.choice_list.clear();
     }
 
     pub fn clear_text_box(&mut self) {
@@ -698,7 +704,71 @@ impl TextScriptVM {
                     break;
                 }
 
+                TextScriptExecutionState::WaitMultiChoice(event, ip, wait, selection, blink_tick) => {
 
+                    //OOB, skip choice and go to next event (maybe make this an event too?)
+                    if selection >= state.textscript_vm.choice_list.len() {
+                        state.textscript_vm.state = TextScriptExecutionState::Running(event, ip);
+                        break;
+                    }
+
+                    let blink_tick = blink_tick + 1; //for blinking the cursor
+
+                    if wait > 0 {
+                        state.textscript_vm.state =
+                            TextScriptExecutionState::WaitMultiChoice(event, ip, wait - 1, selection, blink_tick);
+                        break;
+                    }
+
+                    let confirm =
+                        game_scene.player1.controller.trigger_jump() || game_scene.player2.controller.trigger_jump();
+
+
+                    //scroll up/down the choices
+                    if game_scene.player1.controller.trigger_down()
+                        || game_scene.player2.controller.trigger_down()
+                    {
+                        let new_selection = if selection >= state.textscript_vm.choice_list.len() - 1 {0} else {selection + 1};
+
+                        state.sound_manager.play_sfx(1);
+                        state.textscript_vm.state =
+                            TextScriptExecutionState::WaitMultiChoice(event, ip, 0, new_selection, blink_tick);
+                        break;
+                    }
+                    if game_scene.player1.controller.trigger_up()
+                        || game_scene.player2.controller.trigger_up()
+                    {
+                        let new_selection = if selection == 0 {state.textscript_vm.choice_list.len() - 1} else {selection - 1};
+                        
+                        state.sound_manager.play_sfx(1);
+                        state.textscript_vm.state =
+                            TextScriptExecutionState::WaitMultiChoice(event, ip, 0, new_selection, blink_tick);
+                        break;
+                    }
+
+
+                    //TODO: touch support here
+
+                    if confirm {
+                        state.sound_manager.play_sfx(18);
+                        
+
+                        state.textscript_vm.clear_text_box();
+
+                        //key, event, text
+                        //pub choice_list: Vec<(i32, u16, Vec<char>)>,
+
+                        let no_event =  state.textscript_vm.choice_list[selection].1;
+                        state.textscript_vm.state = TextScriptExecutionState::Running(no_event, 0);
+
+                        break;
+                    }
+
+                    //keep updating the blink tick
+                    state.textscript_vm.state = TextScriptExecutionState::WaitMultiChoice(event, ip, wait, selection, blink_tick);
+                    break;
+
+                }
 
                 TextScriptExecutionState::WaitStanding(event, ip) => {
                     if game_scene.player1.flags.hit_bottom_wall() || game_scene.player2.flags.hit_bottom_wall() {
@@ -2108,22 +2178,59 @@ impl TextScriptVM {
 
             TSCOpCode::CHp =>{
 
-                let key = read_cur_varint(&mut cursor)? as usize;
-                let k_event = read_cur_varint(&mut cursor)? as usize;
+                let key = read_cur_varint(&mut cursor)? as i32;
+                let k_event = read_cur_varint(&mut cursor)? as u16;
                 let len = read_cur_varint(&mut cursor)? as usize;
                 let text = read_string_tsc(&mut cursor, len).unwrap();
+
+                let text_chr = text; //text.chars().collect();                
+
+                let mut idx = 0;//state.textscript_vm.choice_list.len() - 1;
+
+                //insert new item in-order;
+                while idx < state.textscript_vm.choice_list.len() {
+                    if state.textscript_vm.choice_list[idx].0 >= key {
+                        break;
+                    }
+                    idx += 1;
+                }
+                if state.textscript_vm.choice_list.len() > idx && key == state.textscript_vm.choice_list[idx].0 {
+                    //same key: replace old element
+                    state.textscript_vm.choice_list[idx] = (key, k_event, text_chr);
+                } else {
+                    //insert at last index
+                    state.textscript_vm.choice_list.insert(idx, (key, k_event, text_chr));
+                }
+
 
                 exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
 
             }
             TSCOpCode::CHm =>{
 
-                let key = read_cur_varint(&mut cursor)? as usize;
+                let key = read_cur_varint(&mut cursor)? as i32;
+
+                //find matching key and remote this element
+                let mut scan = VecMutScan::new(&mut state.textscript_vm.choice_list);
+                while let Some(item) = scan.next() {
+                    if item.0 == key {
+                        item.remove();
+                    }
+                }
+
                 exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
 
             }
             TSCOpCode::CHO =>{
+                //potentially add a breakout event here (could also just put the breakout directly after within the same event)
 
+                state.sound_manager.play_sfx(5);
+                exec_state = TextScriptExecutionState::WaitMultiChoice(event, cursor.position() as u32, 16, 0, 0);
+
+            }
+            TSCOpCode::CHC =>{
+                //erase all choices
+                state.textscript_vm.choice_list.clear();
                 exec_state = TextScriptExecutionState::Running(event, cursor.position() as u32);
 
             }
