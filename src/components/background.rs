@@ -69,31 +69,6 @@ pub struct AnimationStyle {
 }
 
 
-//variables that are skipped when saving or loading to and from a config file
-#[derive(Clone)]
-pub struct DynamicLayerVars {
-        //starting positions for each bitmap when drawn onscreen (values that are animated): 
-        pub layer_x_value: f32, //I think these are the starting positions for each bitmap when drawn on the screen
-        pub layer_y_value: f32,
-    
-        //calculate additional frame-realtive offsets (like distant scrolling) and place them here so the other offset functions can get at them
-        pub frame_x_offset: f32,
-        pub frame_y_offset: f32,
-    
-        //coordinates to use for refrencing the screen edge, can be unique for each layer
-        pub edge_coords: Rect<f32>,
-}
-impl Default for DynamicLayerVars {
-    fn default() -> Self {
-        DynamicLayerVars {
-            layer_x_value: 0.0, //current location of the layer on the window
-            layer_y_value: 0.0,
-            frame_x_offset: 0.0, //extra offsets to apply from the camera
-            frame_y_offset: 0.0,
-            edge_coords: Rect::new(0.0, 0.0, 0.0, 0.0),
-        }
-    }
-}
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct LayerConfig {
@@ -684,12 +659,13 @@ impl Background {
 
         }
 
+    Ok(())
+
     */
 
 
 
 
-        Ok(())
     }
 
     pub fn draw_tick(&mut self) -> GameResult<()> {
