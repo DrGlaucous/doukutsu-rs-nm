@@ -1,19 +1,15 @@
 use crate::common::Direction;
 use crate::framework::error::GameResult;
-use crate::game::npc::boss::BossNPC;
-use crate::game::npc::list::NPCList;
-use crate::game::npc::NPC;
-use crate::game::player::Player;
+use crate::game::npc::list::{BorrowedNPC, NPCTokenProvider};
+use crate::game::npc::{NPCContext, NPC};
 use crate::game::shared_game_state::SharedGameState;
-use crate::game::stage::Stage;
 use crate::util::rng::RNG;
 
-impl NPC {
+impl BorrowedNPC<'_> {
     pub fn tick_n042_sue(
         &mut self,
         state: &mut SharedGameState,
-        players: [&mut Player; 2],
-        npc_list: &NPCList,
+        NPCContext { players, npc_list, .. }: NPCContext,
     ) -> GameResult {
         match self.action_num {
             0 | 1 => {
@@ -117,13 +113,15 @@ impl NPC {
                     self.vel_y = 0;
                     self.action_num = 14;
 
-                    self.parent_id = npc_list
-                        .iter_alive()
-                        .find_map(|npc| if npc.event_num == 501 { Some(npc.id) } else { None })
-                        .unwrap_or(0);
+                    self.parent_id = self.unborrow_then(|token| {
+                        npc_list
+                            .iter_alive(token)
+                            .find_map(|npc| if npc.event_num == 501 { Some(npc.id) } else { None })
+                            .unwrap_or(0)
+                    });
                 }
 
-                if let Some(npc) = self.get_parent_ref_mut(npc_list) {
+                if let Some(npc) = self.get_parent(npc_list) {
                     self.direction = npc.direction.opposite();
                     self.x = npc.x + npc.direction.vector_x() * 0xc00;
                     self.y = npc.y + 0x800;
@@ -225,7 +223,7 @@ impl NPC {
         Ok(())
     }
 
-    pub(crate) fn tick_n092_sue_at_pc(&mut self, state: &mut SharedGameState) -> GameResult {
+    pub(crate) fn tick_n092_sue_at_pc(&mut self, state: &mut SharedGameState, _: NPCContext) -> GameResult {
         match self.action_num {
             0 | 1 => {
                 if self.action_num == 0 {
@@ -282,7 +280,7 @@ impl NPC {
         Ok(())
     }
 
-    pub(crate) fn tick_n280_sue_teleported(&mut self, state: &mut SharedGameState) -> GameResult {
+    pub(crate) fn tick_n280_sue_teleported(&mut self, state: &mut SharedGameState, _: NPCContext) -> GameResult {
         match self.action_num {
             0 | 1 => {
                 if self.action_num == 0 {
@@ -335,10 +333,7 @@ impl NPC {
     pub(crate) fn tick_n284_sue_possessed(
         &mut self,
         state: &mut SharedGameState,
-        players: [&mut Player; 2],
-        npc_list: &NPCList,
-        stage: &mut Stage,
-        boss: &mut BossNPC,
+        NPCContext { players, npc_list, stage, boss, .. }: NPCContext,
     ) -> GameResult {
         if self.action_num < 100 && (!boss.parts[0].cond.alive() || self.life < 500) {
             self.action_num = 100;
@@ -378,7 +373,7 @@ impl NPC {
                 self.display_bounds.right = 0x2000;
                 self.display_bounds.left = 0x2000;
 
-                npc_list.kill_npcs_by_type(257, true, state);
+                npc_list.kill_npcs_by_type(257, true, state, self);
             }
             20 | 21 => {
                 if self.action_num == 20 {

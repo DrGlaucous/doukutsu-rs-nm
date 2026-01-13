@@ -1,4 +1,7 @@
-use crate::framework::backend::{init_backend, BackendRenderer};
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2016 ggez-dev
+// Copyright (c) 2020 doukutsu-rs contributors (see AUTHORS.md)
+use crate::framework::backend::{init_backend, BackendRenderer, WindowParams};
 use crate::framework::error::GameResult;
 use crate::framework::filesystem::Filesystem;
 use crate::framework::gamepad::GamepadContext;
@@ -15,7 +18,7 @@ use crate::framework::backend_libretro::{LibretroBackend, LibretroEventLoop, Ren
 
 pub struct Context {
     pub headless: bool,
-    pub size_hint: (u16, u16),
+    pub window: WindowParams,
     pub(crate) filesystem: Filesystem,
     pub(crate) renderer: Option<Box<dyn BackendRenderer>>,
     pub(crate) gamepad_context: GamepadContext,
@@ -30,7 +33,7 @@ impl Context {
     pub fn new() -> Context {
         Context {
             headless: false,
-            size_hint: (640, 480),
+            window: WindowParams::default(),
             filesystem: Filesystem::new(),
             renderer: None,
             gamepad_context: GamepadContext::new(),
@@ -43,7 +46,7 @@ impl Context {
     }
 
     pub fn run(&mut self, game: &mut Game) -> GameResult {
-        let backend = init_backend(self.headless, self.size_hint)?;
+        let backend = init_backend(self.headless, self.window)?;
         let mut event_loop = backend.create_event_loop(self)?;
         self.renderer = Some(event_loop.new_renderer(self as *mut Context)?);
 

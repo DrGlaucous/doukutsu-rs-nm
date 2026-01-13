@@ -262,9 +262,12 @@ pub struct EngineConstants {
     pub npc: NPCConsts,
     pub weapon: WeaponConsts,
     pub tex_sizes: CaseInsensitiveHashMap<(u16, u16)>,
+    pub ignore_ogph_textures: Vec<String>,
     pub textscript: TextScriptConsts,
     pub title: TitleConsts,
     pub inventory_dim_color: Color,
+    pub background_color: Color,
+    pub intro_background_color: Color,
     pub font_path: String,
     pub font_space_offset: f32,
     pub soundtracks: Vec<ExtraSoundtrack>,
@@ -1421,6 +1424,10 @@ impl EngineConstants {
                 "Title" => (320, 48),
                 "triangles" => (20, 5),
             },
+            ignore_ogph_textures: vec![
+                // All in lowercase
+                "title".to_owned(),
+            ],
             textscript: TextScriptConsts {
                 encoding: TextScriptEncoding::ShiftJIS,
                 encrypted: true,
@@ -1506,6 +1513,8 @@ impl EngineConstants {
                 ],
             },
             inventory_dim_color: Color::from_rgba(0, 0, 0, 0),
+            background_color: Color::from_rgb(0, 0, 32),
+            intro_background_color: Color::from_rgb(0, 0, 0),
             font_path: "csfont.fnt".to_owned(),
             font_space_offset: 0.0,
             soundtracks: vec![
@@ -1682,6 +1691,7 @@ impl EngineConstants {
         self.tex_sizes.insert("uimusic".to_owned(), (192, 144));
         self.title.logo_rect = Rect { left: 0, top: 0, right: 214, bottom: 62 };
         self.inventory_dim_color = Color::from_rgba(0, 0, 32, 150);
+        self.intro_background_color = Color::from_rgb(0, 0, 32);
         self.textscript.encoding = TextScriptEncoding::UTF8;
         self.textscript.encrypted = false;
         self.textscript.animated_face_pics = true;

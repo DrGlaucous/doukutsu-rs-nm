@@ -1,17 +1,16 @@
 use crate::common::{Direction, Rect};
-use crate::components::flash::Flash;
 use crate::framework::error::GameResult;
 use crate::game::caret::CaretType;
 use crate::game::npc::boss::BossNPC;
-use crate::game::npc::list::NPCList;
-use crate::game::npc::NPC;
-use crate::game::player::Player;
+use crate::game::npc::{NPCContext, NPC};
+use crate::game::physics::HitExtents;
 use crate::game::shared_game_state::SharedGameState;
-use crate::game::weapon::bullet::BulletManager;
 use crate::util::rng::RNG;
 
+use super::BossNPCContext;
+
 impl NPC {
-    pub(crate) fn tick_n048_omega_projectiles(&mut self, state: &mut SharedGameState) -> GameResult {
+    pub(crate) fn tick_n048_omega_projectiles(&mut self, state: &mut SharedGameState, _: NPCContext) -> GameResult {
         if (self.flags.hit_left_wall() && self.vel_x < 0) || (self.flags.hit_right_wall() && self.vel_x > 0) {
             self.vel_x = -self.vel_x;
         } else if self.flags.hit_bottom_wall() {
@@ -53,10 +52,7 @@ impl BossNPC {
     pub(crate) fn tick_b01_omega(
         &mut self,
         state: &mut SharedGameState,
-        players: [&mut Player; 2],
-        npc_list: &NPCList,
-        bullet_manager: &BulletManager,
-        flash: &mut Flash,
+        BossNPCContext { players, npc_list, npc_token, bullet_manager, flash, .. }: BossNPCContext,
     ) {
         match self.parts[0].action_num {
             0 => {
@@ -74,7 +70,7 @@ impl BossNPC {
                 self.parts[0].target_y = self.parts[0].y;
                 self.parts[0].display_bounds =
                     Rect { left: 40 * 0x200, top: 40 * 0x200, right: 40 * 0x200, bottom: 0x2000 };
-                self.parts[0].hit_bounds = Rect { left: 0x1000, top: 24 * 0x200, right: 0x1000, bottom: 0x2000 };
+                self.parts[0].hit_bounds = HitExtents { left: 0x1000, top: 24 * 0x200, right: 0x1000, bottom: 0x2000 };
                 self.hurt_sound[0] = 52;
 
                 self.parts[1].cond.set_alive(true);
@@ -94,7 +90,7 @@ impl BossNPC {
                 self.parts[3].x = self.parts[0].x + 0x2000;
                 self.parts[3].y = self.parts[0].y;
                 self.parts[3].display_bounds = Rect { left: 24 * 0x200, top: 0x2000, right: 0x2000, bottom: 0x2000 };
-                self.parts[3].hit_bounds = Rect { left: 0x1000, top: 0x1000, right: 0x1000, bottom: 0x1000 };
+                self.parts[3].hit_bounds = HitExtents { left: 0x1000, top: 0x1000, right: 0x1000, bottom: 0x1000 };
                 self.hurt_sound[3] = 52;
 
                 self.parts[4].cond.set_alive(true);
@@ -421,7 +417,8 @@ impl BossNPC {
             self.parts[5].action_num = 1;
             self.parts[5].npc_flags.set_solid_soft(true);
             self.parts[5].npc_flags.set_ignore_solidity(true);
-            self.parts[5].hit_bounds = Rect { left: 20 * 0x200, top: 36 * 0x200, right: 20 * 0x200, bottom: 0x2000 };
+            self.parts[5].hit_bounds =
+                HitExtents { left: 20 * 0x200, top: 36 * 0x200, right: 20 * 0x200, bottom: 0x2000 };
         }
 
         self.parts[5].x = self.parts[0].x;
@@ -433,7 +430,7 @@ impl BossNPC {
             self.parts[0].damage = 0;
             self.parts[5].damage = 0;
 
-            npc_list.kill_npcs_by_type(48, true, state);
+            npc_list.kill_npcs_by_type(48, true, state, npc_token);
         }
     }
 }
