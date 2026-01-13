@@ -13,7 +13,6 @@ use crate::sound::organya::{Song as Organya, Version};
 use crate::sound::stuff::*;
 use crate::sound::wav::*;
 use crate::sound::wave_bank::SoundBank;
-use crate::sound::InterpolationMode;
 
 #[derive(Clone)]
 pub struct FIRData {

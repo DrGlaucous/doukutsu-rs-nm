@@ -43,6 +43,7 @@ pub mod shared_game_state;
 pub mod stage;
 pub mod weapon;
 
+#[cfg(not(feature = "backend-libretro"))]
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
 pub struct LaunchOptions {
@@ -87,6 +88,7 @@ pub struct LaunchOptions {
 
 }
 
+#[cfg(not(feature = "backend-libretro"))]
 impl Default for LaunchOptions {
     fn default() -> Self {
         Self {
@@ -104,6 +106,7 @@ impl Default for LaunchOptions {
     }
 }
 
+#[cfg(not(feature = "backend-libretro"))]
 impl LaunchOptions {
     pub fn apply_defaults(&mut self, ctx: &Context, settings: &Settings) {
         self.window_width = Some(self.window_width.unwrap_or(ctx.window.size_hint.0));
@@ -126,6 +129,79 @@ impl LaunchOptions {
         }
     }
 }
+
+
+
+//todo: There HAS to be a better way to do this...
+#[cfg(feature = "backend-libretro")]
+
+//gut the clap parser for the retroarch version: it introduces too many complexities
+//#[derive(Debug, Parser)]
+//#[command(version, about, long_about = None)]
+pub struct LaunchOptions <'a>{
+    //#[arg(long, hide = cfg!(not(feature = "netplay")))]
+    /// Do not create a window and skip audio initialization.
+    pub server_mode: bool,
+
+    //#[arg(long)]
+    /// Window height in pixels.
+    pub window_height: Option<u16>,
+
+    //#[arg(long)]
+    /// Window width in pixels.
+    pub window_width: Option<u16>,
+
+    //#[arg(long)]
+    /// Startup in fullscreen mode.
+    pub window_fullscreen: bool,
+
+    //#[arg(long, default_value_t = Self::default().log_level)]
+    /// The minimum level of records that will be written to the log file.
+    ///
+    /// Possible values: error, warn, info, debug, trace.
+    pub log_level: LogLevel,
+
+
+    //retroarch breakout stuff:
+
+    pub return_types: bool, //returns game and context when initialization is complete
+    
+    pub external_timer: bool, //use a time source fed in by the parent program, allowing it to control the game's update speed
+
+    pub usr_dir: Option<PathBuf>, //where the game should be loaded from
+
+    pub resource_dir: Option<PathBuf>, //where the saves should be placed
+
+    //this is messy, but I can't find a way around it for now.
+    pub audio_config: sound::backend_libretro::OutputBufConfig<'a>, //audio config to be handed down to the shared state
+
+}
+
+#[cfg(feature = "backend-libretro")]
+impl <'a>LaunchOptions<'a> {
+    pub fn apply_defaults(&mut self, ctx: &Context, settings: &Settings) {
+        self.window_width = Some(self.window_width.unwrap_or(ctx.window.size_hint.0));
+        self.window_height = Some(self.window_height.unwrap_or(ctx.window.size_hint.1));
+
+        if !self.window_fullscreen {
+            self.window_fullscreen = settings.window_mode.is_fullscreen();
+        }
+    }
+
+    pub fn window(&self) -> WindowParams {
+        let default = WindowParams::default();
+
+        let width = self.window_width.unwrap_or(default.size_hint.0);
+        let height = self.window_height.unwrap_or(default.size_hint.1);
+
+        WindowParams {
+            size_hint: (width, height),
+            mode: if self.window_fullscreen { WindowMode::Fullscreen } else { WindowMode::Windowed },
+        }
+    }
+}
+
+
 
 lazy_static! {
     pub static ref GAME_SUSPENDED: Mutex<bool> = Mutex::new(false);
