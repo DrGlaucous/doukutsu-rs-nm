@@ -100,9 +100,6 @@ webbrowser = { version = "0.8.6", optional = true }
 winit = { git = "https://github.com/doukutsu-rs/winit.git", rev = "878f206d19af01b0977277929eee5e32667453c0", optional = true, default_features = false, features = ["x11"] }
 xmltree = "0.10"
 
-[target.'cfg(not(target_os = "horizon"))'.dependencies]
-open = "3.2"
-
 [target.'cfg(target_os = "windows")'.dependencies]
 winapi = { version = "0.3", features = ["winuser"] }
 
