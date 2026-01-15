@@ -709,22 +709,6 @@ impl SettingsMenu {
             CurrentMenu::GraphicsMenu => match self.graphics.tick(controller, state) {
                 MenuSelectionResult::Selected(GraphicsMenuEntry::WindowMode, _) => {
                     self.current = CurrentMenu::DisplayMenu
-                // MenuSelectionResult::Selected(GraphicsMenuEntry::WindowMode, toggle)
-                // | MenuSelectionResult::Right(GraphicsMenuEntry::WindowMode, toggle, _)
-                // | MenuSelectionResult::Left(GraphicsMenuEntry::WindowMode, toggle, _) => {
-                //     if let MenuEntry::Options(_, value, _) = toggle {
-                //         let (new_mode, new_value) = match *value {
-                //             0 => (WindowMode::Fullscreen, 1),
-                //             1 => (WindowMode::Windowed, 0),
-                //             _ => unreachable!(),
-                //         };
-
-                //         *value = new_value;
-                //         state.settings.window_mode = new_mode;
-                //         ctx.window.mode = new_mode;
-
-                //         let _ = state.settings.save(ctx);
-                //     }
                 }
                 MenuSelectionResult::Selected(GraphicsMenuEntry::VSyncMode, toggle)
                 | MenuSelectionResult::Right(GraphicsMenuEntry::VSyncMode, toggle, _) => {

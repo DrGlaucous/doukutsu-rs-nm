@@ -95,7 +95,7 @@ impl GlutinEventLoop {
             }
 
             window = window.with_title("doukutsu-rs");
-            window = window.with_inner_size(PhysicalSize{width: ctx.size_hint.0 as u32, height: ctx.size_hint.1 as u32});
+            window = window.with_inner_size(PhysicalSize{width: ctx.window.size_hint.0 as u32, height: ctx.window.size_hint.1 as u32});
             
             #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "android", target_os = "horizon")))]
             {
@@ -560,13 +560,17 @@ impl BackendEventLoop for GlutinEventLoop {
                         state_ref.frame_time = 0.0;
                         ctx.has_ticked_since_change = false;
                     }
-                    
-                    if !ctx.has_ticked_since_change {continue}
 
-                    //should be run for all cases, not just Android
-                    if let Err(err) = game.draw(ctx) {
-                        log::error!("Failed to draw frame: {}", err);
+                    //only redraw if we've ticked at least once since we've changed scenes
+                    if ctx.has_ticked_since_change {
+                        
+                        //should be run for all cases, not just Android
+                        if let Err(err) = game.draw(ctx) {
+                            log::error!("Failed to draw frame: {}", err);
+                        }
+
                     }
+
 
                 }
                 _ => (),

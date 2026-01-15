@@ -6,8 +6,7 @@ use std::io;
 use std::io::Cursor;
 use std::io::Seek;
 use std::io::SeekFrom;
-use std::ops::ControlFlow;
-use std::ops::Not;
+use std::ops::{Not, ControlFlow, Deref};
 use std::rc::Rc;
 
 use num_traits::{clamp, FromPrimitive};

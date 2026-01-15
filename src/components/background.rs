@@ -377,7 +377,7 @@ impl Background {
         //if the config file is valid, load it in
         if let Ok(config) = BkgConfig::load(ctx, path) {
             
-            if state.texture_set.find_texture(ctx, &state.constants.base_paths, &textures.background).is_some() {
+            if state.texture_set.find_texture(ctx, &state.constants.base_paths, &textures.background, false).is_some() {
                 textures.background = config.bmp_filename.clone(); //we need to check the validity of the filename here to stop the program from crashing, but this not essential for function
                 self.bk_config = config;
                 stage.data.background_type = BackgroundType::Custom;

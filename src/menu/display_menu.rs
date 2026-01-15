@@ -165,6 +165,9 @@ impl DisplayMenu {
                     *value = new_value;
                     state.settings.window_mode = new_mode;
 
+                    //apply
+                    ctx.window.mode = new_mode;
+
                     let _ = state.settings.save(ctx);
                 }
             }
