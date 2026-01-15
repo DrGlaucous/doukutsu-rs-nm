@@ -103,6 +103,10 @@ impl WindowMode {
             WindowMode::Fullscreen => false,
         }
     }
+
+    pub fn is_fullscreen(&self) -> bool {
+        *self == WindowMode::Fullscreen
+    }
 }
 
 #[derive(PartialEq, Eq, Copy, Clone, Debug, num_derive::FromPrimitive)]
@@ -210,7 +214,7 @@ impl Season {
 
         if (now.month() == 10 && now.day() > 25) || (now.month() == 11 && now.day() < 3) {
             Season::Halloween
-        } else if (now.month() == 12 && now.day() > 23) || (now.month() == 0 && now.day() < 7) {
+        } else if (now.month() == 12 && now.day() > 23) || (now.month() == 1 && now.day() < 7) {
             Season::Christmas
         } else if now.month() == 4 && now.day() == 29 {
             Season::PixelBirthday
@@ -381,7 +385,7 @@ impl SharedGameState {
 
         if filesystem::exists(ctx, "/base/lighting.tbl") {
             log::info!("Cave Story+ (Switch) data files detected.");
-            ctx.size_hint = (854, 480);
+            ctx.window.size_hint = (854, 480);
             constants.apply_csplus_patches(&mut sound_manager);
             constants.apply_csplus_nx_patches();
             constants.load_nx_stringtable(ctx)?;
@@ -512,12 +516,7 @@ impl SharedGameState {
     }
 
     pub fn reload_stage_table(&mut self, ctx: &mut Context) -> GameResult {
-        let stages = StageData::load_stage_table(
-            ctx,
-            &self.constants.base_paths,
-            self.constants.is_switch,
-            self.constants.stage_encoding,
-        )?;
+        let stages = StageData::load_stage_table(self, ctx)?;
         self.stages = stages;
         Ok(())
     }
@@ -658,7 +657,7 @@ impl SharedGameState {
         }
 
         let mut next_scene = GameScene::new(self, ctx, start_stage_id)?;
-        next_scene.stage.data.background_color = Color::from_rgb(0, 0, 0);
+        next_scene.stage.data.background_color = self.constants.intro_background_color;
         next_scene.player1.cond.set_hidden(true);
         let (pos_x, pos_y) = self.constants.game.intro_player_pos;
         next_scene.player1.x = pos_x as i32 * next_scene.stage.map.tile_size.as_int() * 0x200;
@@ -922,12 +921,14 @@ impl SharedGameState {
     }
 
     pub fn get_rec_filename(&self) -> String {
-        if let Some(mod_path) = &self.mod_path {
-            let name = self.mod_list.get_name_from_path(mod_path.to_string());
-            return format!("/{}", name);
-        } else {
-            return "/290".to_string();
-        }
+        let name = &self
+            .mod_path
+            .clone()
+            .and_then(|mod_path| self.mod_list.get_info_from_path(mod_path))
+            .and_then(|mod_info| mod_info.name.clone().or(Some(mod_info.id.clone())))
+            .unwrap_or("290".to_owned());
+
+        format!("/{name}")
     }
 
     pub fn has_replay_data(&self, ctx: &mut Context, replay_kind: ReplayKind) -> bool {

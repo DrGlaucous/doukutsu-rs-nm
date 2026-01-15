@@ -2,30 +2,15 @@
 
 use std::process::exit;
 
+use clap::Parser;
 
 fn main() {
-    let args = std::env::args();
-    let mut options = doukutsu_rs::game::LaunchOptions { server_mode: false, editor: false, return_types: false, external_timer: false, resource_dir: None, usr_dir: None};
-
-    for arg in args {
-        if arg == "--server-mode" {
-            options.server_mode = true;
-        }
-
-        if arg == "--editor" {
-            options.editor = true;
-        }
-    }
-
-    if options.server_mode && options.editor {
-        eprintln!("Cannot run in server mode and editor mode at the same time.");
-        exit(1);
-    }
+    let options = doukutsu_rs::game::LaunchOptions::parse();
 
     let result = doukutsu_rs::game::init(options);
 
     #[cfg(target_os = "windows")]
-        unsafe {
+    unsafe {
         use std::ffi::OsStr;
         use std::os::windows::prelude::*;
         use winapi::_core::ptr::null_mut;
@@ -34,13 +19,13 @@ fn main() {
         use winapi::um::winuser::MB_OK;
 
         if let Err(e) = result {
-            let title: LPCWSTR = OsStr::new("Error!").encode_wide().chain(Some(0)).collect::<Vec<u16>>().as_ptr();
-            let message: LPCWSTR = OsStr::new(format!("Whoops, doukutsu-rs crashed: {}", e).as_str())
+            let title = OsStr::new("Error!").encode_wide().chain(Some(0)).collect::<Vec<u16>>();
+            let message = OsStr::new(format!("Whoops, doukutsu-rs crashed: {}", e).as_str())
                 .encode_wide()
                 .chain(Some(0))
-                .collect::<Vec<u16>>()
-                .as_ptr();
-            MessageBoxW(null_mut(), message, title, MB_OK);
+                .collect::<Vec<u16>>();
+
+            MessageBoxW(null_mut(), message.as_ptr() as LPCWSTR, title.as_ptr() as LPCWSTR, MB_OK);
             exit(1);
         }
     }

@@ -28,7 +28,7 @@ use sdl2::{controller, keyboard, pixels, EventPump, GameControllerSubsystem, Sdl
 use crate::common::{Color, Rect};
 use crate::framework::backend::{
     Backend, BackendEventLoop, BackendGamepad, BackendRenderer, BackendShader, BackendTexture, SpriteBatchCommand,
-    VertexData,
+    VertexData, WindowParams,
 };
 use crate::framework::context::Context;
 use crate::framework::error::{GameError, GameResult};
@@ -45,16 +45,15 @@ use crate::game::GAME_SUSPENDED;
 
 pub struct SDL2Backend {
     context: Sdl,
-    size_hint: (u16, u16),
 }
 
 impl SDL2Backend {
-    pub fn new(size_hint: (u16, u16)) -> GameResult<Box<dyn Backend>> {
+    pub fn new(window_params: WindowParams) -> GameResult<Box<dyn Backend>> {
         sdl2::hint::set("SDL_JOYSTICK_THREAD", "1");
 
         let context = sdl2::init().map_err(GameError::WindowError)?;
 
-        let backend = SDL2Backend { context, size_hint };
+        let backend = SDL2Backend { context };
 
         Ok(Box::new(backend))
     }
@@ -62,7 +61,7 @@ impl SDL2Backend {
 
 impl Backend for SDL2Backend {
     fn create_event_loop(&self, ctx: &Context) -> GameResult<Box<dyn BackendEventLoop>> {
-        SDL2EventLoop::new(&self.context, self.size_hint, ctx)
+        SDL2EventLoop::new(&self.context, ctx)
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -129,8 +128,6 @@ impl WindowOrCanvas {
         if let WindowOrCanvas::Win(window) = self {
             let canvas = window
                 .into_canvas()
-                .accelerated()
-                .present_vsync()
                 .build()
                 .map_err(|e| GameError::RenderError(e.to_string()))?;
 
@@ -159,7 +156,7 @@ struct SDL2Context {
 }
 
 impl SDL2EventLoop {
-    pub fn new(sdl: &Sdl, size_hint: (u16, u16), ctx: &Context) -> GameResult<Box<dyn BackendEventLoop>> {
+    pub fn new(sdl: &Sdl, ctx: &Context) -> GameResult<Box<dyn BackendEventLoop>> {
         let event_pump = sdl.event_pump().map_err(GameError::WindowError)?;
         let video = sdl.video().map_err(GameError::WindowError)?;
 
@@ -172,15 +169,19 @@ impl SDL2EventLoop {
         gl_attr.set_context_profile(GLProfile::Compatibility);
         gl_attr.set_context_version(2, 1);
 
-        let mut win_builder = video.window("Cave Story (doukutsu-rs)", size_hint.0 as _, size_hint.1 as _);
+        let mut win_builder = video.window("Cave Story (doukutsu-rs)", ctx.window.size_hint.0 as _, ctx.window.size_hint.1 as _);
         win_builder.position_centered();
         win_builder.resizable();
+
+        if ctx.window.mode.is_fullscreen() {
+            win_builder.fullscreen();
+        }
 
         #[cfg(feature = "render-opengl")]
         win_builder.opengl();
 
         let mut window = win_builder.build().map_err(|e| GameError::WindowError(e.to_string()))?;
-        #[cfg(not(any(target_os = "windows", target_os = "android", target_os = "horizon")))]
+        #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "android", target_os = "horizon")))]
         {
             let mut file = filesystem::open(&ctx, "/builtin/icon.bmp").unwrap();
             let mut buf: Vec<u8> = Vec::new();
@@ -303,7 +304,7 @@ impl BackendEventLoop for SDL2EventLoop {
                                 if keymod.intersects(keyboard::Mod::RALTMOD | keyboard::Mod::LALTMOD)
                                     && drs_scan == ScanCode::Return
                                 {
-                                    let new_mode = match state.settings.window_mode {
+                                    let new_mode = match ctx.window.mode {
                                         WindowMode::Windowed => WindowMode::Fullscreen,
                                         WindowMode::Fullscreen => WindowMode::Windowed,
                                     };
@@ -322,6 +323,7 @@ impl BackendEventLoop for SDL2EventLoop {
                                     refs.fullscreen_type = fullscreen_type;
 
                                     state.settings.window_mode = new_mode;
+                                    ctx.window.mode = new_mode;
                                 }
                             }
                             ctx.keyboard_context.set_key(drs_scan, true);
@@ -391,12 +393,12 @@ impl BackendEventLoop for SDL2EventLoop {
             }
 
             {
-                if state.settings.window_mode.get_sdl2_fullscreen_type() != self.refs.borrow().fullscreen_type {
+                if ctx.window.mode.get_sdl2_fullscreen_type() != self.refs.borrow().fullscreen_type {
                     let mut refs = self.refs.borrow_mut();
                     let window = refs.window.window_mut();
 
-                    let fullscreen_type = state.settings.window_mode.get_sdl2_fullscreen_type();
-                    let show_cursor = state.settings.window_mode.should_display_mouse_cursor();
+                    let fullscreen_type = ctx.window.mode.get_sdl2_fullscreen_type();
+                    let show_cursor = ctx.window.mode.should_display_mouse_cursor();
 
                     window.set_fullscreen(fullscreen_type);
                     window
@@ -495,7 +497,9 @@ impl BackendEventLoop for SDL2EventLoop {
                 GLContext { gl_version, is_sdl: true, get_proc_address, swap_buffers, get_current_buffer, user_data, ctx };
 
             return Ok(Box::new(OpenGLRenderer::new(gl_context, UnsafeCell::new(imgui))));
-        } else {
+        }
+        
+        {
             let mut refs = self.refs.borrow_mut();
             let window = std::mem::take(&mut refs.window);
             refs.window = window.make_canvas()?;

@@ -13,6 +13,7 @@ use crate::framework::error::{GameError, GameResult};
 use crate::framework::filesystem;
 use crate::game::map::{Map, NPCData, TilesetAnimConfig};
 use crate::game::scripting::tsc::text_script::{TextScript, TextScriptEncoding};
+use crate::game::SharedGameState;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct NpcType {
@@ -258,11 +259,14 @@ fn from_csplus_stagetbl(s: &[u8], is_switch: bool, encoding: Option<TextScriptEn
 
 impl StageData {
     pub fn load_stage_table(
+        state: &SharedGameState,
         ctx: &mut Context,
-        roots: &Vec<String>,
-        is_switch: bool,
-        encoding: Option<TextScriptEncoding>,
     ) -> GameResult<Vec<Self>> {
+
+        let roots = &state.constants.base_paths;
+        let is_switch = state.constants.is_switch;
+        let encoding = state.constants.stage_encoding;
+
         let stage_tbl_path = "/stage.tbl";
         let stage_sect_path = "/stage.sect";
         let mrmap_bin_path = "/mrmap.bin";
@@ -321,7 +325,7 @@ impl StageData {
                             pxpack_data: None,
                             background: Background::new(&background),
                             background_type: BackgroundType::from(bg_type),
-                            background_color: Color::from_rgb(0, 0, 32),
+                            background_color: state.constants.background_color,
                             npc1: NpcType::new(&npc1),
                             npc2: NpcType::new(&npc2),
                         };
@@ -386,7 +390,7 @@ impl StageData {
                     pxpack_data: None,
                     background: Background::new(&background),
                     background_type: BackgroundType::from(bg_type),
-                    background_color: Color::from_rgb(0, 0, 32),
+                    background_color: state.constants.background_color,
                     npc1: NpcType::new(&npc1),
                     npc2: NpcType::new(&npc2),
                 };
@@ -445,7 +449,7 @@ impl StageData {
                     pxpack_data: None,
                     background: Background::new(&background),
                     background_type: BackgroundType::from(bg_type),
-                    background_color: Color::from_rgb(0, 0, 32),
+                    background_color: state.constants.background_color,
                     npc1: NpcType::new(&npc1),
                     npc2: NpcType::new(&npc2),
                 };
@@ -502,7 +506,7 @@ impl StageData {
                     pxpack_data: None,
                     background: Background::new(NXENGINE_BACKDROPS.get(bg_id).unwrap_or(&"0")),
                     background_type: BackgroundType::from(bg_type),
-                    background_color: Color::from_rgb(0, 0, 32),
+                    background_color: state.constants.background_color,
                     npc1: NpcType::new(NXENGINE_NPCS.get(npc1).unwrap_or(&"0")),
                     npc2: NpcType::new(NXENGINE_NPCS.get(npc2).unwrap_or(&"0")),
                 };

@@ -2,29 +2,35 @@ use std::hint::unreachable_unchecked;
 
 use num_traits::clamp;
 
-use crate::common::{CDEG_RAD, Direction};
-use crate::components::flash::Flash;
+use crate::common::{Direction, CDEG_RAD};
 use crate::framework::error::GameResult;
 use crate::game::caret::CaretType;
-use crate::game::npc::boss::BossNPC;
-use crate::game::npc::list::NPCList;
-use crate::game::npc::NPC;
-use crate::game::player::Player;
+use crate::game::npc::list::{BorrowedNPC, NPCTokenProvider};
+use crate::game::npc::{NPCContext, NPC};
 use crate::game::shared_game_state::SharedGameState;
-use crate::game::stage::Stage;
 use crate::util::rng::RNG;
 
-impl NPC {
-    pub(crate) fn tick_n066_misery_bubble(&mut self, state: &mut SharedGameState, npc_list: &NPCList) -> GameResult {
+impl BorrowedNPC<'_> {
+    pub(crate) fn tick_n066_misery_bubble(
+        &mut self,
+        state: &mut SharedGameState,
+        NPCContext { npc_list, .. }: NPCContext,
+    ) -> GameResult {
         match self.action_num {
             0 | 1 => {
                 if self.action_num == 0 {
-                    if let Some(npc) = npc_list.iter().find(|npc| npc.event_num == 1000) {
+                    let npc = self.unborrow_then(|token| {
+                        npc_list.iter().find(|npc| npc.borrow(token).event_num == 1000)
+                    });
+
+                    if let Some(npc) = npc {
+                        let npc = npc.borrow_unmanaged();
+
                         self.action_counter2 = npc.id;
                         self.target_x = npc.x;
                         self.target_y = npc.y;
 
-                        let angle = f64::atan2((self.y - self.target_y) as f64,  (self.x - self.target_x) as f64);
+                        let angle = f64::atan2((self.y - self.target_y) as f64, (self.x - self.target_x) as f64);
                         self.vel_x = (angle.cos() * -1024.0) as i32;
                         self.vel_y = (angle.sin() * -1024.0) as i32;
                     }
@@ -45,6 +51,7 @@ impl NPC {
                     state.sound_manager.play_sfx(21);
 
                     if let Some(npc) = npc_list.get_npc(self.action_counter2 as usize) {
+                        let mut npc = npc.borrow_mut_unmanaged();
                         npc.cond.set_alive(false);
                     }
                 }
@@ -76,8 +83,7 @@ impl NPC {
     pub(crate) fn tick_n067_misery_floating(
         &mut self,
         state: &mut SharedGameState,
-        npc_list: &NPCList,
-        flash: &mut Flash,
+        NPCContext {  npc_list, flash, .. }: NPCContext,
     ) -> GameResult {
         match self.action_num {
             0 | 1 => {
@@ -234,8 +240,7 @@ impl NPC {
     pub(crate) fn tick_n082_misery_standing(
         &mut self,
         state: &mut SharedGameState,
-        npc_list: &NPCList,
-        flash: &mut Flash,
+        NPCContext {  npc_list, flash, .. }: NPCContext,
     ) -> GameResult {
         match self.action_num {
             0 | 1 => {
@@ -416,8 +421,7 @@ impl NPC {
     pub(crate) fn tick_n247_misery_boss(
         &mut self,
         state: &mut SharedGameState,
-        players: [&mut Player; 2],
-        npc_list: &NPCList,
+        NPCContext { players, npc_list, .. }: NPCContext,
     ) -> GameResult {
         match self.action_num {
             0 | 1 => {
@@ -614,7 +618,8 @@ impl NPC {
                     }
 
                     let player = self.get_closest_player_ref(&players);
-                    self.action_num = if player.x >= self.x - 0xe000 && player.x <= self.x + 0xe000 { 100 } else { 160 };
+                    self.action_num =
+                        if player.x >= self.x - 0xe000 && player.x <= self.x + 0xe000 { 100 } else { 160 };
                 }
             }
             160 | 161 => {
@@ -664,7 +669,7 @@ impl NPC {
                     self.vel_x = 0;
                     self.vel_y = 0;
 
-                    npc_list.kill_npcs_by_type(252, true, state);
+                    npc_list.kill_npcs_by_type(252, true, state, self);
 
                     let mut npc = NPC::create(4, &state.npc_table);
                     npc.cond.set_alive(true);
@@ -702,7 +707,7 @@ impl NPC {
         Ok(())
     }
 
-    pub(crate) fn tick_n248_misery_boss_vanishing(&mut self, state: &mut SharedGameState) -> GameResult {
+    pub(crate) fn tick_n248_misery_boss_vanishing(&mut self, state: &mut SharedGameState, _: NPCContext) -> GameResult {
         if self.flags.hit_anything() {
             self.cond.set_alive(false);
             state.create_caret(self.x, self.y, CaretType::ProjectileDissipation, Direction::Left);
@@ -723,7 +728,7 @@ impl NPC {
         Ok(())
     }
 
-    pub(crate) fn tick_n249_misery_boss_appearing(&mut self, state: &mut SharedGameState) -> GameResult {
+    pub(crate) fn tick_n249_misery_boss_appearing(&mut self, state: &mut SharedGameState, _: NPCContext) -> GameResult {
         self.action_counter2 += 1;
         if self.action_counter2 > 8 {
             self.cond.set_alive(false);
@@ -743,8 +748,7 @@ impl NPC {
     pub(crate) fn tick_n250_misery_boss_lightning_ball(
         &mut self,
         state: &mut SharedGameState,
-        players: [&mut Player; 2],
-        npc_list: &NPCList,
+        NPCContext { players, npc_list, .. }: NPCContext,
     ) -> GameResult {
         match self.action_num {
             0 | 1 => {
@@ -807,7 +811,7 @@ impl NPC {
     pub(crate) fn tick_n251_misery_boss_lightning(
         &mut self,
         state: &mut SharedGameState,
-        npc_list: &NPCList,
+        NPCContext { npc_list, .. }: NPCContext,
     ) -> GameResult {
         if self.action_num == 0 {
             self.action_num = 1;
@@ -831,8 +835,7 @@ impl NPC {
     pub(crate) fn tick_n252_misery_boss_bats(
         &mut self,
         state: &mut SharedGameState,
-        players: [&mut Player; 2],
-        npc_list: &NPCList,
+        NPCContext { players, npc_list, .. }: NPCContext,
     ) -> GameResult {
         match self.action_num {
             0 | 1 => {
@@ -849,13 +852,13 @@ impl NPC {
                     self.action_counter += 1;
                 }
 
-                if let Some(parent) = self.get_parent_ref_mut(npc_list) {
+                if let Some(parent) = self.get_parent(npc_list) {
                     self.x = parent.x
                         + self.action_counter as i32 * ((self.action_counter2 as f64 * CDEG_RAD).cos() * 512.0) as i32
-                        / 4;
+                            / 4;
                     self.y = parent.y
                         + self.action_counter as i32 * ((self.action_counter2 as f64 * CDEG_RAD).sin() * 512.0) as i32
-                        / 4;
+                            / 4;
 
                     if parent.action_num == 151 {
                         self.action_num = 10;
@@ -912,14 +915,7 @@ impl NPC {
         Ok(())
     }
 
-    pub(crate) fn tick_n283_misery_possessed(
-        &mut self,
-        state: &mut SharedGameState,
-        players: [&mut Player; 2],
-        npc_list: &NPCList,
-        stage: &mut Stage,
-        boss: &mut BossNPC,
-    ) -> GameResult {
+    pub(crate) fn tick_n283_misery_possessed(&mut self, state: &mut SharedGameState, NPCContext { players, npc_list, stage, boss, .. }: NPCContext) -> GameResult {
         if self.action_num < 100 && (!boss.parts[0].cond.alive() || self.life < 400) {
             self.action_num = 100;
         }
@@ -1147,12 +1143,7 @@ impl NPC {
         Ok(())
     }
 
-    pub(crate) fn tick_n289_critter_orange(
-        &mut self,
-        state: &mut SharedGameState,
-        players: [&mut Player; 2],
-        stage: &mut Stage,
-    ) -> GameResult {
+    pub(crate) fn tick_n289_critter_orange(&mut self, state: &mut SharedGameState, NPCContext { players, stage, .. }: NPCContext) -> GameResult {
         match self.action_num {
             0 | 1 => {
                 if self.action_num == 0 {
@@ -1229,12 +1220,7 @@ impl NPC {
         Ok(())
     }
 
-    pub(crate) fn tick_n290_bat_misery(
-        &mut self,
-        state: &mut SharedGameState,
-        players: [&mut Player; 2],
-        stage: &mut Stage,
-    ) -> GameResult {
+    pub(crate) fn tick_n290_bat_misery(&mut self, state: &mut SharedGameState, NPCContext { players, stage, .. }: NPCContext) -> GameResult {
         match self.action_num {
             0 | 1 => {
                 if self.action_num == 0 {
@@ -1293,7 +1279,7 @@ impl NPC {
     pub(crate) fn tick_n301_misery_fish_missile(
         &mut self,
         state: &mut SharedGameState,
-        players: [&mut Player; 2],
+        NPCContext { players, .. }: NPCContext,
     ) -> GameResult {
         match self.action_num {
             0 | 1 => {

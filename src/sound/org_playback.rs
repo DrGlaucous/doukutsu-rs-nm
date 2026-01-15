@@ -1,6 +1,10 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2020 LunarLambda
+// Copyright (c) 2020 doukutsu-rs contributors (see AUTHORS.md)
 use std::cmp::min;
 use std::hint::unreachable_unchecked;
 use std::mem::MaybeUninit;
+use std::sync::Arc;
 
 use crate::sound::fir::FIR;
 use crate::sound::fir::FIR_STEP;
@@ -107,7 +111,7 @@ impl OrgPlaybackEngine {
 
             let format = WavFormat { channels: 1, sample_rate: 22050, bit_depth: 8 };
 
-            let rbuf = RenderBuffer::new_organya(WavSample { format, data: sound });
+            let rbuf = RenderBuffer::new_organya(format, sound);
 
             for j in 0..8 {
                 for &k in &[0, 64] {
@@ -121,10 +125,14 @@ impl OrgPlaybackEngine {
             // Should be song.version, not self.song.version (current song vs last song)
             if song.version == Version::Extended {
                 // Check for OOB track count, instruments outside of the sample range will be set to the last valid sample
-                let index = if track.inst.inst as usize >= samples.samples.len() {samples.samples.len() - 1} else {track.inst.inst as usize} ;
+                let index = if track.inst.inst as usize >= samples.samples.len() {
+                    samples.samples.len() - 1
+                } else {
+                    track.inst.inst as usize
+                };
                 *buf = RenderBuffer::new(samples.samples[index].clone());
             } else {
-                let index = if idx >= samples.samples.len() {samples.samples.len() - 1} else {idx};
+                let index = if idx >= samples.samples.len() { samples.samples.len() - 1 } else { idx };
                 *buf = RenderBuffer::new(samples.samples[index].clone());
             }
         }
@@ -357,27 +365,21 @@ impl OrgPlaybackEngine {
                         let (sl1, sr1, sl2, sr2) = match (is_16bit, is_stereo) {
                             (true, true) => unsafe {
                                 let ps = pos << 2;
-                                let sl1 = (*sample_data_ptr.add(ps) as u16
-                                    | (*sample_data_ptr.add(ps + 1) as u16) << 8)
+                                let sl1 = (*sample_data_ptr.add(ps) as u16 | (*sample_data_ptr.add(ps + 1) as u16) << 8)
                                     as f32
                                     / 32768.0;
-                                let sr1 =
-                                    (*sample_data_ptr.add(ps + 2) as u16
-                                        | (*sample_data_ptr.add(ps + 3) as u16) << 8)
-                                        as f32
-                                        / 32768.0;
+                                let sr1 = (*sample_data_ptr.add(ps + 2) as u16 | (*sample_data_ptr.add(ps + 3) as u16) << 8)
+                                    as f32
+                                    / 32768.0;
                                 let ps = min(pos + 1, buf.base_pos + buf.len - 1) << 2;
-                                let sl2 = (*sample_data_ptr.add(ps) as u16
-                                    | (*sample_data_ptr.add(ps + 1) as u16) << 8)
+                                let sl2 = (*sample_data_ptr.add(ps) as u16 | (*sample_data_ptr.add(ps + 1) as u16) << 8)
                                     as f32
                                     / 32768.0;
-                                let sr2 =
-                                    (*sample_data_ptr.add(ps + 2) as u16
-                                        | (*sample_data_ptr.add(ps + 3) as u16) << 8)
-                                        as f32
-                                        / 32768.0;
+                                let sr2 = (*sample_data_ptr.add(ps + 2) as u16 | (*sample_data_ptr.add(ps + 3) as u16) << 8)
+                                    as f32
+                                    / 32768.0;
                                 (sl1, sr1, sl2, sr2)
-                            }
+                            },
                             (false, true) => unsafe {
                                 let ps = pos << 1;
                                 let sl1 = (*sample_data_ptr.add(ps) as f32 - 128.0) / 128.0;
@@ -386,26 +388,24 @@ impl OrgPlaybackEngine {
                                 let sl2 = (*sample_data_ptr.add(ps) as f32 - 128.0) / 128.0;
                                 let sr2 = (*sample_data_ptr.add(ps + 1) as f32 - 128.0) / 128.0;
                                 (sl1, sr1, sl2, sr2)
-                            }
+                            },
                             (true, false) => unsafe {
                                 let ps = pos << 1;
-                                let s1 = (*sample_data_ptr.add(ps) as u16
-                                    | (*sample_data_ptr.add(ps + 1) as u16) << 8)
+                                let s1 = (*sample_data_ptr.add(ps) as u16 | (*sample_data_ptr.add(ps + 1) as u16) << 8)
                                     as f32
                                     / 32768.0;
                                 let ps = min(pos + 1, buf.base_pos + buf.len - 1) << 1;
-                                let s2 = (*sample_data_ptr.add(ps) as u16
-                                    | (*sample_data_ptr.add(ps + 1) as u16) << 8)
+                                let s2 = (*sample_data_ptr.add(ps) as u16 | (*sample_data_ptr.add(ps + 1) as u16) << 8)
                                     as f32
                                     / 32768.0;
                                 (s1, s1, s2, s2)
-                            }
+                            },
                             (false, false) => unsafe {
                                 let s1 = (*sample_data_ptr.add(pos) as f32 - 128.0) / 128.0;
                                 let pos = min(pos + 1, buf.base_pos + buf.len - 1);
                                 let s2 = (*sample_data_ptr.add(pos) as f32 - 128.0) / 128.0;
                                 (s1, s1, s2, s2)
-                            }
+                            },
                         };
 
                         let r1 = buf.position.fract() as f32;
@@ -635,7 +635,10 @@ impl RenderBuffer {
             volume: 0,
             pan: 0,
             len: 0,
-            sample: WavSample { format: WavFormat { channels: 2, sample_rate: 22050, bit_depth: 16 }, data: vec![] },
+            sample: WavSample {
+                format: WavFormat { channels: 2, sample_rate: 22050, bit_depth: 16 },
+                data: Arc::new([]),
+            },
             playing: false,
             looping: false,
             base_pos: 0,
@@ -646,16 +649,16 @@ impl RenderBuffer {
         }
     }
 
-    pub fn new_organya(mut sample: WavSample) -> RenderBuffer {
-        let wave = sample.data.clone();
-        sample.data.clear();
+    pub fn new_organya(format: WavFormat, wave: Vec<u8>) -> RenderBuffer {
+        const SIZES: &[usize] = &[256, 256, 128, 128, 64, 32, 16, 8];
+        let mut sample_data = Vec::with_capacity(SIZES.iter().sum());
 
-        for size in &[256_usize, 256, 128, 128, 64, 32, 16, 8] {
+        for size in SIZES {
             let step = 256 / size;
             let mut acc = 0;
 
             for _ in 0..*size {
-                sample.data.push(wave[acc]);
+                sample_data.push(wave[acc]);
                 acc += step;
 
                 if acc >= 256 {
@@ -664,7 +667,7 @@ impl RenderBuffer {
             }
         }
 
-        RenderBuffer::new(sample)
+        RenderBuffer::new(WavSample { format, data: sample_data.into() })
     }
 
     #[inline]

@@ -1039,9 +1039,11 @@ impl BackendRenderer for OpenGLRenderer {
                     self.render_data.surf_texture,
                     BackendShader::Texture,
                 )?;
-                handle_err(gl, 0);
 
-                gl.gl.Finish();
+                //glFinish removed
+                //handle_err(gl, 0);
+
+                //gl.gl.Finish();
                 handle_err(gl, 0);
             }
 

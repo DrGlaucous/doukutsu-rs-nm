@@ -254,8 +254,15 @@ impl Scene for TitleScene {
                 continue;
             }
             if mod_info.satisfies_requirement(&state.mod_requirements) {
-                self.challenges_menu
-                    .push_entry(ChallengesMenuEntry::Challenge(idx), MenuEntry::Active(mod_info.name.clone()));
+                self.challenges_menu.push_entry(
+                    ChallengesMenuEntry::Challenge(idx),
+                    MenuEntry::Active(
+                        mod_info
+                            .name
+                            .clone()
+                            .unwrap_or(state.loc.t("menus.challenges_menu.empty_mod_name").to_string()),
+                    ),
+                );
 
                 if mutate_selection {
                     selected = ChallengesMenuEntry::Challenge(idx);
@@ -389,6 +396,7 @@ impl Scene for TitleScene {
             }
             CurrentMenu::ChallengesMenu => match self.challenges_menu.tick(&mut self.controller, state) {
                 MenuSelectionResult::Selected(ChallengesMenuEntry::Challenge(idx), _) => {
+                    let fallback_mod_name = state.loc.t("menus.challenges_menu.empty_mod_name").to_owned();
                     if let Some(mod_info) = state.mod_list.mods.get(idx) {
                         state.mod_path = Some(mod_info.path.clone());
                         if mod_info.save_slot >= 0 {
@@ -397,7 +405,7 @@ impl Scene for TitleScene {
                             self.nikumaru_rec.load_counter(state, ctx)?;
                             self.current_menu = CurrentMenu::SaveSelectMenu;
                         } else {
-                            let mod_name = mod_info.name.clone();
+                            let mod_name = mod_info.name.clone().unwrap_or(fallback_mod_name.clone());
                             self.confirm_menu.width =
                                 (state.font.builder().compute_width(&mod_name).max(50.0) + 32.0) as u16;
 
@@ -490,11 +498,9 @@ impl Scene for TitleScene {
 
         if self.current_menu == CurrentMenu::MainMenu {
             let batch = state.texture_set.get_or_load_batch(ctx, &state.constants, "Title")?;
-            let logo_x_offset =
-                if state.settings.original_textures && state.constants.supports_og_textures { 20.0 } else { 0.0 };
 
             batch.add_rect(
-                ((state.canvas_size.0 - state.constants.title.logo_rect.width() as f32) / 2.0).floor() + logo_x_offset,
+                ((state.canvas_size.0 - state.constants.title.logo_rect.width() as f32) / 2.0).floor(),
                 40.0,
                 &state.constants.title.logo_rect,
             );

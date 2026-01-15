@@ -97,8 +97,7 @@ impl GlutinEventLoop {
             window = window.with_title("doukutsu-rs");
             window = window.with_inner_size(PhysicalSize{width: ctx.size_hint.0 as u32, height: ctx.size_hint.1 as u32});
             
-            #[cfg(not(any(target_os = "windows", target_os = "android", target_os = "horizon")))]
-            //#[cfg(not(any(target_os = "android", target_os = "horizon")))]
+            #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "android", target_os = "horizon")))]
             {
                 let mut file = filesystem::open(&ctx, "/builtin/icon.bmp").unwrap();
                 let mut buf: Vec<u8> = Vec::new();
@@ -529,9 +528,9 @@ impl BackendEventLoop for GlutinEventLoop {
 
                     #[cfg(not(any(target_os = "android", target_os = "horizon")))]
                     {
-                        if state_ref.settings.window_mode.get_glutin_fullscreen_type() != window.window().fullscreen() {
-                            let fullscreen_type = state_ref.settings.window_mode.get_glutin_fullscreen_type();
-                            let cursor_visible = state_ref.settings.window_mode.should_display_mouse_cursor();
+                        if ctx.window.mode.get_glutin_fullscreen_type() != window.window().fullscreen() {
+                            let fullscreen_type = ctx.window.mode.get_glutin_fullscreen_type();
+                            let cursor_visible = ctx.window.mode.should_display_mouse_cursor();
 
                             window.window().set_fullscreen(fullscreen_type);
                             window.window().set_cursor_visible(cursor_visible);

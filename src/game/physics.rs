@@ -84,6 +84,33 @@ pub const OFFSETS: [(i32, i32); 64] = [
     (4, 4),
 ];
 
+/**
+ * Represents hitbox extents, with each value being the distance from the center of the entity.
+ */
+#[derive(Debug, Clone, Copy)]
+pub struct HitExtents {
+    pub left: u32,
+    pub right: u32,
+    pub top: u32,
+    pub bottom: u32,
+}
+
+impl HitExtents {
+    /**
+     * Check if a point is within the hitbox extents of an entity on X axis (exclusively).
+     */
+    pub const fn point_in_entity_x(&self, entity_x: i32, point_x: i32) -> bool {
+        point_x > entity_x - self.left as i32 && point_x < entity_x + self.right as i32
+    }
+
+    /**
+     * Check if a point is within the hitbox extents of an entity on Y axis (exclusively).
+     */
+    pub const fn point_in_entity_y(&self, entity_y: i32, point_y: i32) -> bool {
+        point_y > entity_y - self.top as i32 && point_y < entity_y + self.bottom as i32
+    }
+}
+
 pub trait PhysicalEntity {
     fn x(&self) -> i32;
     fn y(&self) -> i32;
@@ -98,7 +125,7 @@ pub trait PhysicalEntity {
         0
     }
 
-    fn hit_bounds(&self) -> &Rect<u32>;
+    fn hit_bounds(&self) -> &HitExtents;
     fn display_bounds(&self) -> &Rect<u32>;
 
     fn set_x(&mut self, x: i32);
@@ -127,14 +154,23 @@ pub trait PhysicalEntity {
         let bounds_bottom = if self.is_player() { 0x800 } else { 0x600 };
         let half_tile_size = state.tile_size.as_int() * 0x100;
 
-        if (self.y() - self.hit_bounds().top as i32) < ((y * 2 + 1) * half_tile_size - bounds_top)
-            && (self.y() + self.hit_bounds().bottom as i32) > ((y * 2 - 1) * half_tile_size + bounds_bottom)
+        let hit_bounds = *self.hit_bounds();
+
+        let block_center_x = (x * 2) * half_tile_size;
+        let block_center_y = (y * 2) * half_tile_size;
+        let block_top = (y * 2 - 1) * half_tile_size;
+        let block_bottom = (y * 2 + 1) * half_tile_size;
+        let block_left = (x * 2 - 1) * half_tile_size;
+        let block_right = (x * 2 + 1) * half_tile_size;
+
+        if (self.y() - hit_bounds.top as i32) < (block_bottom - bounds_top)
+            && (self.y() + hit_bounds.bottom as i32) > (block_top + bounds_bottom)
         {
             // left wall
-            if (self.x() - self.hit_bounds().right as i32) < (x * 2 + 1) * half_tile_size
-                && (self.x() - self.hit_bounds().right as i32) > (x * 2) * half_tile_size
+            if (self.x() - hit_bounds.right as i32) < block_right
+                && (self.x() - hit_bounds.right as i32) > block_center_x
             {
-                self.set_x(((x * 2 + 1) * half_tile_size) + self.hit_bounds().right as i32);
+                self.set_x(block_right + hit_bounds.right as i32);
 
                 if self.is_player() {
                     if self.vel_x() < -0x180 {
@@ -150,10 +186,10 @@ pub trait PhysicalEntity {
             }
 
             // right wall
-            if (self.x() + self.hit_bounds().right as i32) > (x * 2 - 1) * half_tile_size
-                && (self.x() + self.hit_bounds().right as i32) < (x * 2) * half_tile_size
+            if (self.x() + hit_bounds.right as i32) > block_left
+                && (self.x() + hit_bounds.right as i32) < block_center_x
             {
-                self.set_x(((x * 2 - 1) * half_tile_size) - self.hit_bounds().right as i32);
+                self.set_x(block_left - hit_bounds.right as i32);
 
                 if self.is_player() {
                     if self.vel_x() > 0x180 {
@@ -169,27 +205,26 @@ pub trait PhysicalEntity {
             }
         }
 
-        if ((self.x() - self.hit_bounds().right as i32) < (x * 2 + 1) * half_tile_size - bounds_x)
-            && ((self.x() + self.hit_bounds().right as i32) > (x * 2 - 1) * half_tile_size + bounds_x)
+        if ((self.x() - hit_bounds.right as i32) < block_right - bounds_x)
+            && ((self.x() + hit_bounds.right as i32) > block_left + bounds_x)
         {
             // ceiling
-            if (self.y() - self.hit_bounds().top as i32) < (y * 2 + 1) * half_tile_size
-                && (self.y() - self.hit_bounds().top as i32) > (y * 2) * half_tile_size
+            if (self.y() - hit_bounds.top as i32) < block_bottom && (self.y() - hit_bounds.top as i32) > block_center_y
             {
-                self.set_y(((y * 2 + 1) * half_tile_size) + self.hit_bounds().top as i32);
+                self.set_y(block_bottom + hit_bounds.top as i32);
 
                 if self.is_player() {
                     if !self.cond().hidden() && self.vel_y() < -0x200 {
                         state.sound_manager.play_sfx(3);
                         state.create_caret(
                             self.x(),
-                            self.y() - self.hit_bounds().top as i32,
+                            self.y() - hit_bounds.top as i32,
                             CaretType::LittleParticles,
                             Direction::Left,
                         );
                         state.create_caret(
                             self.x(),
-                            self.y() - self.hit_bounds().top as i32,
+                            self.y() - hit_bounds.top as i32,
                             CaretType::LittleParticles,
                             Direction::Left,
                         );
@@ -206,10 +241,10 @@ pub trait PhysicalEntity {
             }
 
             // floor
-            if ((self.y() + self.hit_bounds().bottom as i32) > ((y * 2 - 1) * half_tile_size))
-                && ((self.y() + self.hit_bounds().bottom as i32) < (y * 2) * half_tile_size)
+            if ((self.y() + hit_bounds.bottom as i32) > block_top)
+                && ((self.y() + hit_bounds.bottom as i32) < block_center_y)
             {
-                self.set_y(((y * 2 - 1) * half_tile_size) - self.hit_bounds().bottom as i32);
+                self.set_y(block_top - hit_bounds.bottom as i32);
 
                 if self.is_player() {
                     if self.vel_y() > 0x400 {
@@ -231,9 +266,18 @@ pub trait PhysicalEntity {
     fn test_platform_hit(&mut self, state: &mut SharedGameState, x: i32, y: i32) {
         
         let half_tile_size = state.tile_size.as_int() * 0x100;
+        let block_top = (y * 2 - 1) * half_tile_size;
+        let block_left = (x * 2 - 1) * half_tile_size;
+        let block_right = (x * 2 + 1) * half_tile_size;
 
         //calculate previous Y using velocity
         let prev_y = self.y() - self.vel_y();
+
+            //change from upstream: does it actually solve the problem?
+        // if ((self.x() - self.hit_bounds().right as i32) < block_right)
+        //     && ((self.x() + self.hit_bounds().right as i32) > block_left)
+        //     && ((self.y() + self.hit_bounds().bottom as i32) > block_top)
+        //     && ((self.y() + self.hit_bounds().bottom as i32) < block_top + 0x400) {             self.set_y(block_top - self.hit_bounds().bottom as i32);
 
         if ((self.x() - self.hit_bounds().right as i32) < (x * 2 + 1) * half_tile_size)
             && ((self.x() + self.hit_bounds().right as i32) > (x * 2 - 1) * half_tile_size)
@@ -262,12 +306,15 @@ pub trait PhysicalEntity {
         let tile_size = state.tile_size.as_int() * 0x200;
         let half_tile_size = tile_size / 2;
         let quarter_tile_size = half_tile_size / 2;
+        let block_top = (y * 2 - 1) * half_tile_size;
+        let block_left = (x * 2 - 1) * half_tile_size;
+        let block_right = (x * 2 + 1) * half_tile_size;
 
-        if self.x() < (x * 2 + 1) * half_tile_size
-            && self.x() > (x * 2 - 1) * half_tile_size
+        if self.x() < block_right
+            && self.x() > block_left
             && (self.y() - self.hit_bounds().top as i32)
-            < (y * tile_size) - (self.x() - x * tile_size) / 2 + quarter_tile_size
-            && (self.y() + self.hit_bounds().bottom as i32) > (y * 2 - 1) * half_tile_size
+                < (y * tile_size) - (self.x() - x * tile_size) / 2 + quarter_tile_size
+            && (self.y() + self.hit_bounds().bottom as i32) > block_top
         {
             self.set_y(
                 (y * tile_size) - ((self.x() - x * tile_size) / 2) + quarter_tile_size + self.hit_bounds().top as i32,
@@ -303,12 +350,15 @@ pub trait PhysicalEntity {
         let tile_size = state.tile_size.as_int() * 0x200;
         let half_tile_size = tile_size / 2;
         let quarter_tile_size = half_tile_size / 2;
+        let block_top = (y * 2 - 1) * half_tile_size;
+        let block_left = (x * 2 - 1) * half_tile_size;
+        let block_right = (x * 2 + 1) * half_tile_size;
 
-        if self.x() < (x * 2 + 1) * half_tile_size
-            && self.x() > (x * 2 - 1) * half_tile_size
+        if self.x() < block_right
+            && self.x() > block_left
             && (self.y() - self.hit_bounds().top as i32)
-            < (y * tile_size) - (self.x() - x * tile_size) / 2 - quarter_tile_size
-            && (self.y() + self.hit_bounds().bottom as i32) > (y * 2 - 1) * half_tile_size
+                < (y * tile_size) - (self.x() - x * tile_size) / 2 - quarter_tile_size
+            && (self.y() + self.hit_bounds().bottom as i32) > block_top
         {
             self.set_y(
                 (y * tile_size) - ((self.x() - x * tile_size) / 2) - quarter_tile_size + self.hit_bounds().top as i32,
@@ -344,12 +394,15 @@ pub trait PhysicalEntity {
         let tile_size = state.tile_size.as_int() * 0x200;
         let half_tile_size = tile_size / 2;
         let quarter_tile_size = half_tile_size / 2;
+        let block_top = (y * 2 - 1) * half_tile_size;
+        let block_left = (x * 2 - 1) * half_tile_size;
+        let block_right = (x * 2 + 1) * half_tile_size;
 
-        if self.x() < (x * 2 + 1) * half_tile_size
-            && self.x() > (x * 2 - 1) * half_tile_size
+        if self.x() < block_right
+            && self.x() > block_left
             && (self.y() - self.hit_bounds().top as i32)
-            < (y * tile_size) + (self.x() - x * tile_size) / 2 - quarter_tile_size
-            && (self.y() + self.hit_bounds().bottom as i32) > (y * 2 - 1) * half_tile_size
+                < (y * tile_size) + (self.x() - x * tile_size) / 2 - quarter_tile_size
+            && (self.y() + self.hit_bounds().bottom as i32) > block_top
         {
             self.set_y(
                 (y * tile_size) + ((self.x() - x * tile_size) / 2) - quarter_tile_size + self.hit_bounds().top as i32,
@@ -385,12 +438,15 @@ pub trait PhysicalEntity {
         let tile_size = state.tile_size.as_int() * 0x200;
         let half_tile_size = tile_size / 2;
         let quarter_tile_size = half_tile_size / 2;
+        let block_top = (y * 2 - 1) * half_tile_size;
+        let block_left = (x * 2 - 1) * half_tile_size;
+        let block_right = (x * 2 + 1) * half_tile_size;
 
-        if self.x() < (x * 2 + 1) * half_tile_size
-            && self.x() > (x * 2 - 1) * half_tile_size
+        if self.x() < block_right
+            && self.x() > block_left
             && (self.y() - self.hit_bounds().top as i32)
-            < (y * tile_size) + (self.x() - x * tile_size) / 2 + quarter_tile_size
-            && (self.y() + self.hit_bounds().bottom as i32) > (y * 2 - 1) * half_tile_size
+                < (y * tile_size) + (self.x() - x * tile_size) / 2 + quarter_tile_size
+            && (self.y() + self.hit_bounds().bottom as i32) > block_top
         {
             self.set_y(
                 (y * tile_size) + ((self.x() - x * tile_size) / 2) + quarter_tile_size + self.hit_bounds().top as i32,
@@ -426,14 +482,17 @@ pub trait PhysicalEntity {
         let tile_size = state.tile_size.as_int() * 0x200;
         let half_tile_size = tile_size / 2;
         let quarter_tile_size = half_tile_size / 2;
+        let block_bottom = (y * 2 + 1) * half_tile_size;
+        let block_left = (x * 2 - 1) * half_tile_size;
+        let block_right = (x * 2 + 1) * half_tile_size;
 
         self.flags().set_hit_left_higher_half(true);
 
-        if self.x() < (x * 2 + 1) * half_tile_size
-            && self.x() > (x * 2 - 1) * half_tile_size
+        if self.x() < block_right
+            && self.x() > block_left
             && (self.y() + self.hit_bounds().bottom as i32)
-            > (y * tile_size) + (self.x() - x * tile_size) / 2 - quarter_tile_size
-            && (self.y() - self.hit_bounds().top as i32) < (y * 2 + 1) * half_tile_size
+                > (y * tile_size) + (self.x() - x * tile_size) / 2 - quarter_tile_size
+            && (self.y() - self.hit_bounds().top as i32) < block_bottom
         {
             self.set_y(
                 (y * tile_size) + ((self.x() - x * tile_size) / 2)
@@ -459,14 +518,17 @@ pub trait PhysicalEntity {
         let tile_size = state.tile_size.as_int() * 0x200;
         let half_tile_size = tile_size / 2;
         let quarter_tile_size = half_tile_size / 2;
+        let block_bottom = (y * 2 + 1) * half_tile_size;
+        let block_left = (x * 2 - 1) * half_tile_size;
+        let block_right = (x * 2 + 1) * half_tile_size;
 
         self.flags().set_hit_left_lower_half(true);
 
-        if (self.x() < (x * 2 + 1) * half_tile_size)
-            && (self.x() > (x * 2 - 1) * half_tile_size)
+        if (self.x() < block_right)
+            && (self.x() > block_left)
             && (self.y() + self.hit_bounds().bottom as i32)
-            > (y * tile_size) + (self.x() - x * tile_size) / 2 + quarter_tile_size
-            && (self.y() - self.hit_bounds().top as i32) < (y * 2 + 1) * half_tile_size
+                > (y * tile_size) + (self.x() - x * tile_size) / 2 + quarter_tile_size
+            && (self.y() - self.hit_bounds().top as i32) < block_bottom
         {
             self.set_y(
                 (y * tile_size) + ((self.x() - x * tile_size) / 2) + quarter_tile_size
@@ -491,14 +553,17 @@ pub trait PhysicalEntity {
         let tile_size = state.tile_size.as_int() * 0x200;
         let half_tile_size = tile_size / 2;
         let quarter_tile_size = half_tile_size / 2;
+        let block_bottom = (y * 2 + 1) * half_tile_size;
+        let block_left = (x * 2 - 1) * half_tile_size;
+        let block_right = (x * 2 + 1) * half_tile_size;
 
         self.flags().set_hit_right_lower_half(true);
 
-        if (self.x() < (x * 2 + 1) * half_tile_size)
-            && (self.x() > (x * 2 - 1) * half_tile_size)
+        if (self.x() < block_right)
+            && (self.x() > block_left)
             && (self.y() + self.hit_bounds().bottom as i32)
-            > (y * tile_size) - (self.x() - x * tile_size) / 2 + quarter_tile_size
-            && (self.y() - self.hit_bounds().top as i32) < (y * 2 + 1) * half_tile_size
+                > (y * tile_size) - (self.x() - x * tile_size) / 2 + quarter_tile_size
+            && (self.y() - self.hit_bounds().top as i32) < block_bottom
         {
             self.set_y(
                 (y * tile_size) - ((self.x() - x * tile_size) / 2) + quarter_tile_size
@@ -523,14 +588,17 @@ pub trait PhysicalEntity {
         let tile_size = state.tile_size.as_int() * 0x200;
         let half_tile_size = tile_size / 2;
         let quarter_tile_size = half_tile_size / 2;
+        let block_bottom = (y * 2 + 1) * half_tile_size;
+        let block_left = (x * 2 - 1) * half_tile_size;
+        let block_right = (x * 2 + 1) * half_tile_size;
 
         self.flags().set_hit_right_higher_half(true);
 
-        if (self.x() < (x * 2 + 1) * half_tile_size)
-            && (self.x() > (x * 2 - 1) * half_tile_size)
+        if (self.x() < block_right)
+            && (self.x() > block_left)
             && (self.y() + self.hit_bounds().bottom as i32)
-            > (y * tile_size) - (self.x() - x * tile_size) / 2 - quarter_tile_size
-            && (self.y() - self.hit_bounds().top as i32) < (y * 2 + 1) * half_tile_size
+                > (y * tile_size) - (self.x() - x * tile_size) / 2 - quarter_tile_size
+            && (self.y() - self.hit_bounds().top as i32) < block_bottom
         {
             self.set_y(
                 (y * tile_size)
@@ -556,11 +624,18 @@ pub trait PhysicalEntity {
     fn test_hit_upper_left_slope(&mut self, state: &mut SharedGameState, x: i32, y: i32) {
         let tile_size = state.tile_size.as_int() * 0x200;
         let half_tile_size = tile_size / 2;
+        let block_top = (y * 2 - 1) * half_tile_size;
+        let block_left = (x * 2 - 1) * half_tile_size;
+        let block_right = (x * 2 + 1) * half_tile_size;
+
+        //from upstream updates
+        // if self.x() < block_right
+        //     && self.x() > block_left
 
         if (self.x() - self.hit_bounds().left as i32) < (x * 2 + 1) * half_tile_size
             && (self.x() + self.hit_bounds().right as i32) > (x * 2 - 1) * half_tile_size
             && (self.y() - self.hit_bounds().top as i32) < (y * tile_size) - (self.x() - x * tile_size)
-            && (self.y() + self.hit_bounds().bottom as i32) > (y * 2 - 1) * half_tile_size
+            && (self.y() + self.hit_bounds().bottom as i32) > block_top
         {
             self.set_y(
                 min(y * tile_size + tile_size, (y * tile_size) - (self.x() - x * tile_size) + self.hit_bounds().top as i32)
@@ -594,11 +669,17 @@ pub trait PhysicalEntity {
     fn test_hit_upper_right_slope(&mut self, state: &mut SharedGameState, x: i32, y: i32) {
         let tile_size = state.tile_size.as_int() * 0x200;
         let half_tile_size = tile_size / 2;
+        let block_top = (y * 2 - 1) * half_tile_size;
+        let block_left = (x * 2 - 1) * half_tile_size;
+        let block_right = (x * 2 + 1) * half_tile_size;
 
+        //from upstream updates
+        // if self.x() < block_right
+        //     && self.x() > block_left
         if (self.x() - self.hit_bounds().left as i32) < (x * 2 + 1) * half_tile_size
             && (self.x() + self.hit_bounds().right as i32) > (x * 2 - 1) * half_tile_size
             && (self.y() - self.hit_bounds().top as i32) < (y * tile_size) + (self.x() - x * tile_size)
-            && (self.y() + self.hit_bounds().bottom as i32) > (y * 2 - 1) * half_tile_size
+            && (self.y() + self.hit_bounds().bottom as i32) > block_top
         {
             self.set_y(
                 min(y * tile_size + tile_size,(y * tile_size) + (self.x() - x * tile_size) + self.hit_bounds().top as i32),
@@ -633,14 +714,21 @@ pub trait PhysicalEntity {
         let tile_size = state.tile_size.as_int() * 0x200;
         let half_tile_size = tile_size / 2;
         let quarter_tile_size = half_tile_size / 2;
+        let block_bottom = (y * 2 + 1) * half_tile_size;
+        let block_left = (x * 2 - 1) * half_tile_size;
+        let block_right = (x * 2 + 1) * half_tile_size;
 
         self.flags().set_hit_left_higher_half(true);
+
+        //from upstream updates
+        // if self.x() < block_right
+        //     && self.x() > block_left
 
         if (self.x() - self.hit_bounds().left as i32) < (x * 2 + 1) * half_tile_size
             && (self.x() + self.hit_bounds().right as i32) > (x * 2 - 1) * half_tile_size
             && (self.y() + self.hit_bounds().bottom as i32)
-            > (y * tile_size) + (self.x() - x * tile_size) - quarter_tile_size
-            && (self.y() - self.hit_bounds().top as i32) < (y * 2 + 1) * half_tile_size
+                > (y * tile_size) + (self.x() - x * tile_size) - quarter_tile_size
+            && (self.y() - self.hit_bounds().top as i32) < block_bottom
         {
             self.set_y(
                 max(y * tile_size - tile_size, (y * tile_size) + (self.x() - x * tile_size) - quarter_tile_size - self.hit_bounds().bottom as i32),
@@ -664,14 +752,21 @@ pub trait PhysicalEntity {
         let tile_size = state.tile_size.as_int() * 0x200;
         let half_tile_size = tile_size / 2;
         let quarter_tile_size = half_tile_size / 2;
+        let block_bottom = (y * 2 + 1) * half_tile_size;
+        let block_left = (x * 2 - 1) * half_tile_size;
+        let block_right = (x * 2 + 1) * half_tile_size;
 
         self.flags().set_hit_right_higher_half(true);
+
+        //from upstream updates
+        // if (self.x() < block_right)
+        //     && (self.x() > block_left)
 
         if (self.x() - self.hit_bounds().left as i32) < (x * 2 + 1) * half_tile_size
             && (self.x() + self.hit_bounds().right as i32) > (x * 2 - 1) * half_tile_size
             && (self.y() + self.hit_bounds().bottom as i32)
-            > (y * tile_size) - (self.x() - x * tile_size) - quarter_tile_size
-            && (self.y() - self.hit_bounds().top as i32) < (y * 2 + 1) * half_tile_size
+                > (y * tile_size) - (self.x() - x * tile_size) - quarter_tile_size
+            && (self.y() - self.hit_bounds().top as i32) < block_bottom
         {
             self.set_y(
                 max(y * tile_size - tile_size, (y * tile_size) - (self.x() - x * tile_size) - quarter_tile_size - self.hit_bounds().bottom as i32),

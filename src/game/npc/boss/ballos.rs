@@ -1,17 +1,21 @@
-use crate::common::{CDEG_RAD, Direction, Rect};
-use crate::components::flash::Flash;
+use crate::common::{Direction, Rect, CDEG_RAD};
 use crate::framework::error::GameResult;
 use crate::game::caret::CaretType;
 use crate::game::npc::boss::BossNPC;
 use crate::game::npc::list::NPCList;
-use crate::game::npc::NPC;
-use crate::game::player::Player;
+use crate::game::npc::{NPCContext, NPC};
+use crate::game::physics::HitExtents;
 use crate::game::shared_game_state::SharedGameState;
-use crate::game::stage::Stage;
 use crate::util::rng::RNG;
 
+use super::BossNPCContext;
+
 impl NPC {
-    pub(crate) fn tick_n331_ballos_bone_projectile(&mut self, state: &mut SharedGameState) -> GameResult {
+    pub(crate) fn tick_n331_ballos_bone_projectile(
+        &mut self,
+        state: &mut SharedGameState,
+        _: NPCContext,
+    ) -> GameResult {
         match self.action_num {
             0 | 1 => {
                 self.action_num = 1;
@@ -53,7 +57,11 @@ impl NPC {
         Ok(())
     }
 
-    pub(crate) fn tick_n332_ballos_shockwave(&mut self, state: &mut SharedGameState, npc_list: &NPCList) -> GameResult {
+    pub(crate) fn tick_n332_ballos_shockwave(
+        &mut self,
+        state: &mut SharedGameState,
+        NPCContext { npc_list, .. }: NPCContext,
+    ) -> GameResult {
         match self.action_num {
             0 | 1 => {
                 if self.action_num == 0 {
@@ -93,8 +101,7 @@ impl NPC {
     pub(crate) fn tick_n333_ballos_lightning(
         &mut self,
         state: &mut SharedGameState,
-        players: [&mut Player; 2],
-        npc_list: &NPCList,
+        NPCContext { players, npc_list, .. }: NPCContext,
     ) -> GameResult {
         match self.action_num {
             0 | 1 => {
@@ -128,7 +135,11 @@ impl NPC {
         Ok(())
     }
 
-    pub(crate) fn tick_n338_green_devil(&mut self, state: &mut SharedGameState, stage: &mut Stage) -> GameResult {
+    pub(crate) fn tick_n338_green_devil(
+        &mut self,
+        state: &mut SharedGameState,
+        NPCContext { stage, .. }: NPCContext,
+    ) -> GameResult {
         match self.action_num {
             0 | 1 => {
                 if self.action_num == 0 {
@@ -171,7 +182,7 @@ impl NPC {
     pub(crate) fn tick_n339_green_devil_generator(
         &mut self,
         state: &mut SharedGameState,
-        npc_list: &NPCList,
+        NPCContext { npc_list, .. }: NPCContext,
     ) -> GameResult {
         match self.action_num {
             0 | 1 => {
@@ -201,9 +212,7 @@ impl NPC {
     pub(crate) fn tick_n340_ballos(
         &mut self,
         state: &mut SharedGameState,
-        players: [&mut Player; 2],
-        npc_list: &NPCList,
-        flash: &mut Flash,
+        NPCContext { players, npc_list, flash, .. }: NPCContext,
     ) -> GameResult {
         let player = self.get_closest_player_mut(players);
 
@@ -583,8 +592,12 @@ impl NPC {
         Ok(())
     }
 
-    pub(crate) fn tick_n341_ballos_1_head(&mut self, state: &mut SharedGameState, npc_list: &NPCList) -> GameResult {
-        if let Some(parent) = self.get_parent_ref_mut(npc_list) {
+    pub(crate) fn tick_n341_ballos_1_head(
+        &mut self,
+        state: &mut SharedGameState,
+        NPCContext { npc_list, .. }: NPCContext,
+    ) -> GameResult {
+        if let Some(parent) = self.get_parent(npc_list) {
             if parent.action_num == 11 && parent.action_counter > 50 {
                 self.anim_counter += 1;
             }
@@ -609,9 +622,7 @@ impl NPC {
     pub(crate) fn tick_n342_ballos_orbiting_eye(
         &mut self,
         state: &mut SharedGameState,
-        players: [&mut Player; 2],
-        npc_list: &NPCList,
-        boss: &mut BossNPC,
+        NPCContext { players, npc_list, boss, .. }: NPCContext,
     ) -> GameResult {
         if self.action_num < 1000 && boss.parts[0].action_num >= 1000 {
             self.action_num = 1000;
@@ -903,7 +914,7 @@ impl NPC {
     pub(crate) fn tick_n343_ballos_3_cutscene(
         &mut self,
         state: &mut SharedGameState,
-        boss: &mut BossNPC,
+        NPCContext { boss, .. }: NPCContext,
     ) -> GameResult {
         self.action_counter += 1;
         if self.action_counter > 100 {
@@ -918,7 +929,11 @@ impl NPC {
         Ok(())
     }
 
-    pub(crate) fn tick_n344_ballos_3_eyes(&mut self, state: &mut SharedGameState, boss: &mut BossNPC) -> GameResult {
+    pub(crate) fn tick_n344_ballos_3_eyes(
+        &mut self,
+        state: &mut SharedGameState,
+        NPCContext { boss, .. }: NPCContext,
+    ) -> GameResult {
         self.action_counter += 1;
         if self.action_counter > 100 {
             self.cond.set_alive(false);
@@ -935,8 +950,7 @@ impl NPC {
     pub(crate) fn tick_n345_ballos_skull_projectile(
         &mut self,
         state: &mut SharedGameState,
-        npc_list: &NPCList,
-        stage: &mut Stage,
+        NPCContext { npc_list, stage, .. }: NPCContext,
     ) -> GameResult {
         match self.action_num {
             0 | 100 => {
@@ -1004,9 +1018,7 @@ impl NPC {
     pub(crate) fn tick_n346_ballos_orbiting_platform(
         &mut self,
         state: &mut SharedGameState,
-        players: [&mut Player; 2],
-        stage: &mut Stage,
-        boss: &mut BossNPC,
+        NPCContext { players, stage, boss, .. }: NPCContext,
     ) -> GameResult {
         if self.action_num < 1000 && boss.parts[0].action_num >= 1000 {
             self.action_num = 1000;
@@ -1138,7 +1150,7 @@ impl NPC {
         Ok(())
     }
 
-    pub(crate) fn tick_n348_ballos_4_spikes(&mut self, state: &mut SharedGameState) -> GameResult {
+    pub(crate) fn tick_n348_ballos_4_spikes(&mut self, state: &mut SharedGameState, _: NPCContext) -> GameResult {
         match self.action_num {
             0 | 1 => {
                 self.action_num = 1;
@@ -1164,9 +1176,7 @@ impl NPC {
     pub(crate) fn tick_n350_flying_bute_archer(
         &mut self,
         state: &mut SharedGameState,
-        players: [&mut Player; 2],
-        npc_list: &NPCList,
-        stage: &mut Stage,
+        NPCContext { players, npc_list, stage, .. }: NPCContext,
     ) -> GameResult {
         let player = self.get_closest_player_mut(players);
 
@@ -1287,7 +1297,7 @@ impl NPC {
     pub(crate) fn tick_n353_bute_sword_flying(
         &mut self,
         state: &mut SharedGameState,
-        players: [&mut Player; 2],
+        NPCContext { players, .. }: NPCContext,
     ) -> GameResult {
         let player = self.get_closest_player_mut(players);
 
@@ -1365,8 +1375,7 @@ impl NPC {
     pub(crate) fn tick_n354_invisible_deathtrap_wall(
         &mut self,
         state: &mut SharedGameState,
-        npc_list: &NPCList,
-        stage: &mut Stage,
+        NPCContext { npc_list, stage, .. }: NPCContext,
     ) -> GameResult {
         match self.action_num {
             0 => {
@@ -1415,9 +1424,7 @@ impl BossNPC {
     pub(crate) fn tick_b09_ballos(
         &mut self,
         state: &mut SharedGameState,
-        players: [&mut Player; 2],
-        npc_list: &NPCList,
-        flash: &mut Flash,
+        BossNPCContext { players, npc_list, npc_token, flash, .. }: BossNPCContext,
     ) {
         let player = self.parts[0].get_closest_player_mut(players);
 
@@ -1430,7 +1437,7 @@ impl BossNPC {
                 self.parts[0].x = 0x28000;
                 self.parts[0].y = -0x8000;
                 self.hurt_sound[0] = 54;
-                self.parts[0].hit_bounds = Rect { left: 0x4000, top: 0x6000, right: 0x4000, bottom: 0x6000 };
+                self.parts[0].hit_bounds = HitExtents { left: 0x4000, top: 0x6000, right: 0x4000, bottom: 0x6000 };
                 self.parts[0].npc_flags.set_ignore_solidity(true);
                 self.parts[0].npc_flags.set_solid_hard(true);
                 self.parts[0].npc_flags.set_event_when_killed(true);
@@ -1445,7 +1452,7 @@ impl BossNPC {
                 self.parts[1].direction = Direction::Left;
                 self.parts[1].npc_flags.set_ignore_solidity(true);
                 self.parts[1].display_bounds = Rect { left: 0x1800, top: 0, right: 0x1800, bottom: 0x2000 };
-                self.parts[1].hit_bounds = Rect { left: 0x1800, top: 0, right: 0x1800, bottom: 0x2000 };
+                self.parts[1].hit_bounds = HitExtents { left: 0x1800, top: 0, right: 0x1800, bottom: 0x2000 };
 
                 self.parts[2] = self.parts[1].clone();
                 self.parts[2].direction = Direction::Right;
@@ -1456,21 +1463,21 @@ impl BossNPC {
                 self.parts[3].npc_flags.set_invulnerable(true);
                 self.parts[3].npc_flags.set_ignore_solidity(true);
                 self.parts[3].display_bounds = Rect { left: 0x7800, top: 0x7800, right: 0x7800, bottom: 0x7800 };
-                self.parts[3].hit_bounds = Rect { left: 0x6000, top: 0x3000, right: 0x6000, bottom: 0x4000 };
+                self.parts[3].hit_bounds = HitExtents { left: 0x6000, top: 0x3000, right: 0x6000, bottom: 0x4000 };
 
                 self.parts[4].cond.set_alive(true);
                 self.parts[4].cond.set_damage_boss(true);
                 self.parts[4].npc_flags.set_solid_soft(true);
                 self.parts[4].npc_flags.set_invulnerable(true);
                 self.parts[4].npc_flags.set_ignore_solidity(true);
-                self.parts[4].hit_bounds = Rect { left: 0x4000, top: 0x1000, right: 0x4000, bottom: 0x1000 };
+                self.parts[4].hit_bounds = HitExtents { left: 0x4000, top: 0x1000, right: 0x4000, bottom: 0x1000 };
 
                 self.parts[5].cond.set_alive(true);
                 self.parts[5].cond.set_damage_boss(true);
                 self.parts[5].npc_flags.set_solid_hard(true);
                 self.parts[5].npc_flags.set_invulnerable(true);
                 self.parts[5].npc_flags.set_ignore_solidity(true);
-                self.parts[5].hit_bounds = Rect { left: 0x4000, top: 0, right: 0x4000, bottom: 0x6000 };
+                self.parts[5].hit_bounds = HitExtents { left: 0x4000, top: 0, right: 0x4000, bottom: 0x6000 };
             }
             100 | 101 => {
                 if self.parts[0].action_num == 100 {
@@ -1763,7 +1770,7 @@ impl BossNPC {
                     self.parts[0].action_counter = 0;
                     self.parts[0].vel_x = 0;
                     self.parts[0].vel_y = 0;
-                    npc_list.kill_npcs_by_type(339, false, state);
+                    npc_list.kill_npcs_by_type(339, false, state, npc_token);
                 }
 
                 self.parts[0].y += (0x13E00 - self.parts[0].y) / 8;
@@ -1913,8 +1920,8 @@ impl BossNPC {
                     self.parts[4].cond.set_alive(false);
                     self.parts[5].cond.set_alive(false);
 
-                    npc_list.kill_npcs_by_type(350, true, state);
-                    npc_list.kill_npcs_by_type(348, true, state);
+                    npc_list.kill_npcs_by_type(350, true, state, npc_token);
+                    npc_list.kill_npcs_by_type(348, true, state, npc_token);
                 }
             }
             _ => (),

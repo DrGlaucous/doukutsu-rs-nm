@@ -257,6 +257,18 @@ impl SettingsMenu {
         self.graphics.push_entry(
             GraphicsMenuEntry::WindowMode,
             MenuEntry::Active(state.loc.t("menus.options_menu.graphics_menu.display").to_owned())
+
+            // MenuEntry::Options(
+            //     state.loc.t("menus.options_menu.graphics_menu.window_mode.entry").to_owned(),
+            //     // The value in the context can be set via CLI args, but it will be overwritten by the value in the settings,
+            //     // if they're modified
+            //     ctx.window.mode as usize,
+            //     vec![
+            //         state.loc.t("menus.options_menu.graphics_menu.window_mode.windowed").to_owned(),
+            //         state.loc.t("menus.options_menu.graphics_menu.window_mode.fullscreen").to_owned(),
+            //     ],
+            // ),
+
         );
         self.graphics.push_entry(
             GraphicsMenuEntry::LightingEffects,
@@ -697,6 +709,22 @@ impl SettingsMenu {
             CurrentMenu::GraphicsMenu => match self.graphics.tick(controller, state) {
                 MenuSelectionResult::Selected(GraphicsMenuEntry::WindowMode, _) => {
                     self.current = CurrentMenu::DisplayMenu
+                // MenuSelectionResult::Selected(GraphicsMenuEntry::WindowMode, toggle)
+                // | MenuSelectionResult::Right(GraphicsMenuEntry::WindowMode, toggle, _)
+                // | MenuSelectionResult::Left(GraphicsMenuEntry::WindowMode, toggle, _) => {
+                //     if let MenuEntry::Options(_, value, _) = toggle {
+                //         let (new_mode, new_value) = match *value {
+                //             0 => (WindowMode::Fullscreen, 1),
+                //             1 => (WindowMode::Windowed, 0),
+                //             _ => unreachable!(),
+                //         };
+
+                //         *value = new_value;
+                //         state.settings.window_mode = new_mode;
+                //         ctx.window.mode = new_mode;
+
+                //         let _ = state.settings.save(ctx);
+                //     }
                 }
                 MenuSelectionResult::Selected(GraphicsMenuEntry::VSyncMode, toggle)
                 | MenuSelectionResult::Right(GraphicsMenuEntry::VSyncMode, toggle, _) => {

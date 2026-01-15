@@ -1,20 +1,18 @@
 use num_traits::clamp;
 
-use crate::common::{CDEG_RAD, Direction};
+use crate::common::{Direction, CDEG_RAD};
 use crate::framework::error::GameResult;
 use crate::game::caret::CaretType;
-use crate::game::npc::list::NPCList;
-use crate::game::npc::NPC;
-use crate::game::player::Player;
+use crate::game::npc::list::BorrowedNPC;
+use crate::game::npc::{NPCContext, NPC};
 use crate::game::shared_game_state::SharedGameState;
-use crate::game::stage::Stage;
 use crate::util::rng::RNG;
 
-impl NPC {
+impl BorrowedNPC<'_> {
     pub(crate) fn tick_n009_balrog_falling_in(
         &mut self,
         state: &mut SharedGameState,
-        npc_list: &NPCList,
+        NPCContext { npc_list, .. }: NPCContext,
     ) -> GameResult {
         match self.action_num {
             0 | 1 => {
@@ -81,8 +79,7 @@ impl NPC {
     pub(crate) fn tick_n010_balrog_shooting(
         &mut self,
         state: &mut SharedGameState,
-        players: [&mut Player; 2],
-        npc_list: &NPCList,
+        NPCContext { players, npc_list, .. }: NPCContext,
     ) -> GameResult {
         let player = self.get_closest_player_mut(players);
 
@@ -182,7 +179,7 @@ impl NPC {
         Ok(())
     }
 
-    pub(crate) fn tick_n011_balrogs_projectile(&mut self, state: &mut SharedGameState) -> GameResult {
+    pub(crate) fn tick_n011_balrogs_projectile(&mut self, state: &mut SharedGameState, _: NPCContext) -> GameResult {
         if self.flags.hit_anything() {
             self.cond.set_alive(false);
             state.create_caret(self.x, self.y, CaretType::ProjectileDissipation, Direction::Left);
@@ -207,9 +204,7 @@ impl NPC {
     pub(crate) fn tick_n012_balrog_cutscene(
         &mut self,
         state: &mut SharedGameState,
-        players: [&mut Player; 2],
-        npc_list: &NPCList,
-        stage: &mut Stage,
+        NPCContext { players, npc_list, stage, .. }: NPCContext,
     ) -> GameResult {
         match self.action_num {
             0 | 1 => {
@@ -452,8 +447,8 @@ impl NPC {
                     self.vel_y = -0x800;
                     self.npc_flags.set_ignore_solidity(true);
 
-                    npc_list.kill_npcs_by_type(150, false, state);
-                    npc_list.kill_npcs_by_type(117, false, state);
+                    npc_list.kill_npcs_by_type(150, false, state, self);
+                    npc_list.kill_npcs_by_type(117, false, state, self);
 
                     let mut npc = NPC::create(355, &state.npc_table);
                     npc.cond.set_alive(true);
@@ -542,7 +537,11 @@ impl NPC {
         Ok(())
     }
 
-    pub(crate) fn tick_n019_balrog_bust_in(&mut self, state: &mut SharedGameState, npc_list: &NPCList) -> GameResult {
+    pub(crate) fn tick_n019_balrog_bust_in(
+        &mut self,
+        state: &mut SharedGameState,
+        NPCContext { npc_list, .. }: NPCContext,
+    ) -> GameResult {
         match self.action_num {
             0 | 1 => {
                 if self.action_num == 0 {
@@ -619,7 +618,7 @@ impl NPC {
         Ok(())
     }
 
-    pub(crate) fn tick_n033_balrog_bouncing_projectile(&mut self, state: &mut SharedGameState) -> GameResult {
+    pub(crate) fn tick_n033_balrog_bouncing_projectile(&mut self, state: &mut SharedGameState, _: NPCContext) -> GameResult {
         if self.flags.hit_left_wall() || self.flags.hit_right_wall() {
             self.cond.set_alive(false);
             state.create_caret(self.x, self.y, CaretType::ProjectileDissipation, Direction::Left);
@@ -656,8 +655,7 @@ impl NPC {
     pub(crate) fn tick_n036_balrog_hover(
         &mut self,
         state: &mut SharedGameState,
-        players: [&mut Player; 2],
-        npc_list: &NPCList,
+        NPCContext { players, npc_list, .. }: NPCContext,
     ) -> GameResult {
         let player = self.get_closest_player_mut(players);
 
@@ -819,8 +817,7 @@ impl NPC {
     pub(crate) fn tick_n068_balrog_running(
         &mut self,
         state: &mut SharedGameState,
-        mut players: [&mut Player; 2],
-        npc_list: &NPCList,
+        NPCContext { mut players, npc_list, .. }: NPCContext,
     ) -> GameResult {
         match self.action_num {
             0 | 1 => {
@@ -1000,8 +997,7 @@ impl NPC {
     pub(crate) fn tick_n169_balrog_shooting_missiles(
         &mut self,
         state: &mut SharedGameState,
-        mut players: [&mut Player; 2],
-        npc_list: &NPCList,
+        NPCContext { mut players, npc_list, .. }: NPCContext,
     ) -> GameResult {
         match self.action_num {
             0 | 1 => {
@@ -1217,8 +1213,7 @@ impl NPC {
     pub(crate) fn tick_n170_balrog_missile(
         &mut self,
         state: &mut SharedGameState,
-        players: [&mut Player; 2],
-        npc_list: &NPCList,
+        NPCContext { players, npc_list, .. }: NPCContext,
     ) -> GameResult {
         if (self.direction == Direction::Left && self.flags.hit_left_wall())
             || (self.direction == Direction::Right && self.flags.hit_right_wall())
@@ -1279,7 +1274,7 @@ impl NPC {
         Ok(())
     }
 
-    pub(crate) fn tick_n306_balrog_nurse(&mut self, state: &mut SharedGameState) -> GameResult {
+    pub(crate) fn tick_n306_balrog_nurse(&mut self, state: &mut SharedGameState, _: NPCContext) -> GameResult {
         match self.action_num {
             0 | 1 => {
                 if self.action_num == 0 {
@@ -1315,8 +1310,7 @@ impl NPC {
     pub(crate) fn tick_n356_balrog_rescuing(
         &mut self,
         state: &mut SharedGameState,
-        players: [&mut Player; 2],
-        npc_list: &NPCList,
+        NPCContext { players, npc_list, .. }: NPCContext,
     ) -> GameResult {
         match self.action_num {
             0 | 11 => {

@@ -9,7 +9,7 @@ use std::ffi::CStr;
 use libc::{c_char, c_uint};
 //use libretro_rs::retro::JoypadButton;
 use std::ffi::c_void;
-
+use log::LevelFilter as LogLevel;
 
 //use doukutsu_rs::framework::backend::BackendEventLoop;
 use doukutsu_rs::framework::backend_libretro::{LibretroEventLoop, LibretroBackend, RenderMode};
@@ -260,7 +260,10 @@ impl<'a>  Core<'a>  {
 
         let options = doukutsu_rs::game::LaunchOptions {
             server_mode: false,
-            editor: false,
+            window_height: None,
+            window_width: None,
+            window_fullscreen: false,
+            log_level: LogLevel::Info,
             return_types: true,
             external_timer: true,
             resource_dir: Some(resource_dir),
